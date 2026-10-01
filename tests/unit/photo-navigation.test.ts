@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { formatBRL } from "@/lib/money/format";
 import { PHOTO_MAX_BYTES, PHOTO_PATH_PATTERN, productPhotoPath, validatePhoto } from "@/lib/validation/photo";
 import { NAV_ITEMS, homeFor, navigationFor } from "@/modules/access/navigation";
-import { canManagePhotos, parseRole, ROLES } from "@/modules/access/roles";
+import { can } from "@/modules/access/permissions";
+import { parseRole, ROLES } from "@/modules/access/roles";
 
 describe("validatePhoto (A36)", () => {
   it("aceita JPEG/PNG/WebP até 2 MB", () => {
@@ -26,8 +27,10 @@ describe("validatePhoto (A36)", () => {
 });
 
 describe("navegação por papel (A37)", () => {
-  it("responsável só vê portal; equipe só vê operação", () => {
-    expect(navigationFor("guardian").every((i) => i.href.startsWith("/portal"))).toBe(true);
+  it("família (responsável e aluno) só vê portal; equipe só vê operação", () => {
+    for (const role of ["guardian", "student"] as const) {
+      expect(navigationFor(role).every((i) => i.href.startsWith("/portal"))).toBe(true);
+    }
     for (const role of ["cantina", "secretaria", "admin"] as const) {
       expect(navigationFor(role).every((i) => i.href.startsWith("/operacao"))).toBe(true);
     }
@@ -54,11 +57,11 @@ describe("papéis e dinheiro", () => {
     expect(parseRole("admin")).toBe("admin");
     expect(parseRole("root")).toBeNull();
     expect(parseRole(undefined)).toBeNull();
-    expect(canManagePhotos("guardian")).toBe(false);
-    expect(canManagePhotos("secretaria")).toBe(false);
-    expect(canManagePhotos(null)).toBe(false);
-    expect(canManagePhotos("cantina")).toBe(true);
-    expect(canManagePhotos("admin")).toBe(true);
+    expect(can({ role: "guardian" }, "catalog.photos.manage")).toBe(false);
+    expect(can({ role: "secretaria" }, "catalog.photos.manage")).toBe(false);
+    expect(can({ role: null }, "catalog.photos.manage")).toBe(false);
+    expect(can({ role: "cantina" }, "catalog.photos.manage")).toBe(true);
+    expect(can({ role: "admin" }, "catalog.photos.manage")).toBe(true);
   });
   it("formata centavos em BRL", () => {
     expect(formatBRL(450).replace(/\s/g, " ")).toBe("R$ 4,50");

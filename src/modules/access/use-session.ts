@@ -1,37 +1,58 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { useEffect, useRef, useState } from "react";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import { doc, onSnapshot } from "firebase/firestore";
 import { getFirebaseClient } from "@/lib/firebase/client";
-import { parseRole, type Role } from "./roles";
+import { parseProfile } from "./profile";
+import type { ExtraPermission, Role } from "./roles";
+
+export type SignedOutNotice = "disabled" | null;
 
 export type Session =
   | { status: "loading" }
-  | { status: "signedOut" }
-  | { status: "signedIn"; user: User; role: Role };
+  | { status: "signedOut"; notice: SignedOutNotice }
+  | { status: "signedIn"; user: User; role: Role; permissions: readonly ExtraPermission[] }
+  /** Autenticado, mas sem perfil de acesso válido: nada é liberado (a escola precisa conceder o acesso). */
+  | { status: "denied"; user: User };
 
 /**
- * Sessão do Firebase Web Auth. O papel vem da claim do ID token e serve só para montar a navegação:
- * a autorização real é do servidor e das Rules. Sem claim = responsável (padrão provisório até F03).
+ * Sessão do Firebase Web Auth + perfil de acesso ao vivo (`users/{uid}`). O papel só monta a navegação: a
+ * autorização real é do servidor e das Rules, que leem o mesmo perfil. Mudança de papel atualiza a navegação;
+ * desativação encerra a sessão local. Listener do perfil é desligado no logout e na desmontagem.
  */
 export function useSession(): Session {
   const [session, setSession] = useState<Session>({ status: "loading" });
+  const notice = useRef<SignedOutNotice>(null);
 
   useEffect(() => {
-    let active = true;
-    const unsubscribe = onAuthStateChanged(getFirebaseClient().auth, (user) => {
+    const { auth, db } = getFirebaseClient();
+    let stopProfile: (() => void) | null = null;
+    const stopAuth = onAuthStateChanged(auth, (user) => {
+      stopProfile?.();
+      stopProfile = null;
       if (!user) {
-        setSession({ status: "signedOut" });
+        setSession({ status: "signedOut", notice: notice.current });
+        notice.current = null;
         return;
       }
-      void user.getIdTokenResult().then(
-        (token) => active && setSession({ status: "signedIn", user, role: parseRole(token.claims.role) ?? "guardian" }),
-        () => active && setSession({ status: "signedOut" }),
+      setSession({ status: "loading" });
+      stopProfile = onSnapshot(
+        doc(db, "users", user.uid),
+        (snap) => {
+          const profile = snap.exists() ? parseProfile(snap.data()) : null;
+          if (!profile) setSession({ status: "denied", user });
+          else if (profile.status !== "active") {
+            notice.current = "disabled";
+            void signOut(auth);
+          } else setSession({ status: "signedIn", user, role: profile.role, permissions: profile.permissions });
+        },
+        () => setSession({ status: "denied", user }),
       );
     });
     return () => {
-      active = false;
-      unsubscribe();
+      stopProfile?.();
+      stopAuth();
     };
   }, []);
 

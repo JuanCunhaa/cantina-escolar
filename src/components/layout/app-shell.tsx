@@ -2,16 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { signOut } from "firebase/auth";
 import { getFirebaseClient } from "@/lib/firebase/client";
-import { homeFor, navigationFor } from "@/modules/access/navigation";
+import { areaFor, homeFor, navigationFor } from "@/modules/access/navigation";
 import type { Role } from "@/modules/access/roles";
+import { signOutEverywhere } from "@/modules/access/session-actions";
 import { useSession } from "@/modules/access/use-session";
 import { SignInForm } from "./sign-in-form";
 
 const ROLE_LABEL: Record<Role, string> = {
   guardian: "Responsável",
+  student: "Aluno",
   cantina: "Cantina",
   secretaria: "Secretaria",
   admin: "Administração",
@@ -21,8 +23,20 @@ const ROLE_LABEL: Record<Role, string> = {
 export function AppShell({ area, children }: { area: "portal" | "operacao"; children: ReactNode }) {
   const session = useSession();
   const pathname = usePathname();
+  const [everywhereError, setEverywhereError] = useState(false);
   const role = session.status === "signedIn" ? session.role : null;
-  const allowed = role !== null && (area === "portal" ? role === "guardian" : role !== "guardian");
+  const allowed = role !== null && areaFor(role) === area;
+  const user = session.status === "signedIn" || session.status === "denied" ? session.user : null;
+
+  async function leaveEverywhere() {
+    if (!user) return;
+    setEverywhereError(false);
+    try {
+      await signOutEverywhere(user);
+    } catch {
+      setEverywhereError(true);
+    }
+  }
 
   return (
     <>
@@ -31,17 +45,26 @@ export function AppShell({ area, children }: { area: "portal" | "operacao"; chil
       </a>
       <header className="shell-header">
         <span className="shell-brand">Cantina Escolar · demonstração</span>
-        {session.status === "signedIn" && (
+        {user && (
           <>
             <span className="shell-user">
-              {session.user.email} · {ROLE_LABEL[session.role]}
+              {user.email}
+              {role ? ` · ${ROLE_LABEL[role]}` : ""}
             </span>
             <button type="button" className="secondary" onClick={() => void signOut(getFirebaseClient().auth)}>
               Sair
             </button>
+            <button type="button" className="secondary" onClick={() => void leaveEverywhere()}>
+              Sair de todos os dispositivos
+            </button>
           </>
         )}
       </header>
+      {everywhereError && (
+        <p role="alert" className="notice notice-error shell-main">
+          Não foi possível encerrar as outras sessões agora. Tente novamente.
+        </p>
+      )}
       {role && allowed && (
         <nav className="shell-nav" aria-label="Navegação principal">
           <ul>
@@ -63,7 +86,13 @@ export function AppShell({ area, children }: { area: "portal" | "operacao"; chil
       )}
       <main id="conteudo" className="shell-main" tabIndex={-1}>
         {session.status === "loading" && <p role="status">Carregando…</p>}
-        {session.status === "signedOut" && <SignInForm />}
+        {session.status === "signedOut" && <SignInForm notice={session.notice} />}
+        {session.status === "denied" && (
+          <section>
+            <h1>Acesso ainda não liberado</h1>
+            <p>Sua conta existe, mas a escola ainda não liberou um perfil de acesso. Fale com a secretaria.</p>
+          </section>
+        )}
         {session.status === "signedIn" && !allowed && (
           <section>
             <h1>Área indisponível para o seu perfil</h1>

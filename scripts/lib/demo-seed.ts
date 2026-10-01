@@ -93,10 +93,48 @@ async function expectOk(response: Response, what: string): Promise<void> {
   if (!response.ok) throw new Error(`${what} falhou: ${response.status} ${await response.text()}`);
 }
 
-/** Cria (ou reutiliza) uma conta fictícia no Auth Emulator, opcionalmente com a claim provisória `role`. */
+export type DemoProfile = {
+  role: "guardian" | "student" | "cantina" | "secretaria" | "admin";
+  status?: "active" | "disabled";
+  permissions?: string[];
+  displayName?: string;
+};
+
+type Plain = string | number | boolean | null | Plain[];
+
+function toValue(value: Plain): Record<string, unknown> {
+  if (value === null) return { nullValue: null };
+  if (typeof value === "string") return { stringValue: value };
+  if (typeof value === "boolean") return { booleanValue: value };
+  if (typeof value === "number") return { integerValue: String(value) };
+  return { arrayValue: { values: value.map(toValue) } };
+}
+
+/** Grava um documento no Firestore Emulator com o token "owner" (ignora Rules). Só emulador local. */
+export async function writeDemoDoc(target: EmulatorTarget, path: string, data: Record<string, Plain>): Promise<void> {
+  assertLocal(target);
+  const fields = Object.fromEntries(Object.entries(data).map(([k, v]) => [k, toValue(v)]));
+  const url = `http://${target.firestoreHost}/v1/projects/${target.project}/databases/(default)/documents/${path}`;
+  const response = await fetch(url, { method: "PATCH", headers: { "content-type": "application/json", ...OWNER }, body: JSON.stringify({ fields }) });
+  await expectOk(response, `documento ${path}`);
+}
+
+/** Perfil de acesso fictício em users/{uid} (fonte do papel; ver src/modules/access/profile.ts). */
+export async function setDemoProfile(target: EmulatorTarget, uid: string, email: string, profile: DemoProfile): Promise<void> {
+  await writeDemoDoc(target, `users/${uid}`, {
+    email,
+    displayName: profile.displayName ?? email.split("@")[0] ?? email,
+    role: profile.role,
+    status: profile.status ?? "active",
+    permissions: profile.permissions ?? [],
+    accessVersion: 1,
+  });
+}
+
+/** Cria (ou reutiliza) uma conta fictícia no Auth Emulator; com `role`, grava também o perfil de acesso. */
 export async function ensureAccount(
   target: EmulatorTarget,
-  account: { email: string; password: string; role?: string },
+  account: { email: string; password: string; role?: DemoProfile["role"] },
 ): Promise<string> {
   assertLocal(target);
   const base = `http://${target.authHost}/identitytoolkit.googleapis.com/v1`;
@@ -106,19 +144,8 @@ export async function ensureAccount(
   if (!response.ok) response = await fetch(`${base}/accounts:signInWithPassword?key=fake`, { method: "POST", headers, body });
   await expectOk(response, `conta ${account.email}`);
   const { localId } = (await response.json()) as { localId: string };
-  if (account.role) await setRoleClaim(target, localId, account.role);
+  if (account.role) await setDemoProfile(target, localId, account.email, { role: account.role });
   return localId;
-}
-
-export async function setRoleClaim(target: EmulatorTarget, uid: string, role: string): Promise<void> {
-  assertLocal(target);
-  const url = `http://${target.authHost}/identitytoolkit.googleapis.com/v1/projects/${target.project}/accounts:update`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json", ...OWNER },
-    body: JSON.stringify({ localId: uid, customAttributes: JSON.stringify({ role }) }),
-  });
-  await expectOk(response, `claim de ${uid}`);
 }
 
 async function uploadPhoto(target: EmulatorTarget, path: string, data: Buffer): Promise<void> {

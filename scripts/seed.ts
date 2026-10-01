@@ -5,10 +5,12 @@ import { ensureAccount, seedDemoCatalog, targetFromEnv } from "./lib/demo-seed.t
 const target = targetFromEnv();
 
 try {
-  const accounts = [
-    { email: "familia-a@example.test", password: "senha-fake-a-123" },
-    { email: "familia-b@example.test", password: "senha-fake-b-123" },
+  const accounts: Parameters<typeof ensureAccount>[1][] = [
+    { email: "familia-a@example.test", password: "senha-fake-a-123", role: "guardian" },
+    { email: "familia-b@example.test", password: "senha-fake-b-123", role: "guardian" },
     { email: "cantina@example.test", password: "senha-fake-c-123", role: "cantina" },
+    { email: "secretaria@example.test", password: "senha-fake-s-123", role: "secretaria" },
+    { email: "admin@example.test", password: "senha-fake-d-123", role: "admin" },
   ];
   for (const account of accounts) {
     await ensureAccount(target, account);

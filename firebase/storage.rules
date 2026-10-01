@@ -1,9 +1,14 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Papel provisório (F02): custom claim `role` definida só pelo servidor/Admin. F03 formaliza papéis e pode substituir.
+    // F03: papel e situação lidos do perfil ATUAL (users/{uid}, regra entre serviços Firestore). Revogação vale
+    // imediatamente; a claim do token não é usada. Conta sem perfil ativo não lê nem escreve.
+    function profilePath() { return /databases/(default)/documents/users/$(request.auth.uid); }
+    function activeUser() {
+      return request.auth != null && firestore.exists(profilePath()) && firestore.get(profilePath()).data.status == 'active';
+    }
     function isPhotoStaff() {
-      return request.auth != null && request.auth.token.get('role', '') in ['admin', 'cantina'];
+      return activeUser() && firestore.get(profilePath()).data.role in ['admin', 'cantina'];
     }
     function validPhoto() {
       return request.resource.size > 0
@@ -11,11 +16,11 @@ service firebase.storage {
         && request.resource.contentType.matches('image/(jpeg|png|webp)');
     }
 
-    // Fotos do cardápio (imutáveis após criadas: substituir = novo arquivo; evita trocar o conteúdo depois da validação do servidor): leitura para qualquer conta autenticada; escrita só de funcionário autorizado,
+    // Fotos do cardápio (imutáveis após criadas: substituir = novo arquivo; evita trocar o conteúdo depois da validação do servidor): leitura para conta com perfil ativo; escrita só de funcionário autorizado,
     // com caminho products/{productId}/{arquivo}, tipo e tamanho validados. Rules não inspecionam bytes:
     // o servidor confere metadados ao registrar a foto (/api/catalog/photo).
     match /products/{productId}/{fileName} {
-      allow read: if request.auth != null;
+      allow read: if activeUser();
       allow create: if resource == null && isPhotoStaff() && validPhoto() && fileName.matches('[A-Za-z0-9_-]{1,64}[.](jpg|png|webp)');
       allow delete: if isPhotoStaff();
     }

@@ -6,7 +6,7 @@ import type { Actor } from "./actor";
 /**
  * Comando de prova de F01: credita centavos numa carteira fictícia do próprio ator.
  * Exercita o roteiro de docs/firebase/transactions.md (idempotência, leituras antes de escritas,
- * livro imutável + saldo na mesma transação, efeito externo fora do callback). Não é a carteira real (F04).
+ * livro imutável + saldo na mesma transação, efeito externo fora do callback). Não é a carteira real (F08).
  */
 export const probeInputSchema = z.object({
   key: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/),

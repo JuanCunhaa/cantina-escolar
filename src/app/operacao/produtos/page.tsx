@@ -1,13 +1,13 @@
 "use client";
 
 import { PhotoManager } from "@/modules/catalog/components/photo-manager";
-import { canManagePhotos } from "@/modules/access/roles";
+import { can } from "@/modules/access/permissions";
 import { useSession } from "@/modules/access/use-session";
 
 export default function ProdutosPage() {
   const session = useSession();
   if (session.status !== "signedIn") return null;
-  if (!canManagePhotos(session.role)) {
+  if (!can(session, "catalog.photos.manage")) {
     return (
       <section>
         <h1>Produtos e fotos</h1>

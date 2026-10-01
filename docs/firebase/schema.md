@@ -26,3 +26,13 @@ Não gravar arrays crescentes de todos os pedidos, movimentos ou imagens em um d
 Cada transação sensível lê documentos conhecidos e pequenos: carteira, política, aluno/vínculo, uso diário/semanal, produtos/estoque/cotas, idempotência e pedido quando aplicável. Faça todas as leituras necessárias antes das gravações, conforme o SDK adotado. IDs e resultados devem ser estáveis nas retentativas; efeito HTTP/email/upload fica fora do callback. Não depender de total calculado por consulta de pedidos fora da transação para garantir um limite: use documentos de comprometimento por aluno/data/semana.
 
 Cadastros mutáveis, permissões e estoque que invalidam um checkout devem estar incluídos na leitura transacional relevante. Não manter saldo e livro em transações separadas. Transferência, entrega parcial e reagendamento precisam da mesma disciplina.
+
+### Campos de acesso (F03)
+
+Contrato de acesso já usado por Rules, servidor e testes; F04+ criam/gerenciam os documentos, mas devem respeitar estes nomes.
+
+- `users/{uid}`: `email`, `displayName`, `role` (`guardian|student|cantina|secretaria|admin`), `status` (`active|disabled`), `permissions` (lista de extras; hoje só `topup.reverse`, só secretaria), `accessVersion` (inteiro ≥ 1, +1 a cada mudança), `updatedAt`. Fonte ATUAL do papel (a claim do token não é usada). Escrita só pelo servidor (`setUserAccess`); o dono lê o próprio documento. Conta autenticada sem perfil ativo não lê nada.
+- `students/{studentId}`: além dos campos de F04, `status` (`active|inactive`) e `userUid` (uid do login do aluno ou `null`). Perfil necessário para equipe, responsável vinculado ativo e o próprio aluno; sem custos/dados administrativos.
+- `guardianStudentLinks/{guardianUid_studentId}`: `guardianUid`, `studentId`, `status` (`active|revoked`). Revogar = `status: revoked` (nunca apagar). O responsável lista os próprios vínculos com `where guardianUid == uid` e `status == active`.
+- `studentPolicies/{studentId}`: `allowSitePurchase`, `allowCounterPurchase` (booleanos; ausência = negado), mais limites/bloqueios de F09. Leitura: PDV/administração, responsável vinculado e o próprio aluno (secretaria não).
+- `auditLog/{id}`: `action`, `actorUid`, `actorRole`, `target{type,id}`, `reason`, `before`, `after`, `createdAt`. ID derivado da operação; criada na mesma transação do comando; nunca lida nem escrita pelo cliente.

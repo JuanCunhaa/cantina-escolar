@@ -22,3 +22,12 @@ Sem execução de testes da aplicação nesta entrega. Adicionar tarefa, commit/
 - Falhas resolvidas: lint react-hooks/set-state-in-effect (estado chaveado por uid/caminho); e2e: foco do Tab após login, alert duplicado do route announcer, 1ª compilação de rota no dev server.
 - `npm run audit:prod`: 2 achados já existentes (@grpc/grpc-js alto, uuid moderado via firebase/firebase-admin); sem dependência nova em F02; não corrigido (a correção sugerida rebaixa firebase para 9.x).
 - Não executado: Gitleaks/Semgrep (indisponíveis), Turbopack, CI, homologação Firebase real, axe automatizado.
+
+## F03 — autenticação, papéis e autorização (30/09/2026)
+- Arquivos: src/modules/access/{roles,permissions,errors,profile,actor,authorize,http,users-command,use-session,session-actions,navigation}.ts, src/modules/audit/log.ts, src/app/api/{admin/users,session/revoke}/route.ts (+ probe e catalog/photo adaptados), src/components/layout/{app-shell,sign-in-form}.tsx, src/modules/catalog/photo.ts, src/app/operacao/produtos/page.tsx, firebase/{firestore,storage}.rules, scripts/{seed,lib/demo-seed}.ts, tests/{unit/access,unit/photo-navigation,rules,integration/access-api,e2e/access,helpers}, docs (decisions, schema, status/dependency-audit.md).
+- Resultados: typecheck 0; lint 0; unit 34/34; rules 26/26; integration 46/46; e2e 12/12 (F01 1 + F02 6 + F03 5); build:webpack 0. Skills: cantina-token-economy, -testing, -firebase, -ui, -security, -verify (via ferramenta Skill).
+- Papel migrou de claim para `users/{uid}` (servidor + Firestore Rules + Storage Rules entre serviços, comprovado no emulador). Revogação formalizada e testada (ver decisões de F03).
+- Achado de revisão corrigido: administrador rebaixado no meio da requisição ainda poderia concluir o comando → perfil do ator relido dentro da transação (teste de regressão).
+- Observação: em 1 de 4 execuções completas de `test:integration`, `probe-command` (F01, 12 escritas concorrentes no mesmo documento) falhou com `10 ABORTED: Transaction lock timeout` do emulador; passou isolado, em 2 reexecuções completas e no commit anterior (git stash). Tratado como instabilidade de carga do emulador, não explicada a fundo; reavaliar se reaparecer.
+- audit:prod: análise em docs/status/dependency-audit.md (não alcançáveis em produção; override compatível validado só no lockfile, NÃO aplicado).
+- Não executado: Gitleaks/Semgrep (indisponíveis nesta máquina), Turbopack, CI, homologação Firebase real (incl. regra entre serviços do Storage), axe automatizado.

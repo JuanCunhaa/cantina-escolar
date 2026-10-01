@@ -6,8 +6,19 @@
   },
   "A02": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/rules (emulador): dois responsáveis vinculados leem o mesmo aluno/política; sem vínculo e vínculo revogado negados (revogação imediata no mesmo contexto); nenhum cliente escreve aluno/vínculo/política; sem list de alunos/políticas",
+      "tests/integration/access-api.test.ts: authorizeStudent (Admin SDK, também em transação) — dois responsáveis view/manage; sem vínculo, ID malformado e aluno inexistente negados; revogar um vínculo não afeta o outro",
+      "tests/unit/access.test.ts: decideStudentAction",
+      "npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 34/34",
+      "npm run test:rules 26/26",
+      "npm run test:integration 46/46",
+      "npm run test:e2e 12/12",
+      "npm run build:webpack exit 0"
+    ],
+    "notes": "Parcial (F03, 30/09/2026): acesso por vínculo provado em leitura (Rules) e em autorização de servidor. Alteração de configuração por AMBOS os responsáveis (limites/permissões/bloqueios, com auditoria de autor) depende de F04 (vínculos reais) e F09 (políticas); manter not_run."
   },
   "A03": {
     "status": "not_run",
@@ -36,8 +47,18 @@
   },
   "A08": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/integration/access-api.test.ts: política allowSitePurchase/allowCounterPurchase revogada nega purchase.site do aluno e purchase.counter (PDV) imediatamente; consulta do aluno e compra do responsável seguem; aluno inativo não compra",
+      "tests/unit/access.test.ts: matriz completa de decideStudentAction",
+      "npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 34/34",
+      "npm run test:rules 26/26",
+      "npm run test:integration 46/46",
+      "npm run test:e2e 12/12",
+      "npm run build:webpack exit 0"
+    ],
+    "notes": "Parcial: decisão de autorização provada com política atual. Checkout (F11) e PDV (F15) ainda não existem para exercitar o bloqueio nem para provar que pedidos existentes permanecem; manter not_run."
   },
   "A09": {
     "status": "not_run",
@@ -146,8 +167,20 @@
   },
   "A30": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/integration/access-api.test.ts: POST /api/admin/users — aluno, responsável, cantina, secretaria e conta sem perfil recebem 403 (nada muda); 401 sem token; claim forjada role=admin não concede nada",
+      "tests/unit/access.test.ts: matriz de capacidades — secretaria só students.search/topup.register (sem costs.read/profit.read/audit.read/users.manage); estorno manual só com permissão extra explícita",
+      "tests/rules: nenhum papel (inclusive admin) lê custos/lucro/relatórios/auditoria pelo cliente; secretaria não lê studentPolicies",
+      "tests/e2e/access.spec.ts: aluno não alcança a operação; conta sem perfil não recebe navegação nem produtos",
+      "npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 34/34",
+      "npm run test:rules 26/26",
+      "npm run test:integration 46/46",
+      "npm run test:e2e 12/12",
+      "npm run build:webpack exit 0"
+    ],
+    "notes": "Parcial: negação por API administrativa e matriz provadas; ainda não há rotas/telas de custos, lucro e relatórios (F06/F10/F21) para provar que a secretaria é negada nelas; manter not_run."
   },
   "A31": {
     "status": "not_run",
@@ -170,18 +203,34 @@
   "A33": {
     "status": "not_run",
     "evidence": [
-      "tests/rules/firestore-storage.rules.test.ts: família B não lê A; anônimo negado; sem list amplo; cliente não escreve saldo/livro/docs alheios; wallets/users/students/products/stockBalances/idempotencyRecords deny-all",
-      "tests/integration/probe-route.test.ts: ator sempre do token, 401 sem/invalid/revogado"
+      "tests/rules (emulador): isolamento família A×B (vínculos), perfil só do dono, cliente não escreve papel/perfil/aluno/vínculo/política/auditoria (nem admin), desativado/sem perfil/claim forjada sem acesso, deny-all para carteira, estoque, produtos, idempotência",
+      "tests/integration/probe-route.test.ts + access-api.test.ts: ator sempre do token+perfil atual; token revogado/conta desativada 401; perfil desativado 403 account_inactive",
+      "tests/e2e/access.spec.ts: login/recuperação com mensagens genéricas; sair de todos os dispositivos",
+      "npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 34/34",
+      "npm run test:rules 26/26",
+      "npm run test:integration 46/46",
+      "npm run test:e2e 12/12",
+      "npm run build:webpack exit 0"
     ],
-    "notes": "Parcial: prova a base deny-all e o isolamento da prova de fundação. Papéis, vínculos, secretaria/custos e aluno-admin por API dependem de F03+; manter not_run até lá."
+    "notes": "Parcial: provado para papéis, vínculos, políticas e prova de fundação. Carteira, pedidos, estoque, preço e relatórios reais ainda não existem (F06/F08+/F21); manter not_run."
   },
   "A34": {
     "status": "not_run",
     "evidence": [
-      "tests/e2e/foundation.spec.ts: duas contas, listener do próprio uid atualiza após commit do servidor, outra conta não muda, logout desliga e limpa, troca de conta sem vazamento",
-      "foundation-probe.tsx sinaliza cache (fromCache) como não confirmado"
+      "tests/e2e/foundation.spec.ts: listener de saldo de prova atualiza após commit, outra conta não muda, logout desliga e limpa",
+      "tests/e2e/access.spec.ts: perfil ao vivo — rebaixar muda a tela e retira a lista de produtos sem recarregar, devolver papel restaura, desativar encerra a sessão com aviso; listener do perfil desligado no logout",
+      "tests/rules: listener de perfil próprio e consultas de vínculos limitadas ao próprio uid; sem coleções amplas",
+      "npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 34/34",
+      "npm run test:rules 26/26",
+      "npm run test:integration 46/46",
+      "npm run test:e2e 12/12",
+      "npm run build:webpack exit 0"
     ],
-    "notes": "Parcial: listener de saldo de prova. Pedidos/estoque e troca de aluno reais dependem de F04+/F06; manter not_run."
+    "notes": "Parcial: sessão/perfil/vínculos e saldo de prova. Saldo/pedidos/estoque reais e troca de aluno dependem de F08+/F12; dado de cache não confirmar compra segue só para a prova; manter not_run."
   },
   "A35": {
     "status": "not_run",
@@ -196,9 +245,10 @@
     "evidence": [
       "tests/rules (Storage, emulador): só cantina/admin criam foto; responsável/secretaria/papel desconhecido/anônimo negados; tipo (svg/pdf/html/gif), vazio, >2 MB, nome e caminho validados; sem sobrescrita; leitura só autenticada; caminho privado negado a todos",
       "tests/integration/photo-route.test.ts (21/21 com a suíte): 401/403/404 em produção, caminho de outro produto, arquivo com conteúdo falso removido (422), tipo divergente, >2 MB, inexistente",
-      "tests/e2e/shell-photos.spec.ts: funcionário envia PNG válido (fallback vira foto), txt e >2 MB recusados no cliente, PNG falso recusado pelo servidor; 3 fotos reais + 1 fallback no portal"
+      "tests/e2e/shell-photos.spec.ts: funcionário envia PNG válido (fallback vira foto), txt e >2 MB recusados no cliente, PNG falso recusado pelo servidor; 3 fotos reais + 1 fallback no portal",
+      "F03: tests/rules — upload/leitura por perfil ativo; rebaixar/desativar nega na hora com o mesmo token; claim forjada sem efeito"
     ],
-    "notes": "Parcial: provado no emulador com papel PROVISÓRIO (custom claim `role`, definida só pelo servidor). Papéis/permissões reais e revogação (Rules não checam revogação; token vale até expirar) vêm em F03; homologação Storage real pendente. Limpeza de uploads órfãos e foto substituída: F06. Manter not_run."
+    "notes": "Parcial: provado no emulador. F03 trocou o papel provisório (claim) pelo perfil atual em users/{uid}, lido também pelas Storage Rules (revogação imediata, testada). Homologação Storage real (regra entre serviços exige permissão IAM do serviço no projeto real) pendente. Limpeza de uploads órfãos e foto substituída: F06. Manter not_run."
   },
   "A37": {
     "status": "not_run",

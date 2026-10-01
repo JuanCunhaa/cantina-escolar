@@ -21,7 +21,7 @@ beforeAll(async () => {
   staff = await createTestUser("cantina", "cantina");
   admin = await createTestUser("admin", "admin");
   secretaria = await createTestUser("secretaria", "secretaria");
-  guardian = await createTestUser("familia");
+  guardian = await createTestUser("familia", "guardian");
   await seedDemoCatalog(targetFromEnv());
 });
 

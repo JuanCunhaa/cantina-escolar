@@ -2,10 +2,9 @@ import type { Bucket } from "@google-cloud/storage";
 import type { Firestore } from "firebase-admin/firestore";
 import { z } from "zod";
 import { PHOTO_MAX_BYTES, PHOTO_PATH_PATTERN, PRODUCT_ID_PATTERN } from "@/lib/validation/photo";
-import { canManagePhotos } from "@/modules/access/roles";
 import type { Actor } from "@/modules/access/actor";
+import { authorize } from "@/modules/access/authorize";
 
-export class ForbiddenError extends Error {}
 export class PhotoRejectedError extends Error {}
 export class ProductNotFoundError extends Error {}
 
@@ -32,7 +31,7 @@ export async function registerProductPhoto(
   actor: Actor,
   input: unknown,
 ): Promise<{ productId: string; photoPath: string }> {
-  if (!canManagePhotos(actor.role)) throw new ForbiddenError("Papel sem permissão para fotos.");
+  authorize(actor, "catalog.photos.manage");
   const { productId, path } = registerPhotoSchema.parse(input);
   const match = PHOTO_PATH_PATTERN.exec(path);
   if (match?.[1] !== productId) throw new PhotoRejectedError("Caminho não pertence ao produto.");

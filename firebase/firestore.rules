@@ -4,7 +4,52 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
 
-    // F01: única abertura — a prova de fundação lê apenas o próprio documento e o próprio livro.
+    // F03: papel e situação vêm do perfil ATUAL em users/{uid} (escrito só pelo servidor). Revogar/desativar vale
+    // na próxima leitura, mesmo com ID token ainda dentro da validade. Conta sem perfil ativo não lê nada.
+    function profilePath() { return /databases/$(database)/documents/users/$(request.auth.uid); }
+    function active() {
+      return signedIn() && exists(profilePath()) && get(profilePath()).data.status == 'active';
+    }
+    function hasRole(roles) { return active() && get(profilePath()).data.role in roles; }
+    function isStaff() { return hasRole(['cantina', 'secretaria', 'admin']); }
+
+    // Vínculo responsável-aluno (ID determinístico guardianUid_studentId) e política do aluno: fontes mutáveis.
+    function linkPath(studentId) { return /databases/$(database)/documents/guardianStudentLinks/$(request.auth.uid + '_' + studentId); }
+    function linkedGuardian(studentId) {
+      return hasRole(['guardian']) && exists(linkPath(studentId)) && get(linkPath(studentId)).data.status == 'active';
+    }
+    function studentSelf(studentId) {
+      return hasRole(['student'])
+        && exists(/databases/$(database)/documents/students/$(studentId))
+        && get(/databases/$(database)/documents/students/$(studentId)).data.userUid == request.auth.uid;
+    }
+
+    // Perfil de acesso: o dono lê o próprio (sessão/navegação, inclusive para saber que foi desativado). Sem list.
+    match /users/{uid} {
+      allow get: if isOwner(uid);
+      allow list, write: if false;
+    }
+
+    // Aluno (perfil necessário; sem custos/dados administrativos): equipe, responsável vinculado ativo ou o próprio aluno.
+    // Sem list: busca por nome é do servidor; a família chega ao aluno pelos próprios vínculos.
+    match /students/{studentId} {
+      allow get: if isStaff() || linkedGuardian(studentId) || studentSelf(studentId);
+      allow list, write: if false;
+    }
+
+    // Vínculos: o responsável lista/lê apenas os próprios vínculos ativos (consulta deve filtrar guardianUid == uid e status == active).
+    match /guardianStudentLinks/{linkId} {
+      allow get, list: if active() && resource.data.guardianUid == request.auth.uid && resource.data.status == 'active';
+      allow write: if false;
+    }
+
+    // Política do aluno (permissões de compra, limites, bloqueios): leitura de PDV/administração e da família do aluno.
+    match /studentPolicies/{studentId} {
+      allow get: if hasRole(['cantina', 'admin']) || linkedGuardian(studentId) || studentSelf(studentId);
+      allow list, write: if false;
+    }
+
+    // F01: a prova de fundação lê apenas o próprio documento e o próprio livro (qualquer conta autenticada).
     // Escritas ficam sempre negadas ao cliente; comandos passam pelo servidor (Admin SDK).
     match /foundationProbes/{uid} {
       allow get: if isOwner(uid);
@@ -16,14 +61,15 @@ service cloud.firestore {
       }
     }
 
-    // F02: exemplo de catálogo claramente fictício (isolado de relatórios/dados reais). Leitura por conta
-    // autenticada; escrita nunca pelo cliente (seed/servidor). Substituído pelo catálogo real em F06.
+    // F02: exemplo de catálogo claramente fictício (isolado de relatórios/dados reais). Leitura por conta com perfil
+    // ativo; escrita nunca pelo cliente (seed/servidor). Substituído pelo catálogo real em F06.
     match /demoProducts/{productId} {
-      allow get, list: if signedIn();
+      allow get, list: if active();
       allow write: if false;
     }
 
-    // Todo o resto permanece fechado até F03 (acesso por identidade/vínculo) e tarefas de domínio.
+    // Todo o resto (carteira, pedidos, custos, lucro, relatórios, auditoria, idempotência) permanece fechado ao
+    // cliente: acesso só por servidor autorizado. Custos/lucro ficarão em coleções de administração (nunca abertas à secretaria).
     match /{document=**} { allow read, write: if false; }
   }
 }

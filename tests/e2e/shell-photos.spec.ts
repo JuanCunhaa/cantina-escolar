@@ -14,7 +14,7 @@ test.beforeAll(async () => {
 });
 
 test("portal: cardápio fictício com fotos, fallback, indisponibilidade e total em BRL (A36/A37)", async ({ page }) => {
-  const family = await createTestUser("e2e-familia");
+  const family = await createTestUser("e2e-familia", "guardian");
   await login(page, "/portal/cardapio", family.email);
 
   await expect(page.getByRole("heading", { name: "Cardápio" })).toBeVisible();
@@ -42,7 +42,7 @@ test("portal: cardápio fictício com fotos, fallback, indisponibilidade e total
 });
 
 test("teclado: pular para o conteúdo, navegação e quantidade sem mouse (A37)", async ({ page }) => {
-  const family = await createTestUser("e2e-teclado");
+  const family = await createTestUser("e2e-teclado", "guardian");
   await login(page, "/portal/cardapio", family.email);
   await expect(page.getByTestId("product")).toHaveCount(4);
 
@@ -71,7 +71,7 @@ test("teclado: pular para o conteúdo, navegação e quantidade sem mouse (A37)"
 test("celular: sem rolagem horizontal, alvos de toque e resumo fixo visível (A37)", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 375, height: 667 } });
   const page = await context.newPage();
-  const family = await createTestUser("e2e-celular");
+  const family = await createTestUser("e2e-celular", "guardian");
   await login(page, "/portal/cardapio", family.email);
   await expect(page.getByTestId("product")).toHaveCount(4);
 
@@ -87,7 +87,7 @@ test("celular: sem rolagem horizontal, alvos de toque e resumo fixo visível (A3
 test("reduced motion: sem transições e a ação não depende de animação (A37)", async ({ browser }) => {
   const context = await browser.newContext({ reducedMotion: "reduce" });
   const page = await context.newPage();
-  const family = await createTestUser("e2e-movimento");
+  const family = await createTestUser("e2e-movimento", "guardian");
   await login(page, "/portal/cardapio", family.email);
   const plus = page.getByRole("button", { name: "Aumentar Suco de laranja (exemplo)" });
   await expect(plus).toBeVisible();
@@ -107,7 +107,7 @@ test("reduced motion: sem transições e a ação não depende de animação (A3
 });
 
 test("perfis: responsável não acessa a operação; navegação mostra só o que o papel tem (A37)", async ({ page }) => {
-  const family = await createTestUser("e2e-perfil");
+  const family = await createTestUser("e2e-perfil", "guardian");
   await login(page, "/operacao/produtos", family.email);
   await expect(page.getByRole("heading", { name: "Área indisponível para o seu perfil" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Navegação principal" })).toHaveCount(0);

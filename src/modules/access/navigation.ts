@@ -4,9 +4,9 @@ export type NavItem = { href: string; label: string; roles: readonly Role[]; rea
 
 /** Itens de navegação por papel. `ready: false` = tela de tarefa futura, exibida como indisponível (sem link quebrado). */
 export const NAV_ITEMS: readonly NavItem[] = [
-  { href: "/portal", label: "Início", roles: ["guardian"], ready: true },
-  { href: "/portal/cardapio", label: "Cardápio", roles: ["guardian"], ready: true },
-  { href: "/portal/pedidos", label: "Meus pedidos", roles: ["guardian"], ready: false },
+  { href: "/portal", label: "Início", roles: ["guardian", "student"], ready: true },
+  { href: "/portal/cardapio", label: "Cardápio", roles: ["guardian", "student"], ready: true },
+  { href: "/portal/pedidos", label: "Meus pedidos", roles: ["guardian", "student"], ready: false },
   { href: "/portal/carteira", label: "Carteira", roles: ["guardian"], ready: false },
   { href: "/operacao", label: "Início", roles: ["cantina", "secretaria", "admin"], ready: true },
   { href: "/operacao/pedidos", label: "Pedidos do dia", roles: ["cantina", "admin"], ready: false },
@@ -20,7 +20,11 @@ export function navigationFor(role: Role): NavItem[] {
   return NAV_ITEMS.filter((item) => item.roles.includes(role));
 }
 
-/** Área inicial de cada papel: responsáveis no portal, equipe na operação. */
+/** Área de cada papel: família (responsável e aluno) no portal, equipe na operação. */
+export function areaFor(role: Role): "portal" | "operacao" {
+  return role === "guardian" || role === "student" ? "portal" : "operacao";
+}
+
 export function homeFor(role: Role): string {
-  return role === "guardian" ? "/portal" : "/operacao";
+  return areaFor(role) === "portal" ? "/portal" : "/operacao";
 }
