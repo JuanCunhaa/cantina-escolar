@@ -15,7 +15,7 @@ Data de referência: 01/10/2026. Este arquivo descreve código entregue, não ap
 ## Migração de arquivos para Cloudflare R2 (01/10/2026)
 - Entregue: Firebase Storage substituído por Cloudflare R2 (bucket privado, upload pelo servidor) no módulo src/lib/storage; rotas POST/GET /api/catalog/photo e POST /api/admin/storage/sweep; Storage Rules/Emulator removidos; Auth e Firestore intactos. F06 não iniciada.
 - Validação (execução única após a última mudança): typecheck 0; lint 0; unit 86/86; rules 24/24; integration 101/101; e2e 17/17; build:webpack 0; audit:prod 0.
-- NÃO comprovado: integração com R2 real (sem conta/credenciais nesta máquina; `npm run test:r2` pulado). Migração não declarada homologada. Passos para fechar: docs/status/r2-migration.md ("Pendências").
+- Integração R2 real (01/10/2026, bucket de homologação `cantina-fotos-staging`): `npm run test:r2` 3/3 — PUT condicional recusa sobrescrita (412), ETag = MD5, HEAD/GET/DELETE/LIST, 2 MB, endpoint S3 nega anônimo (400); bucket ficou vazio. NÃO comprovado: checksum padrão do SDK, acesso público via r2.dev/domínio (painel) e o app completo contra o R2 (F24). Migração não declarada homologada. Detalhes: docs/status/r2-migration.md.
 - Skills invocadas via ferramenta Skill: cantina-architecture, cantina-research, cantina-security (revisão manual + testes negativos).
 
 ## F05 — resumo (01/10/2026)
@@ -56,7 +56,7 @@ Data de referência: 01/10/2026. Este arquivo descreve código entregue, não ap
 ## Pendências
 - Dependências: overrides escopados (ver "Fechamento pós-F03" e docs/status/dependency-audit.md). `npm audit` completo ainda lista 3 avisos moderados só de desenvolvimento (GHSA-8988-4f7v-96qf, @opentelemetry/core via firebase-tools); a correção sugerida exige `--force` e não foi aplicada.
 - Primeiro administrador real: criar no Console (Auth + `users/{uid}` role admin); script de bootstrap fica para F24. Desabilitar cadastro público no Firebase Auth do projeto real (conta sem perfil já não acessa nada).
-- Homologação real pendente: bucket R2 de homologação e `npm run test:r2` (ver r2-migration.md), e-mail de redefinição de senha (Firebase Auth), domínios autorizados.
+- Homologação real pendente: homologação do app contra o R2 (F24; a integração do armazenamento já passou, ver r2-migration.md), e-mail de redefinição de senha (Firebase Auth), domínios autorizados.
 - Sem tela de administração de usuários/funcionários (só API `POST /api/admin/users`); papel `student` só tem portal de consulta.
 - F04: convite não é enviado por e-mail (a escola copia o link; nenhuma integração de e-mail inventada); resgate público sem limitação de taxa própria (WAF/edge em F24); tela de revisão de pedidos futuros após troca de turma/turno depende de pedidos (F11+); edição de contato do responsável e de matrícula não existe (matrícula é imutável); busca por trecho/sobrenome é filtro no navegador sobre a lista carregada; importação testada até 300 linhas (limite 500); Gitleaks/Semgrep não executados.
 - F05: horários vivem em `settings/school` (turno novo fora de manhã/tarde precisa de horário configurado, senão fica indisponível); sem tela de revisão de pedidos afetados (F11); sem sincronização automática de feriados; Gitleaks/Semgrep não executados.

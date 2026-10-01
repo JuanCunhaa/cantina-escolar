@@ -8,8 +8,8 @@ Data: 01/10/2026. Autorizada pelo dono do projeto (mudança de arquitetura). Esc
 | --- | --- |
 | Código, testes locais, CI, documentação | Migrado e verde (abaixo) |
 | Nenhum caminho depende do Firebase Storage | Sim: removidos Storage Rules, Storage Emulator, `firebase/storage` (cliente) e `firebase-admin/storage` (servidor) |
-| Integração real com um bucket R2 | **NÃO executada** — ver "Pendências" |
-| Migração "completa"? | **Código completo; comprovação em R2 real pendente.** Não declarar homologada. |
+| Integração real com um bucket R2 | **Executada em 01/10/2026** contra o bucket de homologação `cantina-fotos-staging`: 3/3 passaram (ver "Integração R2 real") |
+| Migração "completa"? | **Código completo e camada de armazenamento comprovada no R2 real.** Falta a homologação do app inteiro (Vercel + Firebase real, F24); não declarar homologada. |
 
 ## O que foi migrado
 
@@ -44,7 +44,8 @@ Execução após a última mudança de código (Windows, emuladores `demo-cantin
 | `npm run test:e2e` | 17/17 |
 | `npm run build:webpack` | 0 |
 | `npm run audit:prod` | 0 vulnerabilidades |
-| `npm run test:r2` | 1 passou, 3 **puladas** (sem `R2_TEST_*`) |
+| `npm run test:r2` (sem credenciais, execução inicial) | 1 passou, 3 puladas |
+| `npm run test:r2` (bucket de homologação) | 3 passaram, 1 "pulado" é só o aviso de ausência de credenciais — ver abaixo |
 
 Antes da migração: unit 64, rules 31, integration 83, e2e 17. A diferença em rules/integration vem dos testes de Storage Rules (removidos) e dos testes do novo fluxo.
 
@@ -52,21 +53,30 @@ Antes da migração: unit 64, rules 31, integration 83, e2e 17. A diferença em 
 
 - **Double local (`STORAGE_LOCAL_DIR`)** em `tests/integration/photo-route.test.ts`, com Auth e Firestore em emulador real: autorização e papéis (401/403, conta desativada, sem perfil), validação de conteúdo/tamanho, chave gerada no servidor, ausência de sobrescrita, leitura indevida, ordem das operações e falhas R2 × Firestore (PUT falha; objeto não confirmado; permissão revogada, conta desativada ou produto removido durante o envio; commit com resultado incerto; falha ao apagar a anterior; envio interrompido; sweep). **Não prova o comportamento do R2.**
 - **Servidor S3 duplo** em `tests/unit/storage.test.ts`: o SDK S3 real fala com um servidor HTTP em loopback que registra cabeçalhos — prova que o cliente envia `If-None-Match: *`, assina com região `auto`, não envia checksum CRC32 e que 412 vira `ObjectExistsError`. **Não prova o R2.**
-- **R2 real** (`tests/r2/r2-integration.test.ts`): escrito, **não executado**. Cobre: PUT condicional real (segunda gravação recusada, bytes intactos), ETag = MD5, HEAD/GET/DELETE/LIST, objeto de 2 MB, ausente = null, bucket sem leitura anônima. Limpa apenas as chaves criadas pela própria execução (`_it/<runId>/`).
+- **R2 real** (`tests/r2/r2-integration.test.ts`): executado, ver "Integração R2 real".
+
+## Integração R2 real (01/10/2026)
+
+- Destino: único autorizado, bucket `cantina-fotos-staging` na conta Cloudflare informada pelo dono (o teste falha, não pula, para qualquer outra conta/bucket; a conta é conferida por SHA-256 e o ID não é versionado). Nenhuma aplicação foi iniciada e o Firebase real não foi acessado.
+- Configuração: o teste recebe `R2_TEST_*` (única cópia, no `.env` local, ignorado pelo Git — confirmado com `git check-ignore`; o `vitest.r2.config.ts` carrega do `.env` só as chaves `R2_TEST_*`). As `R2_*` da aplicação ficam vazias porque o `.env` tem `APP_ENV=emulator`, que recusa R2; nada foi duplicado em outro arquivo, e nenhum valor foi impresso ou registrado.
+- Resultado final: 3 passaram, 1 "pulado" (o bloco que só avisa quando não há credenciais).
+  1. Gravação condicional real: a segunda gravação na mesma chave é recusada (412 → `ObjectExistsError`) e os bytes originais permanecem; ETag do PUT = MD5 dos bytes; HEAD (tamanho/tipo) e GET devolvem o objeto e a imagem é reinspecionada.
+  2. Objeto de 2 MB faz ida e volta; ausente → `null`; DELETE idempotente; LIST enxerga o prefixo.
+  3. O endpoint S3 nega leitura anônima: responde 400 `InvalidArgument: Authorization`.
+- Investigação da única falha: na primeira execução o teste 3 falhou porque eu esperava 401/403/404 e o R2 devolveu 400. Consultei o endpoint anonimamente (o corpo é só o XML de erro acima), concluí que a negação estava correta e a expectativa errada, e a troquei por "4xx, sem devolver a imagem". Os testes 1 e 2 já tinham passado. Reexecução só depois desse ajuste (e outra depois de trocar a constante de conta por hash).
+- Limpeza: o teste apaga somente as chaves que criou (`_it/<runId>/`) e confirma que o prefixo ficou vazio; uma listagem de leitura do bucket ao final mostrou 0 objetos.
+- NÃO comprovado: (a) se o SDK com checksum padrão realmente falha no R2 — o `WHEN_REQUIRED` funciona, mas não testei o padrão; (b) ausência de acesso público por `r2.dev` ou domínio customizado (configuração do painel que o token não lê; o teste 3 cobre só o endpoint S3); (c) o fluxo completo da aplicação (rotas + Firestore real) contra o R2 — as rotas continuam provadas só com o double local.
 
 ## Pendências (bloqueios agrupados)
 
-Nesta máquina não há `wrangler`, sessão Cloudflare nem variáveis `CLOUDFLARE_*`/`R2_*`; por isso nenhuma operação externa foi feita (nenhum bucket foi criado e a conta/bucket não foram confirmados). Para fechar, é preciso (ação sua, sem enviar segredos pelo chat):
-
-1. Confirmar a conta Cloudflare e o nome do bucket de homologação (sugestão: `cantina-fotos-staging`); confirmar se o R2 já está habilitado na conta e se a ativação pede forma de pagamento (a página de preços não esclarece — não ative plano pago sem decidir).
-2. Criar o bucket (privado: não habilitar domínio público nem `r2.dev`) e um token de API R2 "Object Read & Write" restrito a esse bucket (Cloudflare → R2 → Manage R2 API Tokens). Anotar Account ID, Access Key ID e Secret.
-3. No shell (não em arquivo): definir `R2_TEST_ACCOUNT_ID`, `R2_TEST_ACCESS_KEY_ID`, `R2_TEST_SECRET_ACCESS_KEY`, `R2_TEST_BUCKET` e rodar `npm run test:r2`. Anexar o resultado aqui e em `docs/status/acceptance.json` (A36).
+O token usado é restrito a objetos (não lista nem cria buckets); o bucket foi criado pelo dono. As credenciais passaram pelo chat: rotacioná-las após a homologação.
 
 Outras pendências:
 
 - Homologação do app com `APP_ENV=staging` e `R2_*` (Vercel): F24. O `.env` local real não foi lido nem alterado; ele não define `R2_*` — a rota de fotos continua indisponível em produção (catálogo de demonstração) até F06.
 - Se o ambiente de homologação ficar em jurisdição UE, definir `R2_ENDPOINT` com o domínio da jurisdição.
-- Confirmar no R2 real: `If-None-Match: *` (fonte oficial diz suportado), ETag = MD5 em PUT simples e necessidade/inocuidade do `WHEN_REQUIRED`.
+- Confirmar no painel que o bucket `cantina-fotos-staging` não tem `r2.dev` nem domínio customizado habilitados; testar o comportamento do SDK com checksum padrão, se quiser remover o `WHEN_REQUIRED`.
+- Quando o app for implantado em homologação (F24): `APP_ENV=staging` + `R2_*` no gerenciador de segredos; nunca `R2_*` com `APP_ENV=emulator`/`production` apontando para esse bucket (a configuração já recusa).
 - F06 deve acrescentar as coleções do catálogo real a `referencedPhotoKeys` (sweep) e decidir se fotos antigas ligadas a pedidos devem ser preservadas.
 - Sweep é manual (rota admin). Agendamento (cron) fica para F24, com autenticação adequada.
 - Gitleaks/Semgrep: não executados (mesma limitação do restante do projeto).
@@ -83,7 +93,7 @@ npm run test:integration
 npm run test:e2e
 npm run build:webpack
 npm run audit:prod
-npm run test:r2        # pulado sem R2_TEST_*; ver "Pendências" para executar de verdade
+npm run test:r2        # exige R2_TEST_* (no .env local ou no shell); pulado sem elas
 ```
 
 Prova manual local: `npm run emulators` → `npm run dev:emulator` → `npm run seed` (fotos fictícias vão para `.local-storage/`, ignorado pelo Git).

@@ -74,7 +74,7 @@
     "note": "npm run dev:emulator + seed + /api/probe: 401 sem token, 200 com token, 200 replay (emulador)"
   },
   "cloudflare_r2": {
-    "status": "code_ready_not_verified_against_real_account",
-    "note": "sem wrangler, sem credenciais e sem sessão Cloudflare nesta máquina; npm run test:r2 pulado. Ver docs/status/r2-migration.md"
+    "status": "storage_layer_verified_in_staging_bucket",
+    "note": "npm run test:r2 3/3 em 01/10/2026 (cantina-fotos-staging); app completo em homologação pendente (F24). Ver docs/status/r2-migration.md"
   }
 }

@@ -323,9 +323,10 @@
       "falhas entre armazenamento e Firestore (mesmo arquivo): falha no PUT, objeto não confirmado, permissão revogada/conta desativada/produto removido durante o envio, commit com resultado incerto (objeto mantido), falha ao apagar a anterior + sweep, envio interrompido (órfão) + sweep, rota de sweep só da administração",
       "tests/unit/storage.test.ts (22): configuração por ambiente fechada, chaves, inspeção de imagem (PNG/JPEG/WebP), corpo limitado, armazenamento local e cliente S3 real contra servidor S3 duplo (If-None-Match: *, sem checksum CRC32, 412→ObjectExistsError, erros sem vazar segredo)",
       "tests/rules: Firestore nega ao cliente (inclusive equipe) qualquer escrita de metadados de foto; claim forjada sem efeito (Storage Rules removidas)",
-      "tests/e2e/shell-photos.spec.ts: 3 fotos reais (blob com ID token) + 1 fallback; funcionário envia PNG válido; txt e >2 MB recusados no cliente; PNG falso recusado pelo servidor"
+      "tests/e2e/shell-photos.spec.ts: 3 fotos reais (blob com ID token) + 1 fallback; funcionário envia PNG válido; txt e >2 MB recusados no cliente; PNG falso recusado pelo servidor",
+      "tests/r2/r2-integration.test.ts (R2 REAL, bucket de homologação, 01/10/2026): 3/3 — PUT com If-None-Match recusa sobrescrita (412) e preserva os bytes, ETag = MD5, HEAD/GET/DELETE/LIST, objeto de 2 MB, endpoint S3 nega leitura anônima; limpeza só das chaves criadas"
     ],
-    "notes": "Parcial. Migração de Firebase Storage para Cloudflare R2 aprovada em 01/10/2026: provado só com double local e servidor S3 duplo. INTEGRAÇÃO REAL COM R2 NÃO EXECUTADA (sem conta/credenciais nesta máquina; npm run test:r2 pulado). Pendentes: bucket de homologação, execução de tests/r2, confirmação do comportamento real de If-None-Match e checksums. Limpeza de órfãos implementada (sweep); decisão sobre preservar fotos antigas de pedidos fica para F06/F11. Manter not_run."
+    "notes": "Parcial. Migração de Firebase Storage para Cloudflare R2 aprovada em 01/10/2026. Camada de armazenamento comprovada no R2 real de homologação; rotas/regras de negócio provadas com double local + emulador Auth/Firestore. Pendentes: app completo em homologação (F24), confirmação de ausência de acesso público (r2.dev/domínio) no painel e comportamento do SDK com checksum padrão. Decisão sobre fotos antigas de pedidos: F06/F11. Manter not_run."
   },
   "A37": {
     "status": "not_run",

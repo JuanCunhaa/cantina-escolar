@@ -13,6 +13,9 @@ import { ObjectExistsError, type ObjectStore } from "@/lib/storage/types";
 import { makePng } from "../../scripts/lib/demo-seed.ts";
 
 const env = process.env;
+// Conta autorizada identificada pelo SHA-256 do ID (o ID em si não é versionado).
+const ALLOWED_ACCOUNT_SHA256 = "963ef734e23f3415e3be27be4594f20ac912596cd25dc81ee6e786614bc30c8c";
+const ALLOWED_BUCKET = "cantina-fotos-staging";
 const configured = Boolean(env.R2_TEST_ACCOUNT_ID && env.R2_TEST_ACCESS_KEY_ID && env.R2_TEST_SECRET_ACCESS_KEY && env.R2_TEST_BUCKET);
 
 describe.skipIf(!configured)("R2 real (bucket de homologação)", () => {
@@ -37,6 +40,10 @@ describe.skipIf(!configured)("R2 real (bucket de homologação)", () => {
       R2_ENDPOINT: env.R2_TEST_ENDPOINT,
     });
     if (config.driver !== "r2") throw new Error("configuração R2 esperada");
+    // Único destino autorizado desta integração: conta e bucket de homologação do projeto. Qualquer outro falha (não pula).
+    if (createHash("sha256").update(config.accountId).digest("hex") !== ALLOWED_ACCOUNT_SHA256 || config.bucket !== ALLOWED_BUCKET) {
+      throw new Error("Destino R2 não autorizado para esta integração (conta/bucket diferentes do permitido).");
+    }
     store = createR2Store(config);
     publicUrl = `${config.endpoint}/${config.bucket}`;
   });
@@ -84,11 +91,17 @@ describe.skipIf(!configured)("R2 real (bucket de homologação)", () => {
     expect(await store.head(k)).toBeNull();
   });
 
-  it("o bucket é privado: leitura anônima direta é negada", async () => {
+  it("o endpoint S3 nega leitura anônima direta (o R2 responde 400 InvalidArgument/Authorization, observado em 01/10/2026)", async () => {
+    // Prova só o endpoint S3. NÃO prova a ausência de acesso público por r2.dev ou domínio customizado: isso é uma
+    // configuração do bucket (painel) e o token desta integração não a lê.
     const k = key("privado.png");
-    await store.putIfAbsent(k, makePng(8, 8, [9, 9, 9]), { contentType: "image/png" });
+    const bytes = makePng(8, 8, [9, 9, 9]);
+    await store.putIfAbsent(k, bytes, { contentType: "image/png" });
     const response = await fetch(`${publicUrl}/${k}`);
-    expect([401, 403, 404]).toContain(response.status);
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(response.status).toBeLessThan(500);
+    expect(response.headers.get("content-type")).not.toBe("image/png");
+    expect((await response.arrayBuffer()).byteLength).not.toBe(bytes.byteLength);
   });
 });
 
