@@ -1,0 +1,77 @@
+{
+  "node_helpers": {
+    "status": "validated_in_user_environment",
+    "runtime": "Node v24.20.0"
+  },
+  "ripgrep": {
+    "status": "available",
+    "version": "15.2.0"
+  },
+  "typescript_lsp": {
+    "status": "not_installed_by_package",
+    "optional": true
+  },
+  "firebase_cli": {
+    "status": "configured",
+    "version": "15.32.0",
+    "note": "devDependency; java Temurin 21 presente"
+  },
+  "firebase_emulator_suite": {
+    "status": "configured",
+    "emulators": [
+      "auth",
+      "firestore",
+      "storage"
+    ],
+    "project": "demo-cantina",
+    "note": "rules/integration/e2e executados localmente"
+  },
+  "vitest": {
+    "status": "configured",
+    "version": "5.0.3"
+  },
+  "playwright": {
+    "status": "configured",
+    "version": "1.63.0",
+    "browser": "chromium-1243 já presente"
+  },
+  "gitleaks": {
+    "status": "ci_configured_not_executed",
+    "local": "blocked_by_app_control_policy (erro 4551); não contornado",
+    "ci": "v8.30.1 linux_x64, SHA-256 551f6fc8…470eb conferido contra checksums oficiais e baixado/validado localmente; git + dir com --redact em .github/workflows/ci.yml",
+    "executed": false
+  },
+  "semgrep": {
+    "status": "ci_configured_not_executed",
+    "note": "pip install semgrep sem versão fixada (pendência); não instalado localmente"
+  },
+  "rtk": {
+    "status": "not_installed_by_package",
+    "optional": true
+  },
+  "firebase_plugin_mcp": {
+    "status": "not_connected_by_package",
+    "optional": true
+  },
+  "npm_audit": {
+    "status": "executed",
+    "note": "audit --omit=dev: avisos @grpc/grpc-js/firebase são ruído de range (instalado 1.14.5 > 1.13.6); uuid/gaxios moderados via firebase-tools (dev)"
+  },
+  "next_swc_native": {
+    "status": "blocked_locally",
+    "note": "@next/swc-win32-x64-msvc bloqueado; usar --webpack (WASM). Turbopack não verificado aqui"
+  },
+  "ci": {
+    "status": "configured_not_executed",
+    "file": ".github/workflows/ci.yml",
+    "note": "YAML válido (parse), nenhum run em GitHub; sem repositório Git local"
+  },
+  "build": {
+    "webpack": "passed_locally (npm run build:webpack, exit 0)",
+    "default_turbopack": "not_proven — bloqueado localmente; primeira prova será o passo npm run build do CI ou deploy Vercel (nenhum executado)"
+  },
+  "dev_emulator": {
+    "status": "validated_locally",
+    "note": "npm run dev:emulator + seed + /api/probe: 401 sem token, 200 com token, 200 replay (emulador)"
+  }
+}

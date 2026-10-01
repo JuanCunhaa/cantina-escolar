@@ -1,0 +1,328 @@
+{
+  "source_filename": "Prompt-Completo-Cantina-Escolar(1).md",
+  "source_sha256": "fa2477d8da23d1cb7ca1d2c5448cba33ccd850a40f97dcdb3aa7b244117bdcf3",
+  "source_sections": [
+    {
+      "section": "1",
+      "path": "docs/product.md",
+      "sha256": "059b3cda25d9a9faa3fd3ebdc255007d02acced1747470b9a8d5895bf172fa85"
+    },
+    {
+      "section": "2,2.1,2.2",
+      "path": "docs/architecture.md",
+      "sha256": "4693e7315cc96fc71ff446cadad88b233929e5c55ec41e9055798831ae486e0d"
+    },
+    {
+      "section": "2.3",
+      "path": "docs/firebase/auth-realtime.md",
+      "sha256": "7fdc4472eb22259072e4041523cd45415de26280716b3a4cdda110059d447c33"
+    },
+    {
+      "section": "2.4",
+      "path": "docs/deployment.md",
+      "sha256": "b9486a7b3f33a5fc52b7a8b69e73b47d195b3e08d210170a008a7d0701ebc4af"
+    },
+    {
+      "section": "2.5",
+      "path": "docs/dependencies.md",
+      "sha256": "97021fce70fe30f3b6cf06741a36907b46d4fcfde301a58ab3799393d7edc90e"
+    },
+    {
+      "section": "3",
+      "path": "docs/design.md",
+      "sha256": "3d1b0e24991f7c3052648055f1282ae78cea771a133035cce9bf2290b78548bb"
+    },
+    {
+      "section": "4",
+      "path": "docs/domains/access.md",
+      "sha256": "b3f895649a7a3ce2556e30e436632d043f7cd323495febbfd20f51b5b4dfa742"
+    },
+    {
+      "section": "5",
+      "path": "docs/domains/wallet.md",
+      "sha256": "5729e5ead8688da74b125f24a93ca30af92fee72bf41ffe1edaaffa45d8bae04"
+    },
+    {
+      "section": "6",
+      "path": "docs/domains/payments.md",
+      "sha256": "8046670f87cbff0101b256878f5776650327a1fdaf22dace7eb0c58851898505"
+    },
+    {
+      "section": "7",
+      "path": "docs/domains/catalog-menu.md",
+      "sha256": "3f6a0e51369c932fee64870aeb99711f3de35777570a3af56affbcbbc64fce49"
+    },
+    {
+      "section": "8",
+      "path": "docs/domains/calendar.md",
+      "sha256": "d25fcc5ba7b684fead87228bbe89593f8ea2921b318d866f9d66c7467bcab09a"
+    },
+    {
+      "section": "9",
+      "path": "docs/domains/policies.md",
+      "sha256": "802459f3fccb4fce432f06f9005ded0772889f356413396007443ac6b7598a7f"
+    },
+    {
+      "section": "10",
+      "path": "docs/domains/checkout.md",
+      "sha256": "9050b1f0226e65f507b0a5a435c0a2311f1f6a8ca0cf8b87ac70d1064bc7cf4d"
+    },
+    {
+      "section": "11",
+      "path": "docs/domains/my-orders.md",
+      "sha256": "205837a9fdbdaa2765b43d1eebf47af234e5e9670078409885c612fb5998765f"
+    },
+    {
+      "section": "12",
+      "path": "docs/domains/fulfillment.md",
+      "sha256": "f3407b1b085435ff699a276e5a9ee130de62ed49d5345028664a85c8c4cf6913"
+    },
+    {
+      "section": "13",
+      "path": "docs/domains/pos.md",
+      "sha256": "ea9bfe4ba4af0acf784608dcadedaedef3f3a07312de28826cbd0e8ae336683b"
+    },
+    {
+      "section": "14",
+      "path": "docs/domains/cancellations.md",
+      "sha256": "5e56693632fffcb88b69407874ae8166af16fb7207def109e9756fc74dae17f0"
+    },
+    {
+      "section": "15",
+      "path": "docs/domains/inventory.md",
+      "sha256": "4679a8795a53c56814dd0c73d1118ba6831077ef283d51656d2feb8f5e850100"
+    },
+    {
+      "section": "16",
+      "path": "docs/domains/reports-cash.md",
+      "sha256": "7d61a21a5b9e672f6cd9e6e47e1100b96f01a66dbcd211f452ae2fdb66738aa6"
+    },
+    {
+      "section": "17",
+      "path": "docs/screens.md",
+      "sha256": "cc819d3846513fbff7ab43bebbdc7c969bc6c0a92e4a0180cf30ed699df3076f"
+    },
+    {
+      "section": "19",
+      "path": "docs/security.md",
+      "sha256": "cdc998d436f9a760875e01124be23b359d8e8dff7aa61050868b55a1bf8bf592"
+    },
+    {
+      "section": "21",
+      "path": "docs/delivery.md",
+      "sha256": "8be25a144f2311febf664aefa910ee421d7c65481acb23eda03ae0b9acaed0a4"
+    },
+    {
+      "section": "18",
+      "path": "docs/firebase/schema.md",
+      "sha256": "bd8238ca888fcf2f57a0037bd4beef16a687405d10e60175bfbe8bb674f90ded"
+    },
+    {
+      "section": "18.1",
+      "path": "docs/firebase/queries.md",
+      "sha256": "03ba4b8f1e3c7aff1197b8704d4bdaab972a3db3802056b1e5e786d2638136d8"
+    },
+    {
+      "section": "18.2",
+      "path": "docs/firebase/security-rules.md",
+      "sha256": "1c25ffab1fdfa7ae247b118fc820faf0ed292f107f7ee8321c679e60f1945200"
+    },
+    {
+      "section": "20-intro",
+      "path": "docs/testing/strategy.md",
+      "sha256": "591c1f2ee04fb1c949f795c539468acfb72a26d906bba63a06811ef6f6b658d4"
+    }
+  ],
+  "criteria": {
+    "A01": {
+      "source_number": 1,
+      "path": "docs/testing/wallet.md",
+      "sha256": "96505757c8467ce08fe8fc1e7a1cecc3f84931f318884955fa26fbf14644d108"
+    },
+    "A02": {
+      "source_number": 2,
+      "path": "docs/testing/access.md",
+      "sha256": "e1a0637ff01b6cfd36caab2f82f23ef779bbb50ac5f0817c7c3779e613ae7403"
+    },
+    "A03": {
+      "source_number": 3,
+      "path": "docs/testing/wallet.md",
+      "sha256": "2495751e4f4b60ef5f364cc8fdb086b74c94da546e00440789ba3c310ced18cb"
+    },
+    "A04": {
+      "source_number": 4,
+      "path": "docs/testing/payments.md",
+      "sha256": "e336aed953f57f145d4a522bfc761552eab00d2a531b76ee99d12c4840c51de6"
+    },
+    "A05": {
+      "source_number": 5,
+      "path": "docs/testing/payments.md",
+      "sha256": "528f1d2546caa91c9beb446dd4b40827281251d25b91398255b337d8ec21050c"
+    },
+    "A06": {
+      "source_number": 6,
+      "path": "docs/testing/payments.md",
+      "sha256": "a451f93ea02876ce8ffe985c4ff1efe375d74c5d6a6f7c9f87d8c0caeaff411d"
+    },
+    "A07": {
+      "source_number": 7,
+      "path": "docs/testing/payments.md",
+      "sha256": "05c39f7f6f49f0975f46ca02a4e816bf46e9fd0bc81bdb2ad4e2868cb8343d61"
+    },
+    "A08": {
+      "source_number": 8,
+      "path": "docs/testing/access.md",
+      "sha256": "2a052d3f5fcfce0302d7c581d12bec8b9bcf6e38ec1a290a783e9f1b6c736c73"
+    },
+    "A09": {
+      "source_number": 9,
+      "path": "docs/testing/access.md",
+      "sha256": "0dd92642be9ca1671854cb0b6deef947cc6c19fe4d8586f81753a8825f47b5f7"
+    },
+    "A10": {
+      "source_number": 10,
+      "path": "docs/testing/calendar-policies.md",
+      "sha256": "7f4cffa809e5e31447f763d6b4bc77b72b0349ea76617ccc9c44c09c225e8fb9"
+    },
+    "A11": {
+      "source_number": 11,
+      "path": "docs/testing/calendar-policies.md",
+      "sha256": "f83bc8994719b680af1194a89fa0b6dbbb1a656d1a96c04da86f9d170034e095"
+    },
+    "A12": {
+      "source_number": 12,
+      "path": "docs/testing/calendar-policies.md",
+      "sha256": "70946f51822f030be2d4399cbd4a30b667c21b38586c595bbba116e14bd1718c"
+    },
+    "A13": {
+      "source_number": 13,
+      "path": "docs/testing/calendar-policies.md",
+      "sha256": "a1dd73ccb933ba08bd7bc8209d6a115caf50cbeb8765e954269c17e1583e1b80"
+    },
+    "A14": {
+      "source_number": 14,
+      "path": "docs/testing/calendar-policies.md",
+      "sha256": "7865a86e791c944a0dea2fdfedc84ee3708e6252b48fc2cd0035003e22f46225"
+    },
+    "A15": {
+      "source_number": 15,
+      "path": "docs/testing/checkout.md",
+      "sha256": "f1efb35609d259893d91a395289db73a4044a9461870f43af29fd31030af129b"
+    },
+    "A16": {
+      "source_number": 16,
+      "path": "docs/testing/checkout.md",
+      "sha256": "99c0210098a0519d308fc97264e219f1176fd3fd00fd90e6a63588df3b4acdff"
+    },
+    "A17": {
+      "source_number": 17,
+      "path": "docs/testing/checkout.md",
+      "sha256": "208eb9964d131478b56601e38636ed0b62bd4957c6907cba0350c96271c8f144"
+    },
+    "A18": {
+      "source_number": 18,
+      "path": "docs/testing/checkout.md",
+      "sha256": "6905d4d5d6d5eb3c7a42e3d8ffba78bf5b513e410d95f839a62e5cb402b9df43"
+    },
+    "A19": {
+      "source_number": 19,
+      "path": "docs/testing/inventory-pos.md",
+      "sha256": "3e174fe0c61785abe58d1325cb3a6769dabf2d78ebd5df02dec8d2c239ba9bde"
+    },
+    "A20": {
+      "source_number": 20,
+      "path": "docs/testing/inventory-pos.md",
+      "sha256": "08f4b0e692f4a13fd261648c5e07f85bedea9e0704c6f48a468b2f9d23e1e584"
+    },
+    "A21": {
+      "source_number": 21,
+      "path": "docs/testing/inventory-pos.md",
+      "sha256": "4b50d55692a8815dc5e62d8ad39a1c96f9514d3a75850a653625b9c9335a9d0d"
+    },
+    "A22": {
+      "source_number": 22,
+      "path": "docs/testing/fulfillment.md",
+      "sha256": "721a0cb7df32add8593b03503df229ae6ae43332196a72e1726fabf21042dd06"
+    },
+    "A23": {
+      "source_number": 23,
+      "path": "docs/testing/fulfillment.md",
+      "sha256": "fa6b2e2c0bb370a64c05026f2ac47bfc7f841ec4a7d3414acffc69d4174a0fe3"
+    },
+    "A24": {
+      "source_number": 24,
+      "path": "docs/testing/checkout.md",
+      "sha256": "b8d675497a66c7de951c46eb68d6ba13ba1b5be76af0030885ba32191640d6cc"
+    },
+    "A25": {
+      "source_number": 25,
+      "path": "docs/testing/inventory-pos.md",
+      "sha256": "5e391ac403626fbcd703022fc72068e270cfb323a37e781b962137ccaf2cd7ba"
+    },
+    "A26": {
+      "source_number": 26,
+      "path": "docs/testing/fulfillment.md",
+      "sha256": "8751c630cd77697ca335efaaad20a15c299ac206e603711043fad981a52cbc44"
+    },
+    "A27": {
+      "source_number": 27,
+      "path": "docs/testing/fulfillment.md",
+      "sha256": "9bd369b2b2494c05752fd3693523265fc7e168e7cc915f1c1a20799d6e18bae5"
+    },
+    "A28": {
+      "source_number": 28,
+      "path": "docs/testing/reports.md",
+      "sha256": "22000f39a33ed4d200fa58816717b4694230a0da4fea1a40486bf00d9dca8a09"
+    },
+    "A29": {
+      "source_number": 29,
+      "path": "docs/testing/payments.md",
+      "sha256": "ec75d9cfb40900cdb4af2a03b4d2a8570d45b6639284eac1db44c17277e28471"
+    },
+    "A30": {
+      "source_number": 30,
+      "path": "docs/testing/access.md",
+      "sha256": "0e63d3737713512e2f40417d02265a4c4634177115e9f97e8b79385c5b5bf313"
+    },
+    "A31": {
+      "source_number": 31,
+      "path": "docs/testing/payments.md",
+      "sha256": "32ce97c538388f0606128924b0c0541646955ef9747707bdeb3f1bb20bec8eb2"
+    },
+    "A32": {
+      "source_number": 32,
+      "path": "docs/testing/infrastructure-ui.md",
+      "sha256": "e31e37a8c20f1d7a9240fc7c2b232f0258c0f00b59c91eb0d32c091ead008ccd"
+    },
+    "A33": {
+      "source_number": 33,
+      "path": "docs/testing/access.md",
+      "sha256": "75c43f3a4d0120632d5b87d43a5dde8fee3f36c275669eae5adb2db3e1fa6cbf"
+    },
+    "A34": {
+      "source_number": 34,
+      "path": "docs/testing/infrastructure-ui.md",
+      "sha256": "16a691768f0cda8b7db4d5fc82f582ba26d7f519d4f99c779012a7f78ac7a538"
+    },
+    "A35": {
+      "source_number": 35,
+      "path": "docs/testing/infrastructure-ui.md",
+      "sha256": "e970e61372a30bbfd89b8e9a41f8e341eefaa4f3161b89a760d3c5526489838e"
+    },
+    "A36": {
+      "source_number": 36,
+      "path": "docs/testing/infrastructure-ui.md",
+      "sha256": "c5a0b67005994be572d349456e646dbac224d50d7ff2ec02543858271b4fe4cf"
+    },
+    "A37": {
+      "source_number": 37,
+      "path": "docs/testing/infrastructure-ui.md",
+      "sha256": "af9e7ce8126a4c64c37dab6013dcd443de8824703b6b30f717d23b2015654d80"
+    },
+    "A38": {
+      "source_number": 38,
+      "path": "docs/testing/reports.md",
+      "sha256": "998ee37325d46a6f1705c4d386f1cace50da66107827ead5c1bc8e24380ce4c8"
+    }
+  }
+}

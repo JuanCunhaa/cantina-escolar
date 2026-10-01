@@ -1,0 +1,209 @@
+{
+  "A01": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A02": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A03": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A04": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A05": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A06": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A07": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A08": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A09": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A10": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A11": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A12": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A13": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A14": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A15": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A16": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A17": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A18": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A19": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A20": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A21": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A22": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A23": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A24": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A25": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A26": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A27": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A28": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A29": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A30": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A31": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A32": {
+    "status": "not_run",
+    "evidence": [
+      "npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 9/9",
+      "npm run test:rules 7/7",
+      "npm run test:integration 14/14",
+      "npm run test:e2e 1/1",
+      "npm run build:webpack exit 0"
+    ],
+    "notes": "Parcial (F01, 30/09/2026): checks locais verdes em emulador. Pendente: funcionamento em homologação com Firebase real (projeto/credenciais externas) e build Turbopack padrão (binário SWC bloqueado por política do Windows nesta máquina; CI deve cobrir). Storage real sem prova de upload (F-fotos)."
+  },
+  "A33": {
+    "status": "not_run",
+    "evidence": [
+      "tests/rules/firestore-storage.rules.test.ts: família B não lê A; anônimo negado; sem list amplo; cliente não escreve saldo/livro/docs alheios; wallets/users/students/products/stockBalances/idempotencyRecords deny-all",
+      "tests/integration/probe-route.test.ts: ator sempre do token, 401 sem/invalid/revogado"
+    ],
+    "notes": "Parcial: prova a base deny-all e o isolamento da prova de fundação. Papéis, vínculos, secretaria/custos e aluno-admin por API dependem de F03+; manter not_run até lá."
+  },
+  "A34": {
+    "status": "not_run",
+    "evidence": [
+      "tests/e2e/foundation.spec.ts: duas contas, listener do próprio uid atualiza após commit do servidor, outra conta não muda, logout desliga e limpa, troca de conta sem vazamento",
+      "foundation-probe.tsx sinaliza cache (fromCache) como não confirmado"
+    ],
+    "notes": "Parcial: listener de saldo de prova. Pedidos/estoque e troca de aluno reais dependem de F04+/F06; manter not_run."
+  },
+  "A35": {
+    "status": "not_run",
+    "evidence": [
+      "tests/integration/probe-command.test.ts: replay sem novo movimento/efeito, payload diferente rejeitado, 12 concorrentes conservam total, disputa pela mesma chave = 1 movimento/1 efeito, falha de efeito externo não repete",
+      "afterCommit só roda fora do callback e só se não for replay"
+    ],
+    "notes": "Parcial: idempotência/retry comprovados no emulador com comando de prova. Documentos de uso diário/semanal e limites concorrentes reais dependem de F08/F09+; manter not_run."
+  },
+  "A36": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A37": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  },
+  "A38": {
+    "status": "not_run",
+    "evidence": [],
+    "notes": ""
+  }
+}

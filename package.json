@@ -1,0 +1,47 @@
+{
+  "name": "cantina-escolar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.12.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "dev:emulator": "node scripts/dev-emulator.ts",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config vitest.unit.config.ts",
+    "test:integration": "firebase emulators:exec --only auth,firestore --project demo-cantina \"vitest run --config vitest.integration.config.ts\"",
+    "test:rules": "firebase emulators:exec --only auth,firestore,storage --project demo-cantina \"vitest run --config vitest.rules.config.ts\"",
+    "test:e2e": "firebase emulators:exec --only auth,firestore --project demo-cantina \"playwright test\"",
+    "emulators": "firebase emulators:start --project demo-cantina",
+    "seed": "node scripts/seed.ts",
+    "dev:webpack": "next dev --webpack",
+    "build:webpack": "next build --webpack",
+    "audit:prod": "npm audit --omit=dev --audit-level=high"
+  },
+  "dependencies": {
+    "firebase": "12.19.0",
+    "firebase-admin": "14.5.0",
+    "next": "16.3.8",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "server-only": "0.0.1",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.2",
+    "@playwright/test": "1.63.0",
+    "@types/node": "26.6.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.8",
+    "firebase-tools": "15.32.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.3"
+  }
+}

@@ -1,0 +1,1954 @@
+{
+  "domains": {
+    "access": [
+      "docs/domains/access.md",
+      "docs/firebase/auth-realtime.md",
+      "docs/firebase/security-rules.md"
+    ],
+    "school": [
+      "docs/domains/calendar.md"
+    ],
+    "students": [
+      "docs/domains/access.md"
+    ],
+    "guardians": [
+      "docs/domains/access.md"
+    ],
+    "catalog": [
+      "docs/domains/catalog-menu.md",
+      "docs/design.md"
+    ],
+    "menu": [
+      "docs/domains/catalog-menu.md",
+      "docs/domains/calendar.md"
+    ],
+    "wallet": [
+      "docs/domains/wallet.md",
+      "docs/firebase/transactions.md"
+    ],
+    "payments": [
+      "docs/domains/payments.md",
+      "docs/firebase/transactions.md"
+    ],
+    "orders": [
+      "docs/domains/checkout.md",
+      "docs/domains/my-orders.md",
+      "docs/domains/cancellations.md",
+      "docs/firebase/transactions.md"
+    ],
+    "fulfillment": [
+      "docs/domains/fulfillment.md",
+      "docs/domains/cancellations.md",
+      "docs/firebase/transactions.md"
+    ],
+    "pos": [
+      "docs/domains/pos.md",
+      "docs/domains/policies.md",
+      "docs/firebase/transactions.md"
+    ],
+    "inventory": [
+      "docs/domains/inventory.md",
+      "docs/firebase/transactions.md"
+    ],
+    "fees": [
+      "docs/domains/payments.md",
+      "docs/domains/reports-cash.md"
+    ],
+    "reports": [
+      "docs/domains/reports-cash.md",
+      "docs/firebase/queries.md"
+    ],
+    "audit": [
+      "docs/security.md"
+    ],
+    "policies": [
+      "docs/domains/policies.md",
+      "docs/domains/calendar.md",
+      "docs/firebase/transactions.md"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "F01",
+      "title": "Fundação técnica e prova de isolamento",
+      "phase": "A",
+      "depends_on": [],
+      "domains": [
+        "access"
+      ],
+      "acceptance": [
+        "A32",
+        "A33",
+        "A34",
+        "A35"
+      ],
+      "docs": [
+        "docs/architecture.md",
+        "docs/firebase/auth-realtime.md",
+        "docs/firebase/schema.md",
+        "docs/firebase/security-rules.md",
+        "docs/testing/strategy.md",
+        "docs/deployment.md"
+      ],
+      "path": "docs/tasks/F01.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "desenho",
+          "skill": "cantina-architecture",
+          "purpose": "Definir schema/fronteiras/contratos necessários, registrar decisão curta e prosseguir com implementação."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F02",
+      "title": "Shell visual, navegação e fotos",
+      "phase": "A",
+      "depends_on": [
+        "F01"
+      ],
+      "domains": [
+        "catalog"
+      ],
+      "acceptance": [
+        "A36",
+        "A37"
+      ],
+      "docs": [
+        "docs/design.md",
+        "docs/screens.md",
+        "docs/firebase/security-rules.md"
+      ],
+      "path": "docs/tasks/F02.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F03",
+      "title": "Autenticação, papéis e autorização",
+      "phase": "B",
+      "depends_on": [
+        "F01"
+      ],
+      "domains": [
+        "access",
+        "audit"
+      ],
+      "acceptance": [
+        "A02",
+        "A08",
+        "A30",
+        "A33",
+        "A34"
+      ],
+      "docs": [
+        "docs/domains/access.md",
+        "docs/firebase/auth-realtime.md",
+        "docs/firebase/security-rules.md"
+      ],
+      "path": "docs/tasks/F03.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F04",
+      "title": "Alunos, responsáveis, vínculos e convites",
+      "phase": "B",
+      "depends_on": [
+        "F03"
+      ],
+      "domains": [
+        "students",
+        "guardians",
+        "access"
+      ],
+      "acceptance": [
+        "A01",
+        "A02",
+        "A30",
+        "A33"
+      ],
+      "docs": [
+        "docs/domains/access.md",
+        "docs/firebase/schema.md"
+      ],
+      "path": "docs/tasks/F04.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F05",
+      "title": "Escola, calendário e datas locais",
+      "phase": "B",
+      "depends_on": [
+        "F04"
+      ],
+      "domains": [
+        "school"
+      ],
+      "acceptance": [
+        "A12",
+        "A13",
+        "A14"
+      ],
+      "docs": [
+        "docs/domains/calendar.md",
+        "docs/screens.md"
+      ],
+      "path": "docs/tasks/F05.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F06",
+      "title": "Catálogo, preço histórico e canais",
+      "phase": "B",
+      "depends_on": [
+        "F02",
+        "F03"
+      ],
+      "domains": [
+        "catalog"
+      ],
+      "acceptance": [
+        "A15",
+        "A16",
+        "A36",
+        "A37"
+      ],
+      "docs": [
+        "docs/domains/catalog-menu.md",
+        "docs/design.md",
+        "docs/firebase/security-rules.md"
+      ],
+      "path": "docs/tasks/F06.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F07",
+      "title": "Cardápio por data, turno e exceções",
+      "phase": "B",
+      "depends_on": [
+        "F05",
+        "F06"
+      ],
+      "domains": [
+        "menu",
+        "school"
+      ],
+      "acceptance": [
+        "A12",
+        "A14",
+        "A15"
+      ],
+      "docs": [
+        "docs/domains/catalog-menu.md",
+        "docs/domains/calendar.md"
+      ],
+      "path": "docs/tasks/F07.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F08",
+      "title": "Carteira, livro e transferências",
+      "phase": "B",
+      "depends_on": [
+        "F04"
+      ],
+      "domains": [
+        "wallet",
+        "audit"
+      ],
+      "acceptance": [
+        "A01",
+        "A03",
+        "A17",
+        "A18",
+        "A35"
+      ],
+      "docs": [
+        "docs/domains/wallet.md",
+        "docs/firebase/schema.md",
+        "docs/firebase/transactions.md"
+      ],
+      "path": "docs/tasks/F08.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "desenho",
+          "skill": "cantina-architecture",
+          "purpose": "Definir schema/fronteiras/contratos necessários, registrar decisão curta e prosseguir com implementação."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "invariantes de negócio",
+          "skill": "cantina-finance",
+          "purpose": "Preservar atomicidade, idempotência, dinheiro/estoque/uso e validar cenários concorrentes do comando."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F09",
+      "title": "Políticas, bloqueios e uso por consumo",
+      "phase": "B",
+      "depends_on": [
+        "F05",
+        "F08"
+      ],
+      "domains": [
+        "policies",
+        "wallet"
+      ],
+      "acceptance": [
+        "A08",
+        "A09",
+        "A10",
+        "A11",
+        "A35"
+      ],
+      "docs": [
+        "docs/domains/policies.md",
+        "docs/domains/calendar.md",
+        "docs/firebase/transactions.md"
+      ],
+      "path": "docs/tasks/F09.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "invariantes de negócio",
+          "skill": "cantina-finance",
+          "purpose": "Preservar atomicidade, idempotência, dinheiro/estoque/uso e validar cenários concorrentes do comando."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F10",
+      "title": "Estoque, cotas e custo médio",
+      "phase": "C",
+      "depends_on": [
+        "F06",
+        "F07"
+      ],
+      "domains": [
+        "inventory"
+      ],
+      "acceptance": [
+        "A18",
+        "A19",
+        "A20",
+        "A21"
+      ],
+      "docs": [
+        "docs/domains/inventory.md",
+        "docs/firebase/schema.md",
+        "docs/firebase/transactions.md"
+      ],
+      "path": "docs/tasks/F10.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "desenho",
+          "skill": "cantina-architecture",
+          "purpose": "Definir schema/fronteiras/contratos necessários, registrar decisão curta e prosseguir com implementação."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "invariantes de negócio",
+          "skill": "cantina-finance",
+          "purpose": "Preservar atomicidade, idempotência, dinheiro/estoque/uso e validar cenários concorrentes do comando."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F11",
+      "title": "Checkout antecipado e lote de datas",
+      "phase": "C",
+      "depends_on": [
+        "F07",
+        "F08",
+        "F09",
+        "F10"
+      ],
+      "domains": [
+        "orders",
+        "wallet",
+        "inventory",
+        "policies"
+      ],
+      "acceptance": [
+        "A10",
+        "A11",
+        "A12",
+        "A14",
+        "A15",
+        "A16",
+        "A17",
+        "A18",
+        "A35"
+      ],
+      "docs": [
+        "docs/domains/checkout.md",
+        "docs/domains/policies.md",
+        "docs/domains/calendar.md",
+        "docs/firebase/transactions.md"
+      ],
+      "path": "docs/tasks/F11.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "desenho",
+          "skill": "cantina-architecture",
+          "purpose": "Definir schema/fronteiras/contratos necessários, registrar decisão curta e prosseguir com implementação."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "invariantes de negócio",
+          "skill": "cantina-finance",
+          "purpose": "Preservar atomicidade, idempotência, dinheiro/estoque/uso e validar cenários concorrentes do comando."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F12",
+      "title": "Meus pedidos, extrato e realtime",
+      "phase": "C",
+      "depends_on": [
+        "F11"
+      ],
+      "domains": [
+        "orders",
+        "wallet"
+      ],
+      "acceptance": [
+        "A26",
+        "A34",
+        "A37"
+      ],
+      "docs": [
+        "docs/domains/my-orders.md",
+        "docs/domains/wallet.md",
+        "docs/firebase/queries.md",
+        "docs/firebase/auth-realtime.md"
+      ],
+      "path": "docs/tasks/F12.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F13",
+      "title": "Preparação, entrega parcial e não retirada",
+      "phase": "C",
+      "depends_on": [
+        "F11"
+      ],
+      "domains": [
+        "fulfillment",
+        "inventory"
+      ],
+      "acceptance": [
+        "A19",
+        "A22",
+        "A23",
+        "A27",
+        "A35"
+      ],
+      "docs": [
+        "docs/domains/fulfillment.md",
+        "docs/domains/inventory.md",
+        "docs/firebase/transactions.md"
+      ],
+      "path": "docs/tasks/F13.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "invariantes de negócio",
+          "skill": "cantina-finance",
+          "purpose": "Preservar atomicidade, idempotência, dinheiro/estoque/uso e validar cenários concorrentes do comando."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F14",
+      "title": "Cancelamentos e reembolsos",
+      "phase": "C",
+      "depends_on": [
+        "F13",
+        "F08"
+      ],
+      "domains": [
+        "orders",
+        "fulfillment",
+        "wallet",
+        "inventory"
+      ],
+      "acceptance": [
+        "A13",
+        "A16",
+        "A22",
+        "A23",
+        "A35"
+      ],
+      "docs": [
+        "docs/domains/cancellations.md",
+        "docs/domains/calendar.md",
+        "docs/firebase/transactions.md"
+      ],
+      "path": "docs/tasks/F14.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "invariantes de negócio",
+          "skill": "cantina-finance",
+          "purpose": "Preservar atomicidade, idempotência, dinheiro/estoque/uso e validar cenários concorrentes do comando."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F15",
+      "title": "PDV e venda direta",
+      "phase": "C",
+      "depends_on": [
+        "F09",
+        "F10",
+        "F11"
+      ],
+      "domains": [
+        "pos",
+        "wallet",
+        "inventory"
+      ],
+      "acceptance": [
+        "A08",
+        "A09",
+        "A11",
+        "A18",
+        "A25",
+        "A26"
+      ],
+      "docs": [
+        "docs/domains/pos.md",
+        "docs/domains/policies.md",
+        "docs/firebase/transactions.md"
+      ],
+      "path": "docs/tasks/F15.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "invariantes de negócio",
+          "skill": "cantina-finance",
+          "purpose": "Preservar atomicidade, idempotência, dinheiro/estoque/uso e validar cenários concorrentes do comando."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F16",
+      "title": "Reagendamento e troca de produtos",
+      "phase": "C",
+      "depends_on": [
+        "F13",
+        "F14",
+        "F15"
+      ],
+      "domains": [
+        "orders",
+        "pos",
+        "fulfillment",
+        "inventory"
+      ],
+      "acceptance": [
+        "A11",
+        "A22",
+        "A24",
+        "A35"
+      ],
+      "docs": [
+        "docs/domains/pos.md",
+        "docs/domains/cancellations.md",
+        "docs/domains/policies.md",
+        "docs/firebase/transactions.md"
+      ],
+      "path": "docs/tasks/F16.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "invariantes de negócio",
+          "skill": "cantina-finance",
+          "purpose": "Preservar atomicidade, idempotência, dinheiro/estoque/uso e validar cenários concorrentes do comando."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F17",
+      "title": "Secretaria, recarga manual e estorno",
+      "phase": "D",
+      "depends_on": [
+        "F08",
+        "F03",
+        "F15"
+      ],
+      "domains": [
+        "payments",
+        "wallet",
+        "fees",
+        "audit"
+      ],
+      "acceptance": [
+        "A04",
+        "A07",
+        "A30"
+      ],
+      "docs": [
+        "docs/domains/payments.md",
+        "docs/domains/access.md",
+        "docs/firebase/transactions.md"
+      ],
+      "path": "docs/tasks/F17.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "invariantes de negócio",
+          "skill": "cantina-finance",
+          "purpose": "Preservar atomicidade, idempotência, dinheiro/estoque/uso e validar cenários concorrentes do comando."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F18",
+      "title": "Adapters reais de Pix e cartão 1x",
+      "phase": "D",
+      "depends_on": [
+        "F08",
+        "F03"
+      ],
+      "domains": [
+        "payments"
+      ],
+      "acceptance": [
+        "A04",
+        "A06"
+      ],
+      "docs": [
+        "docs/domains/payments.md",
+        "docs/decisions.md",
+        "docs/deployment.md"
+      ],
+      "path": "docs/tasks/F18.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "desenho",
+          "skill": "cantina-architecture",
+          "purpose": "Definir schema/fronteiras/contratos necessários, registrar decisão curta e prosseguir com implementação."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "invariantes de negócio",
+          "skill": "cantina-finance",
+          "purpose": "Preservar atomicidade, idempotência, dinheiro/estoque/uso e validar cenários concorrentes do comando."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F19",
+      "title": "Webhooks, conciliação e reversões",
+      "phase": "D",
+      "depends_on": [
+        "F18",
+        "F17"
+      ],
+      "domains": [
+        "payments",
+        "wallet",
+        "audit"
+      ],
+      "acceptance": [
+        "A05",
+        "A06",
+        "A31",
+        "A35"
+      ],
+      "docs": [
+        "docs/domains/payments.md",
+        "docs/firebase/transactions.md",
+        "docs/security.md"
+      ],
+      "path": "docs/tasks/F19.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "invariantes de negócio",
+          "skill": "cantina-finance",
+          "purpose": "Preservar atomicidade, idempotência, dinheiro/estoque/uso e validar cenários concorrentes do comando."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F20",
+      "title": "Taxas, liquidação e fechamento de caixa",
+      "phase": "D",
+      "depends_on": [
+        "F15",
+        "F17",
+        "F19"
+      ],
+      "domains": [
+        "fees",
+        "reports",
+        "payments"
+      ],
+      "acceptance": [
+        "A04",
+        "A28",
+        "A29",
+        "A31"
+      ],
+      "docs": [
+        "docs/domains/payments.md",
+        "docs/domains/reports-cash.md"
+      ],
+      "path": "docs/tasks/F20.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "invariantes de negócio",
+          "skill": "cantina-finance",
+          "purpose": "Preservar atomicidade, idempotência, dinheiro/estoque/uso e validar cenários concorrentes do comando."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F21",
+      "title": "Relatórios e projeções reconstruíveis",
+      "phase": "D",
+      "depends_on": [
+        "F14",
+        "F16",
+        "F20"
+      ],
+      "domains": [
+        "reports",
+        "fees",
+        "inventory"
+      ],
+      "acceptance": [
+        "A20",
+        "A21",
+        "A28",
+        "A29",
+        "A30",
+        "A38"
+      ],
+      "docs": [
+        "docs/domains/reports-cash.md",
+        "docs/firebase/queries.md",
+        "docs/firebase/schema.md"
+      ],
+      "path": "docs/tasks/F21.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "desenho",
+          "skill": "cantina-architecture",
+          "purpose": "Definir schema/fronteiras/contratos necessários, registrar decisão curta e prosseguir com implementação."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "invariantes de negócio",
+          "skill": "cantina-finance",
+          "purpose": "Preservar atomicidade, idempotência, dinheiro/estoque/uso e validar cenários concorrentes do comando."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F22",
+      "title": "Auditoria e rotinas de operação",
+      "phase": "D",
+      "depends_on": [
+        "F21"
+      ],
+      "domains": [
+        "audit",
+        "access"
+      ],
+      "acceptance": [
+        "A07",
+        "A23",
+        "A27",
+        "A30",
+        "A31",
+        "A38"
+      ],
+      "docs": [
+        "docs/security.md",
+        "docs/delivery.md",
+        "docs/screens.md"
+      ],
+      "path": "docs/tasks/F22.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F23",
+      "title": "Aceite integrado, segurança e UX",
+      "phase": "E",
+      "depends_on": [
+        "F22"
+      ],
+      "domains": [
+        "access",
+        "orders",
+        "wallet",
+        "payments",
+        "inventory",
+        "reports"
+      ],
+      "acceptance": [
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "A05",
+        "A06",
+        "A07",
+        "A08",
+        "A09",
+        "A10",
+        "A11",
+        "A12",
+        "A13",
+        "A14",
+        "A15",
+        "A16",
+        "A17",
+        "A18",
+        "A19",
+        "A20",
+        "A21",
+        "A22",
+        "A23",
+        "A24",
+        "A25",
+        "A26",
+        "A27",
+        "A28",
+        "A29",
+        "A30",
+        "A31",
+        "A32",
+        "A33",
+        "A34",
+        "A35",
+        "A36",
+        "A37",
+        "A38"
+      ],
+      "docs": [
+        "docs/testing/strategy.md",
+        "docs/testing/index.md",
+        "docs/security.md",
+        "docs/design.md"
+      ],
+      "path": "docs/tasks/F23.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "invariantes de negócio",
+          "skill": "cantina-finance",
+          "purpose": "Preservar atomicidade, idempotência, dinheiro/estoque/uso e validar cenários concorrentes do comando."
+        },
+        {
+          "stage": "interface",
+          "skill": "cantina-ui",
+          "purpose": "Implementar telas funcionais e verificar a direção clean, fotos, acessibilidade e estados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    },
+    {
+      "id": "F24",
+      "title": "Homologação, backup e entrega",
+      "phase": "E",
+      "depends_on": [
+        "F23"
+      ],
+      "domains": [
+        "access",
+        "payments",
+        "audit"
+      ],
+      "acceptance": [
+        "A32",
+        "A33",
+        "A34",
+        "A36",
+        "A38"
+      ],
+      "docs": [
+        "docs/deployment.md",
+        "docs/delivery.md",
+        "docs/security.md",
+        "docs/external-dependencies.md"
+      ],
+      "path": "docs/tasks/F24.md",
+      "skill_workflow": [
+        {
+          "stage": "contexto",
+          "skill": "cantina-token-economy",
+          "purpose": "Obter metadados desta tarefa pelo script e reduzir buscas/saída sem remover invariantes."
+        },
+        {
+          "stage": "desenho",
+          "skill": "cantina-architecture",
+          "purpose": "Definir schema/fronteiras/contratos necessários, registrar decisão curta e prosseguir com implementação."
+        },
+        {
+          "stage": "casos de teste",
+          "skill": "cantina-testing",
+          "purpose": "Planejar/implementar casos dos IDs de aceite relevantes; não rodar a suíte completa nesta etapa."
+        },
+        {
+          "stage": "persistência e integração",
+          "skill": "cantina-firebase",
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+        },
+        {
+          "stage": "revisão de acesso e risco",
+          "skill": "cantina-security",
+          "purpose": "Revisar os arquivos/comandos alterados, autorização e caminhos negativos; usar scanners quando pertinentes."
+        },
+        {
+          "stage": "validação",
+          "skill": "cantina-verify",
+          "purpose": "Executar checks já planejados, sem repetição desnecessária, e registrar evidência/pendência por critério."
+        },
+        {
+          "stage": "entrega",
+          "skill": "cantina-release",
+          "purpose": "Preparar homologação, backup/restauração, configuração e evidências; sem publicação automática."
+        }
+      ],
+      "conditional_skills": [
+        {
+          "when": "Mudança fora de tarefa ou domínio ambíguo",
+          "skill": "cantina-context"
+        },
+        {
+          "when": "Versão/API/provedor desconhecido ou informação atual necessária",
+          "skill": "cantina-research"
+        },
+        {
+          "when": "Falha de teste/build/runtime/integração ainda não explicada",
+          "skill": "cantina-debug"
+        }
+      ]
+    }
+  ],
+  "acceptance": {
+    "A01": "docs/testing/wallet.md",
+    "A03": "docs/testing/wallet.md",
+    "A02": "docs/testing/access.md",
+    "A08": "docs/testing/access.md",
+    "A09": "docs/testing/access.md",
+    "A30": "docs/testing/access.md",
+    "A33": "docs/testing/access.md",
+    "A04": "docs/testing/payments.md",
+    "A05": "docs/testing/payments.md",
+    "A06": "docs/testing/payments.md",
+    "A07": "docs/testing/payments.md",
+    "A29": "docs/testing/payments.md",
+    "A31": "docs/testing/payments.md",
+    "A10": "docs/testing/calendar-policies.md",
+    "A11": "docs/testing/calendar-policies.md",
+    "A12": "docs/testing/calendar-policies.md",
+    "A13": "docs/testing/calendar-policies.md",
+    "A14": "docs/testing/calendar-policies.md",
+    "A15": "docs/testing/checkout.md",
+    "A16": "docs/testing/checkout.md",
+    "A17": "docs/testing/checkout.md",
+    "A18": "docs/testing/checkout.md",
+    "A24": "docs/testing/checkout.md",
+    "A19": "docs/testing/inventory-pos.md",
+    "A20": "docs/testing/inventory-pos.md",
+    "A21": "docs/testing/inventory-pos.md",
+    "A25": "docs/testing/inventory-pos.md",
+    "A22": "docs/testing/fulfillment.md",
+    "A23": "docs/testing/fulfillment.md",
+    "A26": "docs/testing/fulfillment.md",
+    "A27": "docs/testing/fulfillment.md",
+    "A28": "docs/testing/reports.md",
+    "A38": "docs/testing/reports.md",
+    "A32": "docs/testing/infrastructure-ui.md",
+    "A34": "docs/testing/infrastructure-ui.md",
+    "A35": "docs/testing/infrastructure-ui.md",
+    "A36": "docs/testing/infrastructure-ui.md",
+    "A37": "docs/testing/infrastructure-ui.md"
+  }
+}

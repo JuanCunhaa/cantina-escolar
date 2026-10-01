@@ -1,0 +1,22 @@
+## 19. Integridade, segurança e infraestrutura
+
+- Firebase Auth verificado em todas as ações; autorização de papel/vínculo no servidor e rules de leitura restritas.
+- TypeScript strict, schemas de validação e cálculo financeiro no servidor.
+- Transações Firestore para carteira, estoque, cotas, uso diário/semanal e reembolso. Callback não chama provedor de pagamento.
+- Idempotência de compra, entrega, transferência, recarga, webhook e estorno.
+- Testes de disputa entre responsáveis, balcão/site e entrega/cancelamento.
+- Sessão segura e proteção de origem/CSRF quando aplicável; logout e revogação de acesso coerentes entre servidor e listeners.
+- Credenciais de Admin SDK somente server-only/ambiente seguro, nunca NEXT_PUBLIC ou browser. A configuração pública do Web SDK (project ID, auth domain, web apiKey etc.) não é credencial Admin e não substitui rules.
+- Não expor tokens de cartão, CVV, segredo de webhook ou dados pessoais desnecessários em logs.
+- Livro e auditoria append-only, com ajustes por novos movimentos e testes de integridade.
+- Firestore/Storage como persistência; nenhuma carteira real em localStorage, JSON, SQLite ou filesystem temporário da Vercel.
+- Offline/cache podem servir consulta sinalizada, mas não confirmar venda, saldo ou entrega por dado desatualizado. Não enfileirar escrita financeira no cliente para “sincronizar depois”.
+- Projetos/ambientes Firebase separados para emuladores, homologação e produção; índices/rules/configuração versionados.
+- Migrações documentais TypeScript com versão, dry-run, idempotência e cópia de segurança; build não modifica a base real.
+- Backup/export e restauração documentados/testados em ambiente de homologação.
+- Listeners com escopo e limite; cleanup adequado; nenhuma assinatura de histórico financeiro inteiro.
+- Não exibir dado de cache como confirmação de cobrança. Mostrar falha/reconexão e permitir repetir comando com a mesma chave.
+- Tarefa agendada de conciliação pode usar Cloud Functions TypeScript ou mecanismo autorizado da hospedagem, sem duplicar regra de negócio.
+- Fotos com upload limitado, compressão, formatos seguros, dimensões padronizadas e metadados, sem base64 no banco.
+- Alertas de orçamento/consumo configuráveis; documentar operações cobradas e não prometer custo zero.
+- Sem microsserviços, multilojas, addons genéricos, app nativo ou sincronização offline para este escopo.

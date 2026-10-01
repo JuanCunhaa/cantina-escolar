@@ -1,0 +1,35 @@
+{
+  "source_sections": 21,
+  "acceptance_criteria": 38,
+  "tasks": 24,
+  "skills": 14,
+  "path_rules": 5,
+  "included_typescript_tools": [
+    "scripts/agent-context.ts",
+    "scripts/run-check.ts"
+  ],
+  "claude_md_lines": 44,
+  "validation_status": "passed",
+  "application_tests": "not_run; application not implemented",
+  "claude_skill_invocation": "not_run; user Claude environment not available",
+  "helper_runtime_tests": {
+    "runtime": "Node v24.19.0",
+    "passed": [
+      "task lookup returns selected task and skill workflow only",
+      "domain lookup and invalid task status",
+      "2000-line success log preserved, summary limited, status 0",
+      "child failure code 7 preserved",
+      "missing command returns failure 127",
+      "missing executable rejected with status 2"
+    ]
+  },
+  "checks": [
+    "JSON/YAML",
+    "local references",
+    "skills referenced by all 24 task workflows",
+    "task dependency order",
+    "source fragment hashes",
+    "38 acceptance hashes",
+    "helper runtime fixtures"
+  ]
+}

@@ -1,0 +1,7 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Ponto inicial fechado. Adaptar tipo/tamanho/caminho/papel antes de liberar uploads.
+    match /{allPaths=**} { allow read, write: if false; }
+  }
+}
