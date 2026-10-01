@@ -1,24 +1,22 @@
-// Seed local: cria duas contas fictícias no Auth Emulator. Recusa qualquer alvo que não seja emulador local.
-const host = process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "127.0.0.1:9099";
-const project = process.env.FIREBASE_PROJECT_ID ?? "demo-cantina";
+// Seed local: contas fictícias no Auth Emulator + catálogo de demonstração (Firestore/Storage Emulator).
+// Recusa qualquer alvo que não seja emulador local com projeto demo-*.
+import { ensureAccount, seedDemoCatalog, targetFromEnv } from "./lib/demo-seed.ts";
 
-if (!/^(127\.0\.0\.1|localhost):\d+$/.test(host) || !project.startsWith("demo-")) {
-  console.error("seed recusado: só emulador local com projeto demo-*.");
+const target = targetFromEnv();
+
+try {
+  const accounts = [
+    { email: "familia-a@example.test", password: "senha-fake-a-123" },
+    { email: "familia-b@example.test", password: "senha-fake-b-123" },
+    { email: "cantina@example.test", password: "senha-fake-c-123", role: "cantina" },
+  ];
+  for (const account of accounts) {
+    await ensureAccount(target, account);
+    console.log(`${account.email}: pronta${account.role ? ` (papel ${account.role})` : ""}`);
+  }
+  await seedDemoCatalog(target);
+  console.log("catálogo de demonstração (fictício) gravado em demoProducts + Storage.");
+} catch (error) {
+  console.error(error instanceof Error ? error.message : "seed falhou");
   process.exit(1);
 }
-
-const accounts = [
-  { email: "familia-a@example.test", password: "senha-fake-a-123" },
-  { email: "familia-b@example.test", password: "senha-fake-b-123" },
-];
-
-for (const account of accounts) {
-  const response = await fetch(`http://${host}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ ...account, returnSecureToken: false }),
-  });
-  console.log(`${account.email}: ${response.ok ? "criada" : `ignorada (${response.status})`}`);
-}
-
-export {};

@@ -14,3 +14,11 @@ Sem execução de testes da aplicação nesta entrega. Adicionar tarefa, commit/
 - Build: scripts build (padrão) e build:webpack; só webpack comprovado (exit 0). Padrão pendente de CI/Vercel.
 - CLAUDE.md: bloco nextjs-agent-rules movido para AGENTS.md (gerador só regrava lá e não regenerou no teste); referência curta no CLAUDE.md limitando a leitura ao necessário.
 - Novo: scripts/dev-emulator.ts (npm run dev:emulator), fluxo manual validado de ponta a ponta no emulador. typecheck 0, lint 0 após as mudanças; testes automatizados não repetidos (sem mudança em src/tests).
+
+## F02 — shell visual, navegação e fotos (30/09/2026)
+- Arquivos: src/app/{globals.css,layout,page,portal/*,operacao/*,api/catalog/photo}, src/components/{layout/{app-shell,area-home,sign-in-form},ui/product-photo}, src/modules/access/{roles,navigation,use-session,actor}, src/modules/catalog/{photo,use-demo-products,components/*}, src/lib/{money/format,validation/photo,firebase/{admin,client},env}, firebase/{storage,firestore}.rules, scripts/{seed,dev-emulator,lib/demo-seed}.ts, playwright.config.ts, package.json (emuladores incluem storage), tests/{unit/photo-navigation,rules,integration/photo-route,e2e/shell-photos,helpers}.
+- Resultados: typecheck 0; lint 0; unit 17/17; rules 13/13; integration 21/21; e2e 7/7 (1 de F01 + 6 de F02); build:webpack 0.
+- Achado de revisão corrigido: Rules permitiam sobrescrever foto já validada (update) → só create com `resource == null`; teste de regressão.
+- Falhas resolvidas: lint react-hooks/set-state-in-effect (estado chaveado por uid/caminho); e2e: foco do Tab após login, alert duplicado do route announcer, 1ª compilação de rota no dev server.
+- `npm run audit:prod`: 2 achados já existentes (@grpc/grpc-js alto, uuid moderado via firebase/firebase-admin); sem dependência nova em F02; não corrigido (a correção sugerida rebaixa firebase para 9.x).
+- Não executado: Gitleaks/Semgrep (indisponíveis), Turbopack, CI, homologação Firebase real, axe automatizado.

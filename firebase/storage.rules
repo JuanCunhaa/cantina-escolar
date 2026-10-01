@@ -1,7 +1,26 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Ponto inicial fechado. Adaptar tipo/tamanho/caminho/papel antes de liberar uploads.
+    // Papel provisório (F02): custom claim `role` definida só pelo servidor/Admin. F03 formaliza papéis e pode substituir.
+    function isPhotoStaff() {
+      return request.auth != null && request.auth.token.get('role', '') in ['admin', 'cantina'];
+    }
+    function validPhoto() {
+      return request.resource.size > 0
+        && request.resource.size <= 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+
+    // Fotos do cardápio (imutáveis após criadas: substituir = novo arquivo; evita trocar o conteúdo depois da validação do servidor): leitura para qualquer conta autenticada; escrita só de funcionário autorizado,
+    // com caminho products/{productId}/{arquivo}, tipo e tamanho validados. Rules não inspecionam bytes:
+    // o servidor confere metadados ao registrar a foto (/api/catalog/photo).
+    match /products/{productId}/{fileName} {
+      allow read: if request.auth != null;
+      allow create: if resource == null && isPhotoStaff() && validPhoto() && fileName.matches('[A-Za-z0-9_-]{1,64}[.](jpg|png|webp)');
+      allow delete: if isPhotoStaff();
+    }
+
+    // Todo o resto (comprovantes, documentos privados, qualquer outro caminho) permanece fechado.
     match /{allPaths=**} { allow read, write: if false; }
   }
 }

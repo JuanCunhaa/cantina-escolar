@@ -193,13 +193,21 @@
   },
   "A36": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/rules (Storage, emulador): só cantina/admin criam foto; responsável/secretaria/papel desconhecido/anônimo negados; tipo (svg/pdf/html/gif), vazio, >2 MB, nome e caminho validados; sem sobrescrita; leitura só autenticada; caminho privado negado a todos",
+      "tests/integration/photo-route.test.ts (21/21 com a suíte): 401/403/404 em produção, caminho de outro produto, arquivo com conteúdo falso removido (422), tipo divergente, >2 MB, inexistente",
+      "tests/e2e/shell-photos.spec.ts: funcionário envia PNG válido (fallback vira foto), txt e >2 MB recusados no cliente, PNG falso recusado pelo servidor; 3 fotos reais + 1 fallback no portal"
+    ],
+    "notes": "Parcial: provado no emulador com papel PROVISÓRIO (custom claim `role`, definida só pelo servidor). Papéis/permissões reais e revogação (Rules não checam revogação; token vale até expirar) vêm em F03; homologação Storage real pendente. Limpeza de uploads órfãos e foto substituída: F06. Manter not_run."
   },
   "A37": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/e2e/shell-photos.spec.ts: skip link/Tab/Enter/Space operam o cardápio sem mouse, foco com contorno 3px, aria-current; viewport 375px sem rolagem horizontal, alvos >=40px, resumo fixo visível; prefers-reduced-motion zera transição e a ação responde <1s; sem a preferência a transição é 150 ms e também não atrasa; responsável não acessa a operação",
+      "tests/unit/photo-navigation.test.ts: navegação por papel",
+      "inspeção visual de capturas desktop/mobile (lista aberta com separadores, cards só nas fotos)"
+    ],
+    "notes": "Parcial: cobre portal de demonstração e tela de produtos/fotos. Contraste conferido por tokens (muted 6.3:1, accent/branco 6.0:1), sem axe automatizado. PDV, entrega, pedidos e demais telas (F11–F16) devem repetir a prova; manter not_run."
   },
   "A38": {
     "status": "not_run",

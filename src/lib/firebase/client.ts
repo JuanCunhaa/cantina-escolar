@@ -1,9 +1,10 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { connectAuthEmulator, getAuth, type Auth } from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore, type Firestore } from "firebase/firestore";
+import { connectStorageEmulator, getStorage, type FirebaseStorage } from "firebase/storage";
 import { parsePublicEnv } from "@/lib/env";
 
-type Services = { app: FirebaseApp; auth: Auth; db: Firestore };
+type Services = { app: FirebaseApp; auth: Auth; db: Firestore; storage: FirebaseStorage };
 let services: Services | undefined;
 
 /** Inicialização única do Web SDK. Acesso literal a process.env para o bundler inlinar NEXT_PUBLIC_*. */
@@ -29,10 +30,12 @@ export function getFirebaseClient(): Services {
     : getApp();
   const auth = getAuth(app);
   const db = getFirestore(app);
+  const storage = getStorage(app);
   if (fresh && env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true") {
     connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
     connectFirestoreEmulator(db, "127.0.0.1", 8080);
+    connectStorageEmulator(storage, "127.0.0.1", 9199);
   }
-  services = { app, auth, db };
+  services = { app, auth, db, storage };
   return services;
 }

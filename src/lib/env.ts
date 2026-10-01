@@ -14,6 +14,7 @@ const publicSchema = z.object({
 const serverSchema = z.object({
   APP_ENV: z.enum(["emulator", "staging", "production"]),
   FIREBASE_PROJECT_ID: z.string().min(1),
+  FIREBASE_STORAGE_BUCKET: z.string().min(1).optional(),
   FIREBASE_CLIENT_EMAIL: z.string().optional(),
   FIREBASE_PRIVATE_KEY: z.string().optional(),
   FIREBASE_AUTH_EMULATOR_HOST: emulatorHost.optional(),

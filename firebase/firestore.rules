@@ -16,6 +16,13 @@ service cloud.firestore {
       }
     }
 
+    // F02: exemplo de catálogo claramente fictício (isolado de relatórios/dados reais). Leitura por conta
+    // autenticada; escrita nunca pelo cliente (seed/servidor). Substituído pelo catálogo real em F06.
+    match /demoProducts/{productId} {
+      allow get, list: if signedIn();
+      allow write: if false;
+    }
+
     // Todo o resto permanece fechado até F03 (acesso por identidade/vínculo) e tarefas de domínio.
     match /{document=**} { allow read, write: if false; }
   }

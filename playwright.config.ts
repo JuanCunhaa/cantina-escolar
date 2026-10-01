@@ -21,6 +21,10 @@ export default defineConfig({
       NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "demo-cantina.appspot.com",
       NEXT_PUBLIC_FIREBASE_APP_ID: "demo-app",
       FIREBASE_PROJECT_ID: "demo-cantina",
+      FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099",
+      FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080",
+      FIREBASE_STORAGE_EMULATOR_HOST: "127.0.0.1:9199",
+      FIREBASE_STORAGE_BUCKET: "demo-cantina.appspot.com",
       // Hermético: um .env local com credencial real não pode vazar para a prova em emulador.
       FIREBASE_CLIENT_EMAIL: "",
       FIREBASE_PRIVATE_KEY: "",
