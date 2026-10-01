@@ -61,6 +61,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // F05: identidade, dias de funcionamento/horários e exceções de calendário são legíveis por qualquer conta com
+    // perfil ativo (telas e contagem regressiva); escrita só pelo servidor (administração), com auditoria.
+    match /settings/{settingsId} {
+      allow get: if active();
+      allow list, write: if false;
+    }
+    match /calendarDays/{dayId} {
+      allow get, list: if active();
+      allow write: if false;
+    }
+
     // F01: a prova de fundação lê apenas o próprio documento e o próprio livro (qualquer conta autenticada).
     // Escritas ficam sempre negadas ao cliente; comandos passam pelo servidor (Admin SDK).
     match /foundationProbes/{uid} {

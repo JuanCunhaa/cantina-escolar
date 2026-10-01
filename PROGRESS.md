@@ -7,9 +7,17 @@ Data de referência: 01/10/2026. Este arquivo descreve código entregue, não ap
 - F02 — shell visual, navegação por papel e fotos (escopo implementado; A36/A37 parciais).
 - F03 — autenticação, papéis e autorização (escopo implementado; A02/A08/A30/A33/A34 parciais, ver abaixo).
 - F04 — alunos, responsáveis, vínculos e convites (escopo implementado; A01/A02/A30/A33 parciais, ver abaixo).
+- F05 — escola, calendário e datas locais (escopo implementado; A12/A13/A14 parciais, ver abaixo).
 
 ## Em andamento
-- Nenhuma. Próximas elegíveis: F05/F06 (conferir docs/tasks/index.md; F06 também liberada por F02+F03) e F08 (carteira real, depende de F04, agora liberada). Não iniciada nesta sessão.
+- Nenhuma. Próximas elegíveis: F06 (catálogo) e F08 (carteira); F07 e F09 exigem também F06/F08 (conferir docs/tasks/index.md). Nenhuma iniciada nesta sessão.
+
+## F05 — resumo (01/10/2026)
+- Entregue: datas locais America/Sao_Paulo sobre instantes UTC (src/lib/dates/school-time.ts); regras puras (src/modules/school/calendar.ts): agora >= limite, janela hoje…hoje+7 inclusive, dia sem funcionamento negado sem estender a janela, limites de compra (07:00/14:00) e cancelamento (08:00/15:00) independentes por turno, snapshot de política com instantes UTC; `settings/school` (nome, dias de funcionamento, horários por turno; versão otimista) e `calendarDays` (extra/fechado) com comandos idempotentes só admin e auditoria (POST /api/school/settings, /api/school/calendar); `checkPurchase` (canônica para F11/F15, aceita transação) e GET da janela; Rules de leitura (perfil ativo) e escrita negada; tela /operacao/calendario (admin).
+- Efeito em pedidos futuros (documentado, sem implementar F11): mudanças valem para novas avaliações; pedidos guardam snapshot e o cancelamento usa só ele; afetar pedidos existentes exigirá ação explícita com prévia e auditoria em F11 (docs/decisions.md "Decisões de F05").
+- Validação (emulador demo-cantina, execução única após a última mudança): typecheck 0; lint 0; unit 64/64; rules 31/31; integration 83/83; e2e 17/17; build:webpack 0; audit:prod 0. Captura 375 px inspecionada (test-results/f05-calendario-375.png), sem rolagem horizontal.
+- Skills invocadas via ferramenta Skill: cantina-token-economy, cantina-testing, cantina-firebase, cantina-ui, cantina-security (revisão manual + testes negativos), cantina-verify.
+- Detalhes: docs/status/history.md; contrato em docs/firebase/schema.md ("Escola, calendário e política de horário (F05)").
 
 ## F04 — resumo (01/10/2026)
 - Entregue (administração, `students.manage`): turmas e turnos (`classes`/`shifts`, nome único, arquivar bloqueado com aluno ativo); alunos (`students/{stu_…}`, matrícula única e imutável por `uniquenessKeys` na mesma transação, homônimos aceitos, editar turma/turno/nome com motivo e `version`, arquivar sem perder histórico; política padrão negada criada junto); diretório com busca por prefixo/matrícula e filtros mostrando turma/turno (equipe com `students.search`); vínculos responsável–aluno sem "principal" (`POST /api/links`, revogar nunca apaga); permissões de compra por qualquer responsável vinculado (`POST /api/policies`, `configVersion`, autor no `auditLog`); convites de uso único (hash SHA-256, token só no fragmento `/convite#…`, 72 h padrão/14 d máx., 5 pendentes por aluno; responsável só pela administração, login do aluno também por responsável vinculado; resgate cria conta ou vincula a conta logada, com compensação); login opcional do aluno (um login ↔ um aluno, removível); importação CSV com prévia, digest, duplicidade (ignorar/atualizar), avisos de possível duplicidade, validação e proteção contra fórmula.
@@ -32,6 +40,7 @@ Data de referência: 01/10/2026. Este arquivo descreve código entregue, não ap
 
 ## Aceite (parcial; todos permanecem not_run globalmente — evidência em docs/status/acceptance.json)
 - A01: só a independência de cadastro/política entre irmãos (F04); saldos independentes dependem da carteira (F08).
+- A12/A13/A14: regra, limites exatos, janela hoje+7, fuso e horários configuráveis provados (unit/integração/rules/e2e admin); checkout/PDV/cancelamento real e "não cancelar entregue" dependem de F11/F13/F15 — seguem not_run.
 - A02: ambos os responsáveis alteram as permissões de compra com autor auditado; sem vínculo/vínculo revogado negados (API, Rules, e2e). Limites/bloqueios por produto (F09) e efeito em checkout/PDV (F11/F15) pendentes.
 - A08: decisão de autorização com política atual provada (F03); bloqueio de checkout/PDV e preservação de pedidos dependem de F11/F15.
 - A30: aluno/responsável/cantina/secretaria negados nas APIs administrativas (usuários, turmas, alunos, importação, vínculos, convites); rotas de custos/lucro/relatórios inexistentes ainda (F06/F10/F21).
@@ -44,6 +53,7 @@ Data de referência: 01/10/2026. Este arquivo descreve código entregue, não ap
 - Homologação real pendente: regra entre serviços do Storage (exige permissão IAM do serviço no projeto), e-mail de redefinição de senha (Firebase Auth), domínios autorizados.
 - Sem tela de administração de usuários/funcionários (só API `POST /api/admin/users`); papel `student` só tem portal de consulta.
 - F04: convite não é enviado por e-mail (a escola copia o link; nenhuma integração de e-mail inventada); resgate público sem limitação de taxa própria (WAF/edge em F24); tela de revisão de pedidos futuros após troca de turma/turno depende de pedidos (F11+); edição de contato do responsável e de matrícula não existe (matrícula é imutável); busca por trecho/sobrenome é filtro no navegador sobre a lista carregada; importação testada até 300 linhas (limite 500); Gitleaks/Semgrep não executados.
+- F05: horários vivem em `settings/school` (turno novo fora de manhã/tarde precisa de horário configurado, senão fica indisponível); sem tela de revisão de pedidos afetados (F11); sem sincronização automática de feriados; Gitleaks/Semgrep não executados.
 - Remover `demoProducts`, `/api/catalog/photo` e a regra quando o catálogo real (F06) existir; remover `/api/probe`/`foundationProbes` quando a carteira real (F08) existir.
 - Concorrência no mesmo documento: transações leitura→escrita disputam a promoção do lock (≈3,4 s por impasse no emulador); com `COMMAND_TRANSACTION` 12 escritores/documento passam. Não medido no Firestore real; revalidar na homologação (F24) e ao implementar a carteira (F08).
 - Gitleaks: job no CI (v8.30.1, SHA-256 fixado) CONFIGURADO, não executado; local bloqueado pela política do Windows. Semgrep: não executado.
@@ -54,4 +64,4 @@ Data de referência: 01/10/2026. Este arquivo descreve código entregue, não ap
 - Dica de ambiente: `npm run test:e2e` não aceita filtro; para um spec use `npx firebase emulators:exec --only auth,firestore,storage --project demo-cantina "npx playwright test <arquivo>"`. Seed local agora cria também secretaria@/admin@example.test (perfis em `users`).
 
 ## Próxima ação
-- Ler docs/tasks/index.md e executar a próxima tarefa elegível (por exemplo /cantina-task F08 ou F06) em sessão nova.
+- Ler docs/tasks/index.md e executar a próxima tarefa elegível (por exemplo /cantina-task F06 ou F08) em sessão nova.

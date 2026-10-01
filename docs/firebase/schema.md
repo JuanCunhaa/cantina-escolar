@@ -50,3 +50,10 @@ Escritas só pelo servidor (Admin SDK) em transação com auditoria; o cliente l
 - `users/{uid}.contact` (opcional, responsável, texto ≤ 60): gravado no resgate do convite; `setUserAccess` usa `merge` e preserva o campo.
 - `auditLog` (ações F04): `school.{class|shift}.{create|rename|archive|restore}`, `student.create`, `student.update`, `student.import` (resumo), `student.login.revoke`, `link.add`, `link.revoke`, `policy.set`, `invitation.create|revoke|redeem`.
 - Índices: nenhum composto necessário (consultas só de igualdade ou intervalo em um campo + ordenação pelo mesmo campo; `firestore.indexes.json` segue vazio). Diretório de alunos: leitura paginada por cursor, ordenada por `nameNormalized`.
+
+### Escola, calendário e política de horário (F05)
+
+- `settings/school` (único): `schoolName` (≤ 80), `weekdays` (0=domingo…6=sábado; padrão seg–sex), `shiftPolicies{shiftId:{purchaseCutoff,cancelCutoff}}` (`HH:MM` locais, independentes), `version` (inteiro; comando exige `expectedVersion`, divergência = 409 `stale_settings`), `updatedAt`. Turno sem política explícita usa o padrão pelo nome normalizado (`manha` 07:00/08:00, `tarde` 14:00/15:00); outro turno sem configuração fica indisponível para compra (falha fechada).
+- `calendarDays/{YYYY-MM-DD}`: `date`, `kind` (`extra` habilita dia fora dos dias de funcionamento; `closed` bloqueia dia regular), `reason`, `updatedAt`. Remover apaga o documento (histórico em `auditLog`). Só datas de hoje (local) até +400 dias; passado é recusado.
+- Leitura por qualquer conta com perfil ativo; escrita só pelo servidor (admin) via `POST /api/school/settings` e `POST /api/school/calendar`, idempotentes, com auditoria (`school.settings.update`, `school.calendar.{set|clear}`; `after.appliesTo = "new_orders_only"`). Sem índice composto (consulta de janela por intervalo no ID do documento).
+- Snapshot de política para o pedido (F11 grava; calculado por `snapshotPolicy`): `timezone`, `consumptionDate` (data local), `shiftId`, `purchaseCutoff/cancelCutoff` (HH:MM), `purchaseCutoffAt/cancelCutoffAt` (instantes UTC), `settingsVersion`. Cancelamento familiar usa SEMPRE o snapshot, nunca a configuração atual.

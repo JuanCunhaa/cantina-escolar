@@ -11,3 +11,7 @@ Relatórios filtrados/exportação devem respeitar autorização. Totais grandes
 ### Alunos e responsáveis (F04)
 
 Busca por nome: `students` por intervalo de prefixo em `nameNormalized` (custo = documentos devolvidos), mais matrícula exata; paginação por cursor (≤ 100 por página) via `GET /api/students`, só para quem tem `students.search` (cantina, secretaria, administração). Não há busca textual por trecho/sobrenome no Firestore: a tela filtra no navegador sobre as páginas carregadas (escola de ~300 alunos = 3 leituras de página; aprox. 300 reads por abertura da lista). A importação CSV lê o diretório inteiro (≤ 5000 documentos) na prévia e na confirmação. Responsável: listeners próprios em `guardianStudentLinks` (guardianUid == uid e status == active) + `students/{id}` + `studentPolicies/{id}` por filho; cleanup quando o vínculo some.
+
+### Calendário (F05)
+
+`GET /api/school/calendar?shiftId=` (qualquer perfil ativo): lê o turno, `settings/school` e `calendarDays` por intervalo de ID (hoje…hoje+7, ≤ 8 documentos). `checkPurchase(db, {shiftId, date, now?}, tx?)` faz as mesmas leituras (turno, settings, 1 dia) e pode rodar dentro da transação do checkout. Tela admin escuta `calendarDays` inteira (≤ ~400 documentos por limite de data).
