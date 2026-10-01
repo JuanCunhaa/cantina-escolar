@@ -1,8 +1,18 @@
 {
   "A01": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/integration/students-api.test.ts (F04, parcial): dois filhos do mesmo responsável são alunos/políticas independentes — alterar a política de A não muda B",
+      "npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 46/46",
+      "npm run test:rules 30/30",
+      "npm run test:integration 73/73",
+      "npm run test:e2e 15/15",
+      "npm run build:webpack exit 0",
+      "npm run audit:prod 0 vulnerabilidades"
+    ],
+    "notes": "Parcial (F04, 01/10/2026): só a independência de cadastro/política entre irmãos. Saldos independentes e 'gasto de A não debita B' dependem da carteira (F08); manter not_run."
   },
   "A02": {
     "status": "not_run",
@@ -16,9 +26,20 @@
       "npm run test:rules 26/26",
       "npm run test:integration 46/46",
       "npm run test:e2e 12/12",
-      "npm run build:webpack exit 0"
+      "npm run build:webpack exit 0",
+      "tests/integration/students-api.test.ts (F04): dois responsáveis vinculados ao mesmo aluno alteram as permissões de compra (configVersion 1→3) e cada alteração fica no auditLog com o autor; responsável sem vínculo, vínculo revogado, aluno, cantina e secretaria recebem 403 sem alterar nada; vínculo só por administração ou convite validado",
+      "tests/e2e/students.spec.ts: responsável cria conta por convite, vê apenas o próprio filho e altera a permissão pela tela; responsável sem vínculo não vê o aluno",
+      "tests/rules (F04): vínculo é escrita só do servidor (sem auto-vínculo pelo cliente); aluno/política legíveis apenas pela família vinculada",
+      "npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 46/46",
+      "npm run test:rules 30/30",
+      "npm run test:integration 73/73",
+      "npm run test:e2e 15/15",
+      "npm run build:webpack exit 0",
+      "npm run audit:prod 0 vulnerabilidades"
     ],
-    "notes": "Parcial (F03, 30/09/2026): acesso por vínculo provado em leitura (Rules) e em autorização de servidor. Alteração de configuração por AMBOS os responsáveis (limites/permissões/bloqueios, com auditoria de autor) depende de F04 (vínculos reais) e F09 (políticas); manter not_run."
+    "notes": "Parcial (F04): configuração por AMBOS os responsáveis com auditoria de autor e negação sem vínculo provadas para as permissões de compra (site/balcão). Limites diários/semanais e bloqueios por produto (F09) e o efeito sobre checkout/PDV (F11/F15) seguem pendentes; manter not_run."
   },
   "A03": {
     "status": "not_run",
@@ -178,9 +199,19 @@
       "npm run test:rules 26/26",
       "npm run test:integration 46/46",
       "npm run test:e2e 12/12",
-      "npm run build:webpack exit 0"
+      "npm run build:webpack exit 0",
+      "tests/integration/students-api.test.ts (F04): cantina/secretaria/responsável/aluno recebem 403 em turmas, cadastro, importação CSV, vínculos, convites de responsável, ficha e diretório de responsáveis; cantina e secretaria só consultam a lista (students.search)",
+      "tests/e2e/students.spec.ts: cantina e secretaria sem formulário de cadastro/importação e sem acesso a Turmas e turnos; responsável não alcança a operação",
+      "npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 46/46",
+      "npm run test:rules 30/30",
+      "npm run test:integration 73/73",
+      "npm run test:e2e 15/15",
+      "npm run build:webpack exit 0",
+      "npm run audit:prod 0 vulnerabilidades"
     ],
-    "notes": "Parcial: negação por API administrativa e matriz provadas; ainda não há rotas/telas de custos, lucro e relatórios (F06/F10/F21) para provar que a secretaria é negada nelas; manter not_run."
+    "notes": "Parcial: negação por API administrativa (usuários F03; turmas, alunos, importação, vínculos e convites F04) e matriz provadas; ainda não há rotas/telas de custos, lucro e relatórios (F06/F10/F21) para provar a negação da secretaria nelas; manter not_run."
   },
   "A31": {
     "status": "not_run",
@@ -212,9 +243,19 @@
       "npm run test:rules 26/26",
       "npm run test:integration 46/46",
       "npm run test:e2e 12/12",
-      "npm run build:webpack exit 0"
+      "npm run build:webpack exit 0",
+      "tests/rules (F04): turmas/turnos só leitura; convites e chaves de unicidade invisíveis e intocáveis para qualquer papel (inclusive admin); responsável vinculado não escreve aluno/política nem cria vínculo; outra família e conta sem vínculo não leem; aluno com login lê só o próprio cadastro",
+      "tests/integration/students-api.test.ts (F04): token do convite não é gravado (só hash), uso único sob disputa de 3 resgates simultâneos (1 vence, contas perdedoras removidas), expirado/revogado/adulterado = mesma recusa sem criar conta, matrícula única sob criação concorrente, limite de 5 convites pendentes sob concorrência",
+      "npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 46/46",
+      "npm run test:rules 30/30",
+      "npm run test:integration 73/73",
+      "npm run test:e2e 15/15",
+      "npm run build:webpack exit 0",
+      "npm run audit:prod 0 vulnerabilidades"
     ],
-    "notes": "Parcial: provado para papéis, vínculos, políticas e prova de fundação. Carteira, pedidos, estoque, preço e relatórios reais ainda não existem (F06/F08+/F21); manter not_run."
+    "notes": "Parcial: provado para papéis, vínculos, políticas, cadastro de alunos, convites e prova de fundação. Carteira, pedidos, estoque, preço e relatórios reais ainda não existem (F06/F08+/F21); manter not_run."
   },
   "A34": {
     "status": "not_run",

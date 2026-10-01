@@ -49,6 +49,18 @@ service cloud.firestore {
       allow list, write: if false;
     }
 
+    // F04: turmas e turnos são cadastro público interno (nomes), legíveis por qualquer conta com perfil ativo para
+    // montar telas; escrita só pelo servidor (administração). Convites, chaves de unicidade, idempotência e
+    // auditoria continuam fechados ao cliente (regra final).
+    match /classes/{classId} {
+      allow get, list: if active();
+      allow write: if false;
+    }
+    match /shifts/{shiftId} {
+      allow get, list: if active();
+      allow write: if false;
+    }
+
     // F01: a prova de fundação lê apenas o próprio documento e o próprio livro (qualquer conta autenticada).
     // Escritas ficam sempre negadas ao cliente; comandos passam pelo servidor (Admin SDK).
     match /foundationProbes/{uid} {

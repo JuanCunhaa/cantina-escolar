@@ -6,13 +6,17 @@ export type NavItem = { href: string; label: string; roles: readonly Role[]; rea
 export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/portal", label: "Início", roles: ["guardian", "student"], ready: true },
   { href: "/portal/cardapio", label: "Cardápio", roles: ["guardian", "student"], ready: true },
+  { href: "/portal/alunos", label: "Alunos", roles: ["guardian"], ready: true },
   { href: "/portal/pedidos", label: "Meus pedidos", roles: ["guardian", "student"], ready: false },
   { href: "/portal/carteira", label: "Carteira", roles: ["guardian"], ready: false },
   { href: "/operacao", label: "Início", roles: ["cantina", "secretaria", "admin"], ready: true },
+  { href: "/operacao/alunos", label: "Alunos", roles: ["cantina", "secretaria", "admin"], ready: true },
   { href: "/operacao/pedidos", label: "Pedidos do dia", roles: ["cantina", "admin"], ready: false },
   { href: "/operacao/pdv", label: "PDV", roles: ["cantina", "admin"], ready: false },
   { href: "/operacao/produtos", label: "Produtos e fotos", roles: ["cantina", "admin"], ready: true },
   { href: "/operacao/recebimentos", label: "Recebimentos", roles: ["secretaria", "admin"], ready: false },
+  { href: "/operacao/responsaveis", label: "Responsáveis", roles: ["admin"], ready: true },
+  { href: "/operacao/escola", label: "Turmas e turnos", roles: ["admin"], ready: true },
   { href: "/operacao/painel", label: "Painel", roles: ["admin"], ready: false },
 ];
 

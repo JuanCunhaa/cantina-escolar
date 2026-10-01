@@ -368,3 +368,76 @@ describe("Firestore rules — alunos, vínculos e políticas (F03; A02/A33)", ()
     await assertFails(getDoc(doc(db, "demoProducts/p1")));
   });
 });
+
+describe("Firestore rules — F04: turmas, turnos, convites e dados de cadastro (A02/A33)", () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "classes/c1"), { name: "5A", status: "active" });
+      await setDoc(doc(db, "shifts/s1"), { name: "Manhã", status: "active" });
+      await setDoc(doc(db, "students/kid1"), { name: "Aluno Um", enrollment: "M1", status: "active", userUid: null, classId: "c1", shiftId: "s1" });
+      await setDoc(doc(db, "students/kid2"), { name: "Aluno Dois", enrollment: "M2", status: "active", userUid: null, classId: "c1", shiftId: "s1" });
+      await setDoc(doc(db, "guardianStudentLinks/gA_kid1"), { guardianUid: "gA", studentId: "kid1", status: "active" });
+      await setDoc(doc(db, "guardianStudentLinks/gB_kid1"), { guardianUid: "gB", studentId: "kid1", status: "active" });
+      await setDoc(doc(db, "studentPolicies/kid1"), { allowSitePurchase: false, allowCounterPurchase: false, configVersion: 1 });
+      await setDoc(doc(db, "invitations/h1"), { kind: "guardian", studentId: "kid1", status: "pending" });
+      await setDoc(doc(db, "uniquenessKeys/enrollment_M1"), { studentId: "kid1" });
+    });
+  });
+
+  it("turmas e turnos: leitura por conta com perfil ativo; escrita nunca pelo cliente (nem administração)", async () => {
+    const guardian = (await as("gA", "guardian")).firestore();
+    const admin = (await as("adm", "admin")).firestore();
+    for (const db of [guardian, admin]) {
+      await assertSucceeds(getDoc(doc(db, "classes/c1")));
+      await assertSucceeds(getDocs(collection(db, "shifts")));
+      await assertFails(setDoc(doc(db, "classes/c2"), { name: "6B", status: "active" }));
+      await assertFails(updateDoc(doc(db, "shifts/s1"), { name: "Noite" }));
+      await assertFails(deleteDoc(doc(db, "classes/c1")));
+    }
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "classes/c1")));
+    await assertFails(getDoc(doc(env.authenticatedContext("semPerfil").firestore(), "classes/c1")));
+    await assertFails(getDoc(doc((await as("off", "guardian", "disabled")).firestore(), "shifts/s1")));
+  });
+
+  it("convites e chaves de unicidade são invisíveis e intocáveis para qualquer papel", async () => {
+    for (const [uid, role] of [["gA", "guardian"], ["adm", "admin"], ["can", "cantina"], ["sec", "secretaria"]] as const) {
+      const db = (await as(uid, role)).firestore();
+      await assertFails(getDoc(doc(db, "invitations/h1")));
+      await assertFails(getDocs(collection(db, "invitations")));
+      await assertFails(updateDoc(doc(db, "invitations/h1"), { status: "used" }));
+      await assertFails(setDoc(doc(db, "invitations/h2"), { kind: "guardian", studentId: "kid1", status: "pending" }));
+      await assertFails(getDoc(doc(db, "uniquenessKeys/enrollment_M1")));
+      await assertFails(setDoc(doc(db, "uniquenessKeys/enrollment_M9"), { studentId: "kid1" }));
+    }
+  });
+
+  it("responsável vinculado lê o aluno e a política do seu filho, mas não escreve; outra família não lê (A02)", async () => {
+    const a = (await as("gA", "guardian")).firestore();
+    const b = (await as("gB", "guardian")).firestore();
+    const outsider = (await as("gC", "guardian")).firestore();
+    for (const db of [a, b]) {
+      await assertSucceeds(getDoc(doc(db, "students/kid1")));
+      await assertSucceeds(getDoc(doc(db, "studentPolicies/kid1")));
+      await assertFails(updateDoc(doc(db, "studentPolicies/kid1"), { allowSitePurchase: true })); // só pelo servidor
+      await assertFails(updateDoc(doc(db, "students/kid1"), { name: "Outro" }));
+      await assertFails(setDoc(doc(db, "guardianStudentLinks/gA_kid2"), { guardianUid: "gA", studentId: "kid2", status: "active" })); // sem auto-vínculo
+      await assertFails(getDoc(doc(db, "students/kid2")));
+    }
+    await assertFails(getDoc(doc(outsider, "students/kid1")));
+    await assertFails(getDoc(doc(outsider, "studentPolicies/kid1")));
+    await assertFails(setDoc(doc(outsider, "guardianStudentLinks/gC_kid1"), { guardianUid: "gC", studentId: "kid1", status: "active" }));
+    await assertFails(getDocs(collection(outsider, "students")));
+  });
+
+  it("aluno com login lê o próprio cadastro e nada mais; vínculo só por servidor", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), "students/kid1"), { userUid: "stuUser" });
+    });
+    const student = (await as("stuUser", "student")).firestore();
+    await assertSucceeds(getDoc(doc(student, "students/kid1")));
+    await assertFails(getDoc(doc(student, "students/kid2")));
+    await assertFails(updateDoc(doc(student, "students/kid1"), { userUid: "stuUser", name: "Eu" }));
+    await assertFails(setDoc(doc(student, "guardianStudentLinks/stuUser_kid2"), { guardianUid: "stuUser", studentId: "kid2", status: "active" }));
+  });
+});

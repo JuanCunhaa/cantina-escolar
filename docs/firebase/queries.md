@@ -7,3 +7,7 @@ Busca por nome: campo normalizado e estratégia de prefixo/tokens testada para a
 Relatórios não podem depender de varrer toda a base em cada abertura. Projete registros diários/por produto/taxa quando necessário, com ligação ao lançamento de origem. Atualizações de projeção por trigger precisam ser idempotentes: evento pode ser entregue mais de uma vez. Para o volume pequeno, atualizar contadores pertinentes na transação do negócio pode ser mais simples. Projeções são reconstruíveis; o livro de movimentos e snapshots financeiros continuam a fonte.
 
 Relatórios filtrados/exportação devem respeitar autorização. Totais grandes em inteiro/Decimal devem validar faixa segura do JavaScript e conservar precisão ao serializar. Não armazenar saldo em string formatada como “R$ 50,00”.
+
+### Alunos e responsáveis (F04)
+
+Busca por nome: `students` por intervalo de prefixo em `nameNormalized` (custo = documentos devolvidos), mais matrícula exata; paginação por cursor (≤ 100 por página) via `GET /api/students`, só para quem tem `students.search` (cantina, secretaria, administração). Não há busca textual por trecho/sobrenome no Firestore: a tela filtra no navegador sobre as páginas carregadas (escola de ~300 alunos = 3 leituras de página; aprox. 300 reads por abertura da lista). A importação CSV lê o diretório inteiro (≤ 5000 documentos) na prévia e na confirmação. Responsável: listeners próprios em `guardianStudentLinks` (guardianUid == uid e status == active) + `students/{id}` + `studentPolicies/{id}` por filho; cleanup quando o vínculo some.

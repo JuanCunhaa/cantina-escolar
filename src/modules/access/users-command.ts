@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { Auth } from "firebase-admin/auth";
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { z } from "zod";
+import { IdempotencyConflictError } from "@/lib/firebase/command";
 import { COMMAND_TRANSACTION } from "@/lib/firebase/transaction-options";
 import { auditInTransaction } from "@/modules/audit/log";
 import type { Actor } from "./actor";
@@ -10,7 +11,7 @@ import { ForbiddenError } from "./errors";
 import { parseProfile, type AccessProfile } from "./profile";
 import { EXTRA_PERMISSIONS, ROLES, USER_STATUSES } from "./roles";
 
-export class IdempotencyConflictError extends Error {}
+export { IdempotencyConflictError };
 export class UserNotFoundError extends Error {}
 export class InvalidAccessChangeError extends Error {}
 export class LastAdminError extends Error {}
@@ -122,7 +123,8 @@ export async function setUserAccess(
       before.displayName !== after.displayName ||
       before.permissions.join() !== after.permissions.join();
     if (changed) {
-      tx.set(profileRef, { ...after, updatedAt: FieldValue.serverTimestamp() });
+      // merge: preserva campos de cadastro fora do contrato de acesso (ex.: contato do responsável, F04).
+      tx.set(profileRef, { ...after, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
       auditInTransaction(db, tx, auditId, {
         action: "access.set",
         actorUid: actor.uid,

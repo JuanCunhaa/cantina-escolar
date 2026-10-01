@@ -137,6 +137,9 @@ button.secondary:hover:not(:disabled) { background: var(--color-accent-soft); }
 input[type="email"],
 input[type="password"],
 input[type="file"],
+input[type="text"],
+input[type="search"],
+textarea,
 select {
   min-height: var(--touch-target);
   max-width: 100%;
@@ -212,3 +215,20 @@ select {
 .data-table th, .data-table td { text-align: left; padding: var(--space-2); border-bottom: 1px solid var(--color-line); vertical-align: middle; }
 .data-table .photo { width: 6rem; }
 .table-scroll { overflow-x: auto; }
+
+/* F04: formulários de cadastro em seções abertas (sem caixas por campo), barras de filtro e listas simples. */
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.inline-form { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-2) var(--space-3); margin-bottom: var(--space-3); }
+.inline-form > label { flex-basis: 100%; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0 var(--space-3); align-items: end; margin-bottom: var(--space-3); }
+.form-grid > h2 { grid-column: 1 / -1; }
+.form-grid .field, .toolbar .field { max-width: none; }
+.toolbar { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0 var(--space-3); }
+textarea { width: 100%; padding: var(--space-2); border: 1px solid var(--color-muted); border-radius: var(--radius); font: inherit; color: inherit; background: var(--color-surface); }
+input[type="checkbox"] { width: 1.25rem; height: 1.25rem; vertical-align: middle; }
+.plain-list { list-style: none; margin: 0 0 var(--space-3); padding: 0; }
+.plain-list > li { padding: var(--space-2) 0; border-bottom: 1px solid var(--color-line); }
+.student-block { padding: var(--space-3) 0; }
+.student-block h2 { margin-top: 0; }
+fieldset { border: 0; border-top: 1px solid var(--color-line); margin: 0 0 var(--space-3); padding: var(--space-2) 0 0; }
+legend { font-weight: 700; padding: 0; }
