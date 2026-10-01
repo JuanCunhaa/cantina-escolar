@@ -1,16 +1,14 @@
 "use client";
 
 import { useState, type ChangeEvent } from "react";
-import { ref, uploadBytes } from "firebase/storage";
 import { ProductPhoto } from "@/components/ui/product-photo";
 import { formatBRL } from "@/lib/money/format";
-import { getFirebaseClient } from "@/lib/firebase/client";
-import { PHOTO_ACCEPT, productPhotoPath, validatePhoto } from "@/lib/validation/photo";
+import { PHOTO_ACCEPT, validatePhoto } from "@/lib/validation/photo";
 import { useDemoProducts } from "../use-demo-products";
 
 type Feedback = { productId: string; kind: "ok" | "error"; text: string };
 
-/** Operação: troca de foto de produto. Envia ao Storage (Rules validam papel/tipo/tamanho) e o servidor registra o metadado. */
+/** Operação: troca de foto de produto. Envia os bytes ao servidor, que autoriza, valida a imagem e grava no armazenamento privado. */
 export function PhotoManager({ uid, idToken }: { uid: string; idToken: () => Promise<string> }) {
   const { status, products } = useDemoProducts(uid);
   const [busy, setBusy] = useState<string | null>(null);
@@ -29,20 +27,18 @@ export function PhotoManager({ uid, idToken }: { uid: string; idToken: () => Pro
     setBusy(productId);
     setFeedback(null);
     try {
-      const path = productPhotoPath(productId, crypto.randomUUID().replaceAll("-", ""), check.extension);
-      await uploadBytes(ref(getFirebaseClient().storage, path), file, { contentType: check.type });
-      const response = await fetch("/api/catalog/photo", {
+      const response = await fetch(`/api/catalog/photo?productId=${encodeURIComponent(productId)}`, {
         method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${await idToken()}` },
-        body: JSON.stringify({ productId, path }),
+        headers: { "content-type": check.type, authorization: `Bearer ${await idToken()}` },
+        body: file,
       });
       setFeedback(
         response.ok
           ? { productId, kind: "ok", text: "Foto atualizada." }
-          : { productId, kind: "error", text: "O servidor recusou a foto. Use uma imagem JPEG, PNG ou WebP válida de até 2 MB." },
+          : { productId, kind: "error", text: response.status === 403 ? "Seu perfil não tem permissão para trocar fotos." : "O servidor recusou a foto. Use uma imagem JPEG, PNG ou WebP válida de até 2 MB." },
       );
     } catch {
-      setFeedback({ productId, kind: "error", text: "Não foi possível enviar a foto. Seu perfil pode não ter permissão." });
+      setFeedback({ productId, kind: "error", text: "Não foi possível enviar a foto. Verifique a conexão e tente novamente." });
     } finally {
       setBusy(null);
       input.value = "";
@@ -74,7 +70,7 @@ export function PhotoManager({ uid, idToken }: { uid: string; idToken: () => Pro
             {products.map((product) => (
               <tr key={product.id} data-testid="photo-row">
                 <td>
-                  <ProductPhoto photoPath={product.photoPath} name={product.name} />
+                  <ProductPhoto productId={product.id} photoPath={product.photoPath} name={product.name} />
                 </td>
                 <td>{product.name}</td>
                 <td>{formatBRL(product.priceCents)}</td>

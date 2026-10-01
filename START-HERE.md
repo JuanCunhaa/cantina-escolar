@@ -17,7 +17,7 @@ claude --model claude-sonnet-5-5
 Como alternativa, colar o pedido completo abaixo:
 
 ```text
-Você é responsável por desenvolver integralmente a Cantina Escolar descrita neste repositório. Use Claude Sonnet 5.5, quando disponível, preservando TypeScript strict, Next.js e Firebase Auth/Firestore/Storage.
+Você é responsável por desenvolver integralmente a Cantina Escolar descrita neste repositório. Use Claude Sonnet 5.5, quando disponível, preservando TypeScript strict, Next.js, Firebase Auth/Firestore e arquivos no Cloudflare R2 (migração aprovada em 01/10/2026).
 
 Comece lendo CLAUDE.md, PROGRESS.md e docs/tasks/F01.md. Leia apenas os documentos e critérios necessários para essa tarefa. Execute F01 por completo: inicialize a aplicação no diretório atual sem sobrescrever a estrutura, configure emuladores/ambientes e prove login, listener privado e comando servidor transacional com duas contas isoladas. Entregue comportamento funcionando e testado, não somente plano ou telas.
 

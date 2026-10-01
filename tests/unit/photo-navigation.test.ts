@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatBRL } from "@/lib/money/format";
-import { PHOTO_MAX_BYTES, PHOTO_PATH_PATTERN, productPhotoPath, validatePhoto } from "@/lib/validation/photo";
+import { PHOTO_KEY_PATTERN, PHOTO_MAX_BYTES, validatePhoto } from "@/lib/validation/photo";
 import { NAV_ITEMS, homeFor, navigationFor } from "@/modules/access/navigation";
 import { can } from "@/modules/access/permissions";
 import { parseRole, ROLES } from "@/modules/access/roles";
@@ -18,10 +18,10 @@ describe("validatePhoto (A36)", () => {
     expect(validatePhoto({ type: "image/png", size: 0 }).ok).toBe(false);
     expect(validatePhoto({ type: "image/png", size: PHOTO_MAX_BYTES + 1 }).ok).toBe(false);
   });
-  it("caminho gerado casa com o padrão do servidor e rejeita travessia", () => {
-    expect(PHOTO_PATH_PATTERN.test(productPhotoPath("demo-suco", "abc123", "png"))).toBe(true);
+  it("chave de foto aceita só products/{produto}/{nome}.{ext} e rejeita travessia", () => {
+    expect(PHOTO_KEY_PATTERN.test("products/demo-suco/0123456789abcdef0123456789abcdef.png")).toBe(true);
     for (const bad of ["products/../private/x.png", "products/a/b/c.png", "private/a.png", "products/a/b.svg", "products/a/.png"]) {
-      expect(PHOTO_PATH_PATTERN.test(bad)).toBe(false);
+      expect(PHOTO_KEY_PATTERN.test(bad)).toBe(false);
     }
   });
 });

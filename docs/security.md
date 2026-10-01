@@ -9,7 +9,7 @@
 - Credenciais de Admin SDK somente server-only/ambiente seguro, nunca NEXT_PUBLIC ou browser. A configuração pública do Web SDK (project ID, auth domain, web apiKey etc.) não é credencial Admin e não substitui rules.
 - Não expor tokens de cartão, CVV, segredo de webhook ou dados pessoais desnecessários em logs.
 - Livro e auditoria append-only, com ajustes por novos movimentos e testes de integridade.
-- Firestore/Storage como persistência; nenhuma carteira real em localStorage, JSON, SQLite ou filesystem temporário da Vercel.
+- Firestore (dados) e R2 privado (arquivos) como persistência; nenhuma carteira real em localStorage, JSON, SQLite ou filesystem temporário da Vercel.
 - Offline/cache podem servir consulta sinalizada, mas não confirmar venda, saldo ou entrega por dado desatualizado. Não enfileirar escrita financeira no cliente para “sincronizar depois”.
 - Projetos/ambientes Firebase separados para emuladores, homologação e produção; índices/rules/configuração versionados.
 - Migrações documentais TypeScript com versão, dry-run, idempotência e cópia de segurança; build não modifica a base real.

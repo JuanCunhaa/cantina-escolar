@@ -20,11 +20,10 @@
     "status": "configured",
     "emulators": [
       "auth",
-      "firestore",
-      "storage"
+      "firestore"
     ],
     "project": "demo-cantina",
-    "note": "rules/integration/e2e executados localmente"
+    "note": "rules/integration/e2e executados localmente; sem Storage Emulator desde a migração para R2 (01/10/2026)"
   },
   "vitest": {
     "status": "configured",
@@ -73,5 +72,9 @@
   "dev_emulator": {
     "status": "validated_locally",
     "note": "npm run dev:emulator + seed + /api/probe: 401 sem token, 200 com token, 200 replay (emulador)"
+  },
+  "cloudflare_r2": {
+    "status": "code_ready_not_verified_against_real_account",
+    "note": "sem wrangler, sem credenciais e sem sessão Cloudflare nesta máquina; npm run test:r2 pulado. Ver docs/status/r2-migration.md"
   }
 }

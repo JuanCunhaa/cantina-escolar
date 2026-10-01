@@ -48,7 +48,6 @@ jobs:
           NEXT_PUBLIC_FIREBASE_API_KEY: demo-key
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: demo-cantina.firebaseapp.com
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-cantina
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: demo-cantina.appspot.com
           NEXT_PUBLIC_FIREBASE_APP_ID: demo-app
           FIREBASE_PROJECT_ID: demo-cantina
       - run: npm run audit:prod

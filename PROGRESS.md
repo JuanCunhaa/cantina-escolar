@@ -12,6 +12,12 @@ Data de referência: 01/10/2026. Este arquivo descreve código entregue, não ap
 ## Em andamento
 - Nenhuma. Próximas elegíveis: F06 (catálogo) e F08 (carteira); F07 e F09 exigem também F06/F08 (conferir docs/tasks/index.md). Nenhuma iniciada nesta sessão.
 
+## Migração de arquivos para Cloudflare R2 (01/10/2026)
+- Entregue: Firebase Storage substituído por Cloudflare R2 (bucket privado, upload pelo servidor) no módulo src/lib/storage; rotas POST/GET /api/catalog/photo e POST /api/admin/storage/sweep; Storage Rules/Emulator removidos; Auth e Firestore intactos. F06 não iniciada.
+- Validação (execução única após a última mudança): typecheck 0; lint 0; unit 86/86; rules 24/24; integration 101/101; e2e 17/17; build:webpack 0; audit:prod 0.
+- NÃO comprovado: integração com R2 real (sem conta/credenciais nesta máquina; `npm run test:r2` pulado). Migração não declarada homologada. Passos para fechar: docs/status/r2-migration.md ("Pendências").
+- Skills invocadas via ferramenta Skill: cantina-architecture, cantina-research, cantina-security (revisão manual + testes negativos).
+
 ## F05 — resumo (01/10/2026)
 - Entregue: datas locais America/Sao_Paulo sobre instantes UTC (src/lib/dates/school-time.ts); regras puras (src/modules/school/calendar.ts): agora >= limite, janela hoje…hoje+7 inclusive, dia sem funcionamento negado sem estender a janela, limites de compra (07:00/14:00) e cancelamento (08:00/15:00) independentes por turno, snapshot de política com instantes UTC; `settings/school` (nome, dias de funcionamento, horários por turno; versão otimista) e `calendarDays` (extra/fechado) com comandos idempotentes só admin e auditoria (POST /api/school/settings, /api/school/calendar); `checkPurchase` (canônica para F11/F15, aceita transação) e GET da janela; Rules de leitura (perfil ativo) e escrita negada; tela /operacao/calendario (admin).
 - Efeito em pedidos futuros (documentado, sem implementar F11): mudanças valem para novas avaliações; pedidos guardam snapshot e o cancelamento usa só ele; afetar pedidos existentes exigirá ação explícita com prévia e auditoria em F11 (docs/decisions.md "Decisões de F05").
@@ -50,18 +56,18 @@ Data de referência: 01/10/2026. Este arquivo descreve código entregue, não ap
 ## Pendências
 - Dependências: overrides escopados (ver "Fechamento pós-F03" e docs/status/dependency-audit.md). `npm audit` completo ainda lista 3 avisos moderados só de desenvolvimento (GHSA-8988-4f7v-96qf, @opentelemetry/core via firebase-tools); a correção sugerida exige `--force` e não foi aplicada.
 - Primeiro administrador real: criar no Console (Auth + `users/{uid}` role admin); script de bootstrap fica para F24. Desabilitar cadastro público no Firebase Auth do projeto real (conta sem perfil já não acessa nada).
-- Homologação real pendente: regra entre serviços do Storage (exige permissão IAM do serviço no projeto), e-mail de redefinição de senha (Firebase Auth), domínios autorizados.
+- Homologação real pendente: bucket R2 de homologação e `npm run test:r2` (ver r2-migration.md), e-mail de redefinição de senha (Firebase Auth), domínios autorizados.
 - Sem tela de administração de usuários/funcionários (só API `POST /api/admin/users`); papel `student` só tem portal de consulta.
 - F04: convite não é enviado por e-mail (a escola copia o link; nenhuma integração de e-mail inventada); resgate público sem limitação de taxa própria (WAF/edge em F24); tela de revisão de pedidos futuros após troca de turma/turno depende de pedidos (F11+); edição de contato do responsável e de matrícula não existe (matrícula é imutável); busca por trecho/sobrenome é filtro no navegador sobre a lista carregada; importação testada até 300 linhas (limite 500); Gitleaks/Semgrep não executados.
 - F05: horários vivem em `settings/school` (turno novo fora de manhã/tarde precisa de horário configurado, senão fica indisponível); sem tela de revisão de pedidos afetados (F11); sem sincronização automática de feriados; Gitleaks/Semgrep não executados.
-- Remover `demoProducts`, `/api/catalog/photo` e a regra quando o catálogo real (F06) existir; remover `/api/probe`/`foundationProbes` quando a carteira real (F08) existir.
+- Remover `demoProducts`, `/api/catalog/photo` e a regra quando o catálogo real (F06) existir (e estender `referencedPhotoKeys` do sweep de fotos órfãs); remover `/api/probe`/`foundationProbes` quando a carteira real (F08) existir.
 - Concorrência no mesmo documento: transações leitura→escrita disputam a promoção do lock (≈3,4 s por impasse no emulador); com `COMMAND_TRANSACTION` 12 escritores/documento passam. Não medido no Firestore real; revalidar na homologação (F24) e ao implementar a carteira (F08).
 - Gitleaks: job no CI (v8.30.1, SHA-256 fixado) CONFIGURADO, não executado; local bloqueado pela política do Windows. Semgrep: não executado.
 - Build: só `npm run build:webpack` comprovado. Turbopack e CI NÃO comprovados.
 - `.env` local real (APP_ENV=production + conta de serviço; ignorado pelo Git): nunca usar com testes/dev de emulador — use `npm run dev:emulator`. Ação manual sua: confirmar origem e, se a chave circulou fora desta máquina, rotacioná-la.
 - Conta/projeto Firebase, Vercel, provedores Pix/cartão: pendências externas.
 - npm install-scripts bloqueados (@firebase/util, protobufjs, re2, unrs-resolver): sem efeito observado.
-- Dica de ambiente: `npm run test:e2e` não aceita filtro; para um spec use `npx firebase emulators:exec --only auth,firestore,storage --project demo-cantina "npx playwright test <arquivo>"`. Seed local agora cria também secretaria@/admin@example.test (perfis em `users`).
+- Dica de ambiente: `npm run test:e2e` não aceita filtro; para um spec use `npx firebase emulators:exec --only auth,firestore --project demo-cantina "npx playwright test <arquivo>"`. Seed local agora cria também secretaria@/admin@example.test (perfis em `users`).
 
 ## Próxima ação
 - Ler docs/tasks/index.md e executar a próxima tarefa elegível (por exemplo /cantina-task F06 ou F08) em sessão nova.

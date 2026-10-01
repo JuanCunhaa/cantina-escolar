@@ -44,7 +44,7 @@ export function MenuView({ uid }: { uid: string }) {
                 const quantity = quantities[product.id] ?? 0;
                 return (
                   <li key={product.id} className="product-item" data-testid="product" data-unavailable={!product.available}>
-                    <ProductPhoto photoPath={product.photoPath} name={product.name} />
+                    <ProductPhoto productId={product.id} photoPath={product.photoPath} name={product.name} />
                     <div className="product-body">
                       <span className="product-name">{product.name}</span>
                       <span className="muted">{product.description}</span>

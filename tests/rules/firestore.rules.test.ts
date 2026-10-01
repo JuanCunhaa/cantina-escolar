@@ -7,7 +7,6 @@ import {
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
 import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, deleteDoc, where } from "firebase/firestore";
-import { ref, uploadBytes, getBytes, deleteObject } from "firebase/storage";
 
 let env: RulesTestEnvironment;
 
@@ -37,14 +36,12 @@ beforeAll(async () => {
   env = await initializeTestEnvironment({
     projectId: "demo-cantina",
     firestore: { rules: readFileSync("firebase/firestore.rules", "utf8") },
-    storage: { rules: readFileSync("firebase/storage.rules", "utf8") },
   });
 });
 afterAll(async () => env.cleanup());
 
 beforeEach(async () => {
   await env.clearFirestore();
-  await env.clearStorage();
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
     await setDoc(doc(db, "foundationProbes/familyA"), { balanceCents: 500 });
@@ -120,102 +117,13 @@ describe("Firestore rules — catálogo de demonstração (F02/F03)", () => {
   });
 });
 
-const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-const png = { contentType: "image/png" };
-
-describe("Storage rules — fotos de produto (A36)", () => {
-  async function seedFiles() {
-    await env.withSecurityRulesDisabled(async (ctx) => {
-      await uploadBytes(ref(ctx.storage(), "products/p1/demo.png"), PNG, png);
-      await uploadBytes(ref(ctx.storage(), "private/receipt.pdf"), PNG, { contentType: "application/pdf" });
-    });
-  }
-
-  it("funcionário (cantina/admin) envia e remove foto válida no caminho do produto", async () => {
-    for (const role of ["cantina", "admin"]) {
-      const s = (await as(`staff-${role}`, role)).storage();
-      await assertSucceeds(uploadBytes(ref(s, `products/p9/${role}.png`), PNG, png));
-      await assertSucceeds(uploadBytes(ref(s, `products/p9/${role}.jpg`), PNG, { contentType: "image/jpeg" }));
-      await assertSucceeds(uploadBytes(ref(s, `products/p9/${role}.webp`), PNG, { contentType: "image/webp" }));
-      await assertSucceeds(deleteObject(ref(s, `products/p9/${role}.png`)));
+describe("Firestore rules — foto do produto só pelo servidor e claim forjada (F03; A36)", () => {
+  it("nenhum cliente (nem equipe) grava metadados de foto; claim de papel no token não concede leitura sem perfil", async () => {
+    const staff = (await as("staff-photo", "cantina")).firestore();
+    for (const fields of [{ photoPath: "products/p1/x.png" }, { photoSha256: "0".repeat(64) }, { photoUpdatedBy: "staff-photo" }]) {
+      await assertFails(updateDoc(doc(staff, "demoProducts/p1"), fields));
     }
-  });
-
-  it("arquivo já criado não pode ser sobrescrito (nem por funcionário): substituir = novo arquivo", async () => {
-    await seedFiles();
-    const s = (await as("staff", "admin")).storage();
-    await assertFails(uploadBytes(ref(s, "products/p1/demo.png"), PNG, png));
-    await assertSucceeds(uploadBytes(ref(s, "products/p1/novo.png"), PNG, png));
-  });
-
-  it("responsável, aluno, secretaria, papel desconhecido, equipe desativada, sem perfil e anônimo não enviam nem removem", async () => {
-    await seedFiles();
-    const contexts = [
-      env.authenticatedContext("familyA").storage(), // sem perfil
-      (await as("sec", "secretaria")).storage(),
-      (await as("guard", "guardian")).storage(),
-      (await as("stu", "student")).storage(),
-      (await as("x", "root")).storage(), // papel desconhecido
-      (await as("off-cantina", "cantina", "disabled")).storage(), // equipe desativada
-      env.unauthenticatedContext().storage(),
-    ];
-    for (const s of contexts) {
-      await assertFails(uploadBytes(ref(s, "products/p9/a.png"), PNG, png));
-      await assertFails(uploadBytes(ref(s, "products/p1/demo.png"), PNG, png));
-      await assertFails(deleteObject(ref(s, "products/p1/demo.png")));
-    }
-  });
-
-  it("tipo, tamanho, vazio e nome de arquivo são validados", async () => {
-    const s = (await as("staff", "cantina")).storage();
-    for (const type of ["image/svg+xml", "application/pdf", "text/html", "image/gif"]) {
-      await assertFails(uploadBytes(ref(s, "products/p9/a.png"), PNG, { contentType: type }));
-    }
-    await assertFails(uploadBytes(ref(s, "products/p9/a.png"), new Uint8Array(0), png));
-    await assertSucceeds(uploadBytes(ref(s, "products/p9/limite.png"), new Uint8Array(2 * 1024 * 1024), png));
-    await assertFails(uploadBytes(ref(s, "products/p9/grande.png"), new Uint8Array(2 * 1024 * 1024 + 1), png));
-    await assertFails(uploadBytes(ref(s, "products/p9/a.svg"), PNG, png));
-    await assertFails(uploadBytes(ref(s, "products/p9/a.png.exe"), PNG, png));
-  });
-
-  it("caminho fora de products/{id}/{arquivo} é negado, inclusive para funcionário", async () => {
-    const s = (await as("staff", "admin")).storage();
-    for (const path of ["private/a.png", "receipts/a.png", "a.png", "products/a.png", "products/p9/sub/a.png"]) {
-      await assertFails(uploadBytes(ref(s, path), PNG, png));
-    }
-  });
-
-  it("leitura: foto de produto só para conta com perfil ativo; arquivo privado nunca", async () => {
-    await seedFiles();
-    const guardian = (await as("familyA", "guardian")).storage();
-    const staff = (await as("staff", "admin")).storage();
-    await assertSucceeds(getBytes(ref(guardian, "products/p1/demo.png")));
-    await assertFails(getBytes(ref(env.unauthenticatedContext().storage(), "products/p1/demo.png")));
-    await assertFails(getBytes(ref(env.authenticatedContext("semPerfil").storage(), "products/p1/demo.png")));
-    await assertFails(getBytes(ref((await as("off", "guardian", "disabled")).storage(), "products/p1/demo.png")));
-    for (const s of [guardian, staff]) {
-      await assertFails(getBytes(ref(s, "private/receipt.pdf")));
-    }
-  });
-});
-
-describe("Storage rules — revogação imediata (F03)", () => {
-  it("papel rebaixado ou conta desativada perde o upload na hora, com o MESMO contexto/token", async () => {
-    await setProfile("func", "cantina");
-    const ctx = env.authenticatedContext("func");
-    await assertSucceeds(uploadBytes(ref(ctx.storage(), "products/p9/antes.png"), PNG, png));
-    await setProfile("func", "guardian");
-    await assertFails(uploadBytes(ref(ctx.storage(), "products/p9/depois.png"), PNG, png));
-    await setProfile("func", "cantina");
-    await assertSucceeds(uploadBytes(ref(ctx.storage(), "products/p9/volta.png"), PNG, png));
-    await setProfile("func", "cantina", "disabled");
-    await assertFails(uploadBytes(ref(ctx.storage(), "products/p9/off.png"), PNG, png));
-    await assertFails(getBytes(ref(ctx.storage(), "products/p9/volta.png")));
-  });
-
-  it("claim de papel no token não concede nada sem perfil (claim antiga/forjada é irrelevante)", async () => {
     const forged = env.authenticatedContext("forjado", { role: "admin" });
-    await assertFails(uploadBytes(ref(forged.storage(), "products/p9/forjado.png"), PNG, png));
     await assertFails(getDoc(doc(forged.firestore(), "demoProducts/p1")));
   });
 });

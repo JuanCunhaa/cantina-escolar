@@ -13,6 +13,7 @@ export const CAPABILITIES = [
   "audit.read",
   "users.manage",
   "students.manage",
+  "storage.maintain",
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 

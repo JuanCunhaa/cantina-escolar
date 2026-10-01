@@ -20,13 +20,14 @@ test("portal: cardápio fictício com fotos, fallback, indisponibilidade e total
   await expect(page.getByRole("heading", { name: "Cardápio" })).toBeVisible();
   await expect(page.getByTestId("product")).toHaveCount(4);
 
-  // Três produtos têm foto real servida pelo Storage; o quarto cai no fallback discreto.
+  // Três produtos têm foto real servida pelo servidor (bucket privado, blob com o ID token); o quarto cai no fallback discreto.
   const photos = page.locator(".photo img");
   await expect(photos).toHaveCount(3);
   for (const img of await photos.all()) {
     await expect(img).toHaveJSProperty("complete", true);
     expect(await img.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
     await expect(img).toHaveAttribute("alt", /\(exemplo\)/);
+    await expect(img).toHaveAttribute("src", /^blob:/); // nunca um endereço direto do bucket
   }
   await expect(page.locator('[data-fallback="true"]')).toHaveCount(1);
   await expect(page.getByRole("img", { name: /Bolo de cenoura.*sem foto/ })).toBeVisible();
@@ -144,7 +145,7 @@ test("operação: funcionário envia foto válida; arquivo inválido e grande de
   await expect(page.locator("#conteudo").getByRole("alert")).toContainText("2 MB");
   await expect(page.locator('[data-fallback="true"]')).toHaveCount(1);
 
-  // PNG válido: Storage aceita, servidor registra e o listener troca o fallback pela foto.
+  // PNG válido: o servidor valida os bytes, grava no armazenamento privado e registra; o listener troca o fallback pela foto.
   await page.getByLabel("Enviar foto de Bolo de cenoura (exemplo)").setInputFiles({
     name: "bolo.png",
     mimeType: "image/png",
@@ -154,7 +155,7 @@ test("operação: funcionário envia foto válida; arquivo inválido e grande de
   await expect(page.locator('[data-fallback="true"]')).toHaveCount(0);
   await expect(page.locator(".photo img")).toHaveCount(4);
 
-  // Conteúdo que finge ser PNG passa pelas Rules (que não leem bytes) mas é recusado e removido pelo servidor.
+  // Conteúdo que finge ser PNG passa na checagem do navegador (só tipo/tamanho), mas o servidor inspeciona os bytes e recusa.
   await page.getByLabel("Enviar foto de Suco de laranja (exemplo)").setInputFiles({
     name: "falso.png",
     mimeType: "image/png",

@@ -39,7 +39,6 @@ describe("parsePublicEnv", () => {
     NEXT_PUBLIC_FIREBASE_API_KEY: "k",
     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "d",
     NEXT_PUBLIC_FIREBASE_PROJECT_ID: "escola",
-    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "b",
     NEXT_PUBLIC_FIREBASE_APP_ID: "a",
   };
   it("recusa emulador do cliente em projeto não demo", () => {

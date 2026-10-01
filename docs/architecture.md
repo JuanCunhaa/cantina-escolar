@@ -11,7 +11,7 @@ A decisão atual é construir o domínio e a aplicação específicos do zero. O
 - Firebase Authentication como identidade única de responsáveis, alunos com login e funcionários; login por email/senha, recuperação e convites. Não criar outro banco de senhas.
 - Cloud Firestore como banco de toda a aplicação: cadastros, carteiras, movimentos, pedidos, estoque, taxas, relatórios e auditoria.
 - Listeners nativos do Firestore para tempo real. Cloud Firestore já permite atualização em tempo real; não implantar Realtime Database junto sem uma necessidade concreta. Não dividir a fonte de verdade entre dois bancos.
-- Cloud Storage for Firebase para fotos, logotipo e documentos privados quando houver. Não armazenar binários ou base64 de imagens em documentos Firestore.
+- Arquivos (fotos, logotipo, documentos privados quando houver): Cloudflare R2 (bucket privado, API S3-compatível, via src/lib/storage), alteração de arquitetura aprovada em 01/10/2026 (Firebase Storage não é mais usado). Credenciais só no servidor; leitura sempre autorizada pelo servidor; Firestore guarda só metadados e a chave do objeto, nunca URL. Não armazenar binários ou base64 de imagens em documentos Firestore.
 - Firebase Admin SDK apenas no servidor para comandos financeiros e administrativos. Nunca bundlar credenciais administrativas no browser.
 - Tailwind CSS, primitivas acessíveis como Radix/shadcn, ícones discretos e biblioteca de animação como Motion, quando útil.
 - Zod para validação; decimal.js ou representação decimal exata para custos; biblioteca de gráficos para relatórios; bibliotecas de CSV/XLSX com licença compatível.
@@ -32,7 +32,8 @@ Exemplo de estrutura, adaptável sem seguir mecanicamente:
 - src/lib/firebase/client.ts: Firebase Web SDK e inicialização única.
 - src/lib/firebase/admin.ts: Admin SDK com server-only.
 - src/lib/money, dates, validation: utilitários compartilhados bem definidos.
-- firebase/firestore.rules, storage.rules, firestore.indexes.json: regras e índices versionados.
+- firebase/firestore.rules, firestore.indexes.json: regras e índices versionados (não há mais storage.rules).
+- src/lib/storage: contrato `ObjectStore` + implementação R2 (staging/production) e disco local só para emulator; src/modules/catalog/photo*.ts: regras de negócio de fotos.
 - scripts: bootstrap, migrações documentais, reconciliação e seed TypeScript.
 - tests: domínio, integração, rules e E2E.
 - functions: somente se existir necessidade real de Functions, inteiramente TypeScript.

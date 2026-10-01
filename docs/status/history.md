@@ -50,3 +50,6 @@ Sem execução de testes da aplicação nesta entrega. Adicionar tarefa, commit/
 - Resultados (execução única após a última mudança de código): typecheck 0; lint 0; unit 64/64; rules 31/31; integration 83/83; e2e 17/17; build:webpack 0; audit:prod 0. Inspeção da captura 375 px (test-results/f05-calendario-375.png): sem rolagem horizontal, janela hoje…hoje+7 correta.
 - Segurança (cantina-security, manual + testes negativos): escrita só admin (capacidade + perfil atual na transação), 403/401 testados; leitura de janela só com perfil ativo; chaves de política limitadas a 50 e validadas contra turnos existentes; sem dados financeiros/custos envolvidos. Gitleaks/Semgrep não executados.
 - Skills invocadas via Skill: cantina-token-economy, cantina-testing, cantina-firebase, cantina-ui, cantina-security, cantina-verify.
+
+## Migração do armazenamento de arquivos para Cloudflare R2 (01/10/2026)
+- Ver docs/status/r2-migration.md (arquivos, comandos reais, resultados, pendências) e docs/decisions.md ("Armazenamento de arquivos em Cloudflare R2").

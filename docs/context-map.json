@@ -110,7 +110,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "revisão de acesso e risco",
@@ -172,7 +172,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "interface",
@@ -243,7 +243,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "interface",
@@ -313,7 +313,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "interface",
@@ -380,7 +380,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "interface",
@@ -450,7 +450,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "interface",
@@ -519,7 +519,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "interface",
@@ -595,7 +595,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "invariantes de negócio",
@@ -667,7 +667,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "invariantes de negócio",
@@ -747,7 +747,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "invariantes de negócio",
@@ -833,7 +833,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "invariantes de negócio",
@@ -908,7 +908,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "interface",
@@ -979,7 +979,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "invariantes de negócio",
@@ -1058,7 +1058,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "invariantes de negócio",
@@ -1138,7 +1138,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "invariantes de negócio",
@@ -1218,7 +1218,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "invariantes de negócio",
@@ -1296,7 +1296,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "invariantes de negócio",
@@ -1374,7 +1374,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "invariantes de negócio",
@@ -1451,7 +1451,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "invariantes de negócio",
@@ -1523,7 +1523,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "invariantes de negócio",
@@ -1608,7 +1608,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "invariantes de negócio",
@@ -1685,7 +1685,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "interface",
@@ -1794,7 +1794,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "invariantes de negócio",
@@ -1877,7 +1877,7 @@
         {
           "stage": "persistência e integração",
           "skill": "cantina-firebase",
-          "purpose": "Implementar documentos, consultas, índices, listeners, Auth/Storage e/ou transações Firebase afetados."
+          "purpose": "Implementar documentos, consultas, índices, listeners, Auth, Firestore e/ou transações Firebase afetados; arquivos/fotos pelo módulo de Storage R2 (src/lib/storage), nunca Firebase Storage."
         },
         {
           "stage": "revisão de acesso e risco",

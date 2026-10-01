@@ -57,3 +57,12 @@ Escritas só pelo servidor (Admin SDK) em transação com auditoria; o cliente l
 - `calendarDays/{YYYY-MM-DD}`: `date`, `kind` (`extra` habilita dia fora dos dias de funcionamento; `closed` bloqueia dia regular), `reason`, `updatedAt`. Remover apaga o documento (histórico em `auditLog`). Só datas de hoje (local) até +400 dias; passado é recusado.
 - Leitura por qualquer conta com perfil ativo; escrita só pelo servidor (admin) via `POST /api/school/settings` e `POST /api/school/calendar`, idempotentes, com auditoria (`school.settings.update`, `school.calendar.{set|clear}`; `after.appliesTo = "new_orders_only"`). Sem índice composto (consulta de janela por intervalo no ID do documento).
 - Snapshot de política para o pedido (F11 grava; calculado por `snapshotPolicy`): `timezone`, `consumptionDate` (data local), `shiftId`, `purchaseCutoff/cancelCutoff` (HH:MM), `purchaseCutoffAt/cancelCutoffAt` (instantes UTC), `settingsVersion`. Cancelamento familiar usa SEMPRE o snapshot, nunca a configuração atual.
+
+## Fotos de produto — metadados no Firestore, arquivo no R2 (migração 01/10/2026)
+
+Hoje só em `demoProducts/{productId}` (catálogo real: F06). Campos escritos exclusivamente pelo servidor (Rules negam escrita do cliente):
+
+- `photoPath` (string | null): CHAVE do objeto no bucket R2 privado, formato `products/{productId}/{uuid32hex}.{jpg|png|webp}`. Não é URL; nunca gravar URL assinada ou pública como endereço permanente.
+- `photoContentType`, `photoSize`, `photoSha256`, `photoUpdatedBy` (uid), `photoUpdatedAt` (timestamp do servidor).
+
+Leitura do arquivo: sempre `GET /api/catalog/photo?productId=` (autenticado). Objetos órfãos são recolhidos por `sweepOrphanPhotos`.

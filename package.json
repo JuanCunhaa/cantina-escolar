@@ -14,9 +14,10 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.unit.config.ts",
-    "test:integration": "firebase emulators:exec --only auth,firestore,storage --project demo-cantina \"vitest run --config vitest.integration.config.ts\"",
-    "test:rules": "firebase emulators:exec --only auth,firestore,storage --project demo-cantina \"vitest run --config vitest.rules.config.ts\"",
-    "test:e2e": "firebase emulators:exec --only auth,firestore,storage --project demo-cantina \"playwright test\"",
+    "test:integration": "firebase emulators:exec --only auth,firestore --project demo-cantina \"vitest run --config vitest.integration.config.ts\"",
+    "test:rules": "firebase emulators:exec --only auth,firestore --project demo-cantina \"vitest run --config vitest.rules.config.ts\"",
+    "test:r2": "vitest run --config vitest.r2.config.ts",
+    "test:e2e": "firebase emulators:exec --only auth,firestore --project demo-cantina \"playwright test\"",
     "emulators": "firebase emulators:start --project demo-cantina",
     "seed": "node scripts/seed.ts",
     "dev:webpack": "next dev --webpack",
@@ -24,6 +25,7 @@
     "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1145.0",
     "firebase": "12.19.0",
     "firebase-admin": "14.5.0",
     "next": "16.3.8",

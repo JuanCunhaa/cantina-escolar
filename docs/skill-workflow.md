@@ -13,7 +13,7 @@ O pacote tem 14 skills: cinco workflows originais revisados e nove especializado
 | cantina-context | Roteiar mudança sem tarefa definida | Contexto/domínio ambíguo |
 | cantina-token-economy | Reduzir leituras e logs | Contexto da tarefa |
 | cantina-architecture | Definir contratos/schema/fronteiras | Mudança arquitetural |
-| cantina-firebase | Implementar dados/Auth/Storage/rules/listeners | Alteração Firebase |
+| cantina-firebase | Implementar dados/Auth/rules/listeners (arquivos: src/lib/storage, R2) | Alteração Firebase |
 | cantina-finance | Garantir transações/invariantes do comando | Dinheiro/estoque/uso |
 | cantina-ui | Entregar tela acessível e funcional | Interface |
 | cantina-security | Revisar autorização/segredos/risco | Código sensível/limite de acesso |
@@ -36,7 +36,7 @@ As skills ficam em .claude/skills/<nome>/SKILL.md. Os dois comandos de execuçã
 7. Usar cantina-security para acesso, adulteração de preço/ID, dupla cobrança e backend autorizado.
 8. Usar cantina-verify para rodar os checks pendentes e registrar evidência. Se já foram executados após a última alteração, reutilizar evidência válida.
 
-Em F02, não há skill financeira; segurança se restringe ao acesso/upload e testes a UI/Storage. Em uma correção de espaçamento, não carregar arquitetura, gateway e regras de carteira. O fluxo é ajustado pela mudança real.
+Em F02, não há skill financeira; segurança se restringe ao acesso/upload e testes a UI/armazenamento de arquivos. Em uma correção de espaçamento, não carregar arquitetura, gateway e regras de carteira. O fluxo é ajustado pela mudança real.
 
 ## Uso direto
 

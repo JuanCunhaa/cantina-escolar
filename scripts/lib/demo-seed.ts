@@ -1,22 +1,25 @@
 // Dados de demonstração CLARAMENTE FICTÍCIOS, só para emulador local (demo-*). Isolados em `demoProducts`,
 // fora de relatórios reais. Usado por scripts/seed.ts e pelos testes (e2e/integração). Escreve com o token
-// "owner" do emulador, que ignora Rules — por isso recusa qualquer alvo que não seja loopback.
+// "owner" do emulador, que ignora Rules — por isso recusa qualquer alvo que não seja loopback. As fotos vão para o
+// armazenamento local de emulator (mesmo diretório que o servidor de dev/e2e lê), nunca para um bucket real.
 import { deflateSync, crc32 } from "node:zlib";
+import { DEFAULT_LOCAL_STORAGE_DIR } from "../../src/lib/storage/config.ts";
+import { createLocalStore } from "../../src/lib/storage/local.ts";
+import { ObjectExistsError } from "../../src/lib/storage/types.ts";
 
 export type EmulatorTarget = {
   project: string;
   authHost: string;
   firestoreHost: string;
-  storageHost: string;
-  bucket: string;
+  /** Diretório do armazenamento local (STORAGE_LOCAL_DIR do servidor). */
+  storageDir: string;
 };
 
 export const DEFAULT_TARGET: EmulatorTarget = {
   project: "demo-cantina",
   authHost: "127.0.0.1:9099",
   firestoreHost: "127.0.0.1:8080",
-  storageHost: "127.0.0.1:9199",
-  bucket: "demo-cantina.appspot.com",
+  storageDir: process.env.STORAGE_LOCAL_DIR || DEFAULT_LOCAL_STORAGE_DIR,
 };
 
 export function targetFromEnv(env: Record<string, string | undefined> = process.env): EmulatorTarget {
@@ -24,14 +27,13 @@ export function targetFromEnv(env: Record<string, string | undefined> = process.
     project: env.FIREBASE_PROJECT_ID ?? DEFAULT_TARGET.project,
     authHost: env.FIREBASE_AUTH_EMULATOR_HOST ?? DEFAULT_TARGET.authHost,
     firestoreHost: env.FIRESTORE_EMULATOR_HOST ?? DEFAULT_TARGET.firestoreHost,
-    storageHost: env.FIREBASE_STORAGE_EMULATOR_HOST ?? DEFAULT_TARGET.storageHost,
-    bucket: env.FIREBASE_STORAGE_BUCKET ?? DEFAULT_TARGET.bucket,
+    storageDir: env.STORAGE_LOCAL_DIR || DEFAULT_TARGET.storageDir,
   };
 }
 
 function assertLocal(target: EmulatorTarget): void {
   const loopback = /^(127\.0\.0\.1|localhost):\d+$/;
-  const hosts = [target.authHost, target.firestoreHost, target.storageHost];
+  const hosts = [target.authHost, target.firestoreHost];
   if (!hosts.every((h) => loopback.test(h)) || !target.project.startsWith("demo-")) {
     throw new Error("seed recusado: só emulador local com projeto demo-*.");
   }
@@ -148,10 +150,13 @@ export async function ensureAccount(
   return localId;
 }
 
-async function uploadPhoto(target: EmulatorTarget, path: string, data: Buffer): Promise<void> {
-  const url = `http://${target.storageHost}/v0/b/${target.bucket}/o?name=${encodeURIComponent(path)}`;
-  const response = await fetch(url, { method: "POST", headers: { "content-type": "image/png", ...OWNER }, body: new Uint8Array(data) });
-  await expectOk(response, `upload ${path}`);
+async function uploadPhoto(target: EmulatorTarget, key: string, data: Buffer): Promise<void> {
+  // Seed idempotente: a foto de demonstração tem chave fixa e é criada uma única vez (o armazenamento não sobrescreve).
+  try {
+    await createLocalStore(target.storageDir).putIfAbsent(key, data, { contentType: "image/png", metadata: { seed: "demo" } });
+  } catch (error) {
+    if (!(error instanceof ObjectExistsError)) throw error;
+  }
 }
 
 /** Grava o catálogo fictício e as fotos de exemplo (um produto fica sem foto para exercitar o fallback). Idempotente. */

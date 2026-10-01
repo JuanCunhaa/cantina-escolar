@@ -1,4 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   createTestUser,
@@ -32,7 +35,7 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 beforeAll(async () => {
   process.env.APP_ENV = "emulator";
   process.env.FIREBASE_PROJECT_ID = "demo-cantina";
-  process.env.FIREBASE_STORAGE_BUCKET = "demo-cantina.appspot.com";
+  process.env.STORAGE_LOCAL_DIR = mkdtempSync(join(tmpdir(), "cantina-access-"));
   ({ POST: adminUsers } = await import("@/app/api/admin/users/route"));
   ({ POST: revokeSession } = await import("@/app/api/session/revoke/route"));
   ({ POST: photo } = await import("@/app/api/catalog/photo/route"));
@@ -62,9 +65,15 @@ function post(handler: Handler, url: string, token: string | null, body: unknown
 const grant = (token: string | null, body: Record<string, unknown>) =>
   post(adminUsers, "/api/admin/users", token, { key: randomUUID(), reason: "Teste de acesso", ...body });
 
-/** Chamada que só passa pela autorização se o ator for equipe de fotos: autorizado => 422 (arquivo inexistente), negado => 401/403. */
+/** Chamada que só passa pela autorização se o ator for equipe de fotos: autorizado => 422 (bytes que não são imagem), negado => 401/403. */
 const photoProbe = (token: string) =>
-  post(photo, "/api/catalog/photo", token, { productId: "it-produto", path: "products/it-produto/inexistente.png" });
+  photo(
+    new Request("http://localhost/api/catalog/photo?productId=it-produto", {
+      method: "POST",
+      headers: { "content-type": "image/png", authorization: `Bearer ${token}` },
+      body: "não sou uma imagem",
+    }),
+  );
 
 async function profileOf(uid: string) {
   return (await adminDb().doc(`users/${uid}`).get()).data();
@@ -193,7 +202,7 @@ describe("criação de acesso, auditoria e idempotência", () => {
 describe("remoção de permissão e revogação: efeito imediato no servidor (comportamento formal)", () => {
   it("rebaixar o papel nega a próxima chamada com o MESMO token; promover devolve; sem novo login", async () => {
     const user = await createTestUser("rebaixa", "cantina");
-    expect((await photoProbe(user.idToken)).status).toBe(422); // autorizado (falha só por arquivo inexistente)
+    expect((await photoProbe(user.idToken)).status).toBe(422); // autorizado (falha só pelo conteúdo)
 
     expect((await grant(admin.idToken, { uid: user.uid, role: "guardian", reason: "Mudança de função" })).status).toBe(200);
     expect((await photoProbe(user.idToken)).status).toBe(403);

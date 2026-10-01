@@ -48,3 +48,8 @@ Efeito no lockfile: uma única cópia hoistada de `@grpc/grpc-js` 1.14.5 (as có
 
 - Os overrides ficam fora do intervalo declarado por `@firebase/firestore` (`~1.9.0`). Remover quando `firebase`/`@firebase/firestore` subirem o intervalo e o `@google-cloud/storage` subir o `gaxios`; rever a cada atualização de `firebase`/`firebase-admin` (`npm ls @grpc/grpc-js uuid`).
 - `npm audit` completo (com dependências de desenvolvimento) ainda lista 3 avisos moderados (GHSA-8988-4f7v-96qf, `@opentelemetry/core` < 2.8.0, via `firebase-tools` → `@google-cloud/pubsub`). É ferramenta de desenvolvimento, fora do `audit:prod`; a "correção" sugerida pelo npm exige `--force` (downgrade do firebase-tools) e não foi aplicada.
+
+## Atualização 01/10/2026 — migração de arquivos para R2
+
+- Dependência adicionada: `@aws-sdk/client-s3` 3.1145.0 (versão exata, lockfile atualizado; publicada em 01/10/2026). `npm run audit:prod`: 0 vulnerabilidades após a mudança. Os overrides existentes permanecem.
+- Dependências removidas do código: `firebase/storage` (cliente) e `firebase-admin/storage` (servidor); o pacote `@google-cloud/storage` segue apenas como transitivo do `firebase-admin`.

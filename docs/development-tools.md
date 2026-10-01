@@ -8,7 +8,7 @@ Skills orientam; ferramentas executam. Este pacote inclui dois utilitários Type
 | --- | --- | --- |
 | rg/ripgrep | Buscar símbolo/padrão/pasta com saída pequena | Inspeção antes de abrir arquivos |
 | TypeScript tsc | Conferir tipos realmente | Mudança TS e marcos |
-| Firebase CLI + Emulator Suite | Auth/Firestore/Storage/rules/transações locais | Desde F01 e mudanças Firebase |
+| Firebase CLI + Emulator Suite | Auth/Firestore/rules/transações locais (arquivos usam armazenamento local de emulator, não há Storage Emulator) | Desde F01 e mudanças Firebase |
 | Vitest | Regras puras e integração TS | Casos relevantes da tarefa |
 | Playwright | Jornada do site e inspeção visual | Caminhos afetados e aceite E |
 | Gitleaks | Detectar segredo em arquivos/Git | Credenciais/config e entrega |

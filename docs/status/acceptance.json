@@ -319,12 +319,13 @@
   "A36": {
     "status": "not_run",
     "evidence": [
-      "tests/rules (Storage, emulador): só cantina/admin criam foto; responsável/secretaria/papel desconhecido/anônimo negados; tipo (svg/pdf/html/gif), vazio, >2 MB, nome e caminho validados; sem sobrescrita; leitura só autenticada; caminho privado negado a todos",
-      "tests/integration/photo-route.test.ts (21/21 com a suíte): 401/403/404 em produção, caminho de outro produto, arquivo com conteúdo falso removido (422), tipo divergente, >2 MB, inexistente",
-      "tests/e2e/shell-photos.spec.ts: funcionário envia PNG válido (fallback vira foto), txt e >2 MB recusados no cliente, PNG falso recusado pelo servidor; 3 fotos reais + 1 fallback no portal",
-      "F03: tests/rules — upload/leitura por perfil ativo; rebaixar/desativar nega na hora com o mesmo token; claim forjada sem efeito"
+      "tests/integration/photo-route.test.ts (24 testes, emulador Auth/Firestore + armazenamento local double do R2): 401/403 (responsável, aluno, secretaria, sem perfil, conta desativada), envio por cantina/admin, chave gerada no servidor com uid/papel/caminho do cliente ignorados, troca com remoção da foto anterior só após o commit, sem sobrescrita, conteúdo falso/tipo divergente/truncado/vazio/dimensões absurdas (422), >2 MB por Content-Length e por stream (413), leitura autorizada por perfil ativo e negada sem perfil/desativada, ETag/304, 404 em produção",
+      "falhas entre armazenamento e Firestore (mesmo arquivo): falha no PUT, objeto não confirmado, permissão revogada/conta desativada/produto removido durante o envio, commit com resultado incerto (objeto mantido), falha ao apagar a anterior + sweep, envio interrompido (órfão) + sweep, rota de sweep só da administração",
+      "tests/unit/storage.test.ts (22): configuração por ambiente fechada, chaves, inspeção de imagem (PNG/JPEG/WebP), corpo limitado, armazenamento local e cliente S3 real contra servidor S3 duplo (If-None-Match: *, sem checksum CRC32, 412→ObjectExistsError, erros sem vazar segredo)",
+      "tests/rules: Firestore nega ao cliente (inclusive equipe) qualquer escrita de metadados de foto; claim forjada sem efeito (Storage Rules removidas)",
+      "tests/e2e/shell-photos.spec.ts: 3 fotos reais (blob com ID token) + 1 fallback; funcionário envia PNG válido; txt e >2 MB recusados no cliente; PNG falso recusado pelo servidor"
     ],
-    "notes": "Parcial: provado no emulador. F03 trocou o papel provisório (claim) pelo perfil atual em users/{uid}, lido também pelas Storage Rules (revogação imediata, testada). Homologação Storage real (regra entre serviços exige permissão IAM do serviço no projeto real) pendente. Limpeza de uploads órfãos e foto substituída: F06. Manter not_run."
+    "notes": "Parcial. Migração de Firebase Storage para Cloudflare R2 aprovada em 01/10/2026: provado só com double local e servidor S3 duplo. INTEGRAÇÃO REAL COM R2 NÃO EXECUTADA (sem conta/credenciais nesta máquina; npm run test:r2 pulado). Pendentes: bucket de homologação, execução de tests/r2, confirmação do comportamento real de If-None-Match e checksums. Limpeza de órfãos implementada (sweep); decisão sobre preservar fotos antigas de pedidos fica para F06/F11. Manter not_run."
   },
   "A37": {
     "status": "not_run",

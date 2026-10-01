@@ -37,7 +37,6 @@ const tag = randomUUID().slice(0, 6);
 beforeAll(async () => {
   process.env.APP_ENV = "emulator";
   process.env.FIREBASE_PROJECT_ID = "demo-cantina";
-  process.env.FIREBASE_STORAGE_BUCKET = "demo-cantina.appspot.com";
   school = (await import("@/app/api/school/route")).POST as Handler;
   students = (await import("@/app/api/students/route")) as never;
   importRoute = (await import("@/app/api/students/import/route")).POST as Handler;

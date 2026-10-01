@@ -54,7 +54,6 @@ const baseSettings = (shiftPolicies: Record<string, unknown>, extra: Record<stri
 beforeAll(async () => {
   process.env.APP_ENV = "emulator";
   process.env.FIREBASE_PROJECT_ID = "demo-cantina";
-  process.env.FIREBASE_STORAGE_BUCKET = "demo-cantina.appspot.com";
   schoolRoute = (await import("@/app/api/school/route")).POST as Handler;
   settingsRoute = (await import("@/app/api/school/settings/route")) as never;
   calendarRoute = (await import("@/app/api/school/calendar/route")) as never;

@@ -1,6 +1,6 @@
 # Cantina Escolar — instruções do projeto
 
-Desenvolver site operacional para uma escola (~300 alunos), com Next.js/React, TypeScript strict, Firebase Auth, Firestore e Storage; deploy desejado Vercel. UI pt-BR, BRL, America/Sao_Paulo. Claude Code é o agente de desenvolvimento.
+Desenvolver site operacional para uma escola (~300 alunos), com Next.js/React, TypeScript strict, Firebase Auth e Firestore, arquivos no Cloudflare R2 privado (src/lib/storage; Firebase Storage não é mais usado); deploy desejado Vercel. UI pt-BR, BRL, America/Sao_Paulo. Claude Code é o agente de desenvolvimento.
 
 ## Iniciar e localizar contexto
 
@@ -41,9 +41,10 @@ Comandos reais (F01, `package.json`, npm; Node >=24.12, Java 21 para emuladores;
 
 - `npm run dev` / `npm run build` — Next padrão (Turbopack). Nesta máquina Windows o binário SWC nativo é bloqueado: usar `npm run dev:webpack` / `npm run build:webpack`.
 - `npm run lint` (ESLint 9), `npm run typecheck` (tsc strict), `npm test` (unit, Vitest).
-- `npm run test:rules`, `npm run test:integration`, `npm run test:e2e` — sobem Auth/Firestore(/Storage) via `firebase emulators:exec`; e2e usa Playwright com `next dev --webpack` na porta 3100 e ambiente hermético (zera credencial de `.env` local).
+- `npm run test:rules`, `npm run test:integration`, `npm run test:e2e` — sobem Auth/Firestore via `firebase emulators:exec` (arquivos: armazenamento local `STORAGE_LOCAL_DIR`, double do R2; sem Storage Emulator); e2e usa Playwright com `next dev --webpack` na porta 3100 e ambiente hermético (zera credencial de `.env` local).
 - Prova manual local: `npm run emulators` (UI em 4000) → outro terminal `npm run dev:emulator` (Next webpack hermético, porta 3000; ignora .env) → `npm run seed` (contas fictícias familia-a/b@example.test; recusa alvo não local). Não usar `npm run dev` com o .env atual (APP_ENV=production).
 - `npm run audit:prod` — `npm audit` só de produção.
+- `npm run test:r2` — integração OPCIONAL com bucket R2 de homologação (variáveis `R2_TEST_*` só no shell); sem elas os testes são pulados. Não contar como evidência de R2 real quando pulada.
 - Não usar logs com `:` no nome no Windows; `.env` local real nunca é lido pelos testes de emulador.
 
 ## Compact instructions

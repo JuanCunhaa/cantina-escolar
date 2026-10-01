@@ -2,7 +2,7 @@
 
 ## A32
 
-Build, checagem TypeScript strict, lint e testes passam; aplicação funciona em homologação com Firebase Auth/Firestore/Storage, sem arquivos locais como banco.
+Build, checagem TypeScript strict, lint e testes passam; aplicação funciona em homologação com Firebase Auth/Firestore e arquivos no R2 (bucket de homologação), sem arquivos locais como banco.
 
 ## A34
 
@@ -14,7 +14,7 @@ Callback transacional em retry não chama pagamento/email nem duplica movimentos
 
 ## A36
 
-Fotos são enviadas ao Storage somente por operador autorizado; tamanho/tipo são validados, fallback funciona e arquivo privado não vaza por URL de produto.
+Fotos são enviadas ao R2 (por upload pelo servidor) somente por operador autorizado; tamanho/tipo/bytes são validados, não há sobrescrita de foto validada, fallback funciona e arquivo privado não vaza por URL de produto (leitura sempre pelo servidor, sem URL permanente).
 
 ## A37
 

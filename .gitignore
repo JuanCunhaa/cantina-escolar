@@ -6,6 +6,7 @@ coverage/
 test-results/
 playwright-report/
 .firebase/
+.local-storage/
 *-debug.log
 .env*
 !.env.example

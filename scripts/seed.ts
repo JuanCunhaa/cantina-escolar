@@ -1,4 +1,4 @@
-// Seed local: contas fictícias no Auth Emulator + catálogo de demonstração (Firestore/Storage Emulator).
+// Seed local: contas fictícias no Auth Emulator + catálogo de demonstração (Firestore Emulator + armazenamento local de arquivos).
 // Recusa qualquer alvo que não seja emulador local com projeto demo-*.
 import { ensureAccount, seedDemoCatalog, targetFromEnv } from "./lib/demo-seed.ts";
 
@@ -17,7 +17,7 @@ try {
     console.log(`${account.email}: pronta${account.role ? ` (papel ${account.role})` : ""}`);
   }
   await seedDemoCatalog(target);
-  console.log("catálogo de demonstração (fictício) gravado em demoProducts + Storage.");
+  console.log("catálogo de demonstração (fictício) gravado em demoProducts + fotos no armazenamento local.");
 } catch (error) {
   console.error(error instanceof Error ? error.message : "seed falhou");
   process.exit(1);

@@ -3,7 +3,7 @@
 | Pendência | Necessária para | Pode avançar sem ela |
 | --- | --- | --- |
 | Projeto/conta Firebase homologação | Configurar serviços/cloud e validar fora do emulador | F01–F17 usando Emulator Suite |
-| Storage/faturamento/região | Upload/homologação cloud e custos | Fluxo e rules em Storage Emulator |
+| Conta Cloudflare/R2, bucket de homologação e token de API | Upload/leitura reais de arquivos e custos | Lógica e fluxo contra armazenamento local (double) e servidor S3 duplo; integração real pendente (docs/status/r2-migration.md) |
 | Provedor Pix/cartão e elegibilidade | Adapter final e homologação de pagamento | Contratos, estados e testes; não inventar API/confirmar integração |
 | Credenciais gateway sandbox/webhook | Evidência ponta a ponta do adapter real | Fixtures de contrato e integração interna, registradas como tal |
 | Domínio/conta/plano Vercel | Domínios autorizados, callbacks e deploy final | Desenvolvimento/build e roteiro de implantação |
