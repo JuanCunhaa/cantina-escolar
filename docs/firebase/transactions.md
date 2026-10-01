@@ -13,3 +13,5 @@ Este arquivo define o procedimento técnico; as regras de produto são canônica
 Contratos detalhados e limites: [modelo documental](schema.md). Fluxos de autenticação/listeners: [Auth/realtime](auth-realtime.md).
 
 Para pagamento externo: criar intenção local, executar integração idempotente fora da transação, conciliar resultado e só então confirmar crédito transacional. Não simular atomicidade distribuída entre gateway e Firestore.
+
+Disputa no mesmo documento: use `COMMAND_TRANSACTION` (src/lib/firebase/transaction-options.ts, maxAttempts 10) em `runTransaction` de comando. Duas transações que leem e depois escrevem o mesmo documento disputam a promoção do lock; no emulador cada impasse custa ~3,4 s (lock timeout) e o padrão de 5 tentativas do SDK falha com 12 escritores simultâneos. Capacidade testada: 12 escritores simultâneos por documento; não projetar fluxo que concentre mais que isso em uma carteira/cota. Produção não foi medida.

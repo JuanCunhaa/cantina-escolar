@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { Auth } from "firebase-admin/auth";
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { z } from "zod";
+import { COMMAND_TRANSACTION } from "@/lib/firebase/transaction-options";
 import { auditInTransaction } from "@/modules/audit/log";
 import type { Actor } from "./actor";
 import { authorize } from "./authorize";
@@ -134,7 +135,7 @@ export async function setUserAccess(
     }
     tx.create(idemRef, { payloadHash: hash, response: { uid, changed }, createdAt: FieldValue.serverTimestamp() });
     return { uid, changed, replayed: false };
-  });
+  }, COMMAND_TRANSACTION);
 
   // Efeitos no Auth somente após o commit; a decisão de acesso já vale pelo perfil (servidor e Rules).
   if (!result.replayed) await syncAuthDisabled(auth, db, uid, true);

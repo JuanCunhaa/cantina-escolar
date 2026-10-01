@@ -90,7 +90,9 @@ describe("comando transacional de prova (A35)", () => {
     expect(snap.entries).toHaveLength(n);
     expect(effects).toBe(n);
     expect(attempts).toBeGreaterThanOrEqual(n); // callback pode reexecutar em contenção; efeitos não
-  });
+    // Cada impasse de promoção leitura->escrita custa um lock timeout do emulador (~3,4 s): a disputa de 12 escritores leva
+    // de ~4 a ~20 s. Timeout próprio do teste; a asserção de conservação e de efeitos não muda.
+  }, 90000);
 
   it("disputa pela mesma chave produz exatamente um movimento e um efeito", async () => {
     const uid = newUid();

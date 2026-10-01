@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { z } from "zod";
+import { COMMAND_TRANSACTION } from "@/lib/firebase/transaction-options";
 import type { Actor } from "./actor";
 
 /**
@@ -54,7 +55,7 @@ export async function runProbeCommand(
     tx.set(probeRef, { balanceCents, version: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     tx.create(idemRef, { payloadHash: hash, response: { entryId: input.key, balanceCents }, createdAt: FieldValue.serverTimestamp() });
     return { entryId: input.key, balanceCents, replayed: false };
-  });
+  }, COMMAND_TRANSACTION);
 
   if (!result.replayed) await hooks.afterCommit?.(result); // efeito externo somente após commit, uma vez
   return result;
