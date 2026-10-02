@@ -53,6 +53,11 @@ test("administração: categoria, produto, preço com histórico e desativação
   await page.locator("#new-product-description").fill("Doce de chocolate (teste).");
   await page.getByRole("radio", { name: "Planejado por data/turno" }).check();
   await page.locator("#new-product-supplier").fill(`Fornecedor e2e ${tag}`);
+  // Só o turno de que o teste precisa: a homologação compartilhada acumula turnos de outras execuções (limite de 10 por
+  // produto), e o formulário marca todos os ativos por padrão.
+  const shiftsGroup = page.getByRole("group", { name: "Turnos", exact: true });
+  for (const box of await shiftsGroup.getByRole("checkbox").all()) await box.uncheck();
+  await shiftsGroup.getByRole("checkbox", { name: "Manhã (exemplo)" }).check();
   await page.getByRole("button", { name: "Cadastrar produto" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Produto cadastrado." })).toBeVisible();
   const row = page.getByTestId("photo-row").filter({ hasText: product });
