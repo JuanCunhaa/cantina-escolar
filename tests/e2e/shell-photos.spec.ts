@@ -2,9 +2,13 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { createTestUser } from "../helpers/auth-emulator";
 import { makePng } from "../../scripts/lib/demo-seed.ts";
 import { createTempProduct, prepareCatalog, retireTempProduct } from "../helpers/catalog-fixtures.ts";
+import { warmRoutes } from "../helpers/dev-server.ts";
+import { createFamily } from "../helpers/menu-fixtures.ts";
 
 // Roda no emulador (catálogo semeado) e na homologação (catálogo compartilhado, garantido pela API no global-setup):
 // as asserções miram os produtos "(exemplo)" por nome, nunca a contagem total, e nenhum teste altera esses produtos.
+// Desde a F07 o portal mostra o cardápio do ALUNO (data/turno): cada teste cria a própria família com um aluno
+// fictício na manhã de exemplo, e o portal abre na primeira data com compra permitida.
 
 async function login(page: Page, path: string, email: string) {
   await page.goto(path);
@@ -22,14 +26,17 @@ async function priceOf(item: Locator): Promise<number> {
   return Number(reais) * 100 + Number(centavos.padEnd(2, "0"));
 }
 
-test.beforeAll(async () => {
+test.beforeAll(async ({ request }) => {
   await prepareCatalog();
+  await warmRoutes(request, { post: ["/api/students", "/api/links", "/api/menu"], get: ["/api/catalog/photo?productId=x", "/api/menu", "/portal/cardapio"] });
 });
 
-test("portal: catálogo real (fictício) com fotos, fallback, canal só balcão, turno e total em BRL (A36/A37)", async ({ page }) => {
-  const family = await createTestUser("e2e-familia", "guardian");
+test("portal: cardápio do aluno (fictício) com fotos, fallback, canal só balcão, turno e total em BRL (A36/A37)", async ({ page, request }) => {
+  const family = (await createFamily(request, "e2e-familia")).guardian;
   await login(page, "/portal/cardapio", family.email);
-  await expect(page.getByRole("heading", { name: "Cardápio" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cardápio", exact: true })).toBeVisible();
+  // Aluno e turno sempre visíveis: o cardápio exibido é o do turno do aluno.
+  await expect(page.getByTestId("menu-student")).toContainText("Manhã (exemplo)", { timeout: 20000 });
 
   // Produtos com foto: servida pelo servidor (bucket privado, blob com o ID token), nunca um endereço do bucket.
   for (const name of ["Suco de laranja (exemplo)", "Pão com queijo (exemplo)", "Salada de frutas (exemplo)"]) {
@@ -45,7 +52,8 @@ test("portal: catálogo real (fictício) com fotos, fallback, canal só balcão,
   await expect(page.getByRole("img", { name: /Bolo de cenoura.*sem foto/ })).toBeVisible();
   await expect(bolo.getByText("Só no balcão")).toBeVisible();
   await expect(page.getByRole("button", { name: /Aumentar Bolo de cenoura/ })).toHaveCount(0);
-  await expect(product(page, "Salada de frutas (exemplo)").getByText("Só Manhã (exemplo)", { exact: true })).toBeVisible();
+  // Salada é só da manhã: aparece para o aluno da manhã (o aluno da tarde não a vê — ver menu.spec).
+  await expect(product(page, "Salada de frutas (exemplo)")).toBeVisible();
   // Produto desativado não aparece para a família; custo/fornecedor nunca chegam à tela.
   await expect(page.getByText("Pipoca (exemplo)")).toHaveCount(0);
   await expect(page.getByText("Fornecedor fictício")).toHaveCount(0);
@@ -59,8 +67,8 @@ test("portal: catálogo real (fictício) com fotos, fallback, canal só balcão,
   await expect(page.getByTestId("summary-total")).toContainText(brl(2 * suco + pao));
 });
 
-test("teclado: pular para o conteúdo, navegação e quantidade sem mouse (A37)", async ({ page }) => {
-  const family = await createTestUser("e2e-teclado", "guardian");
+test("teclado: pular para o conteúdo, navegação e quantidade sem mouse (A37)", async ({ page, request }) => {
+  const family = (await createFamily(request, "e2e-teclado")).guardian;
   await login(page, "/portal/cardapio", family.email);
   const plus = page.getByRole("button", { name: "Aumentar Salada de frutas (exemplo)" });
   await expect(plus).toBeVisible({ timeout: 20000 });
@@ -87,10 +95,10 @@ test("teclado: pular para o conteúdo, navegação e quantidade sem mouse (A37)"
   await expect(current).toHaveAttribute("aria-current", "page");
 });
 
-test("celular: sem rolagem horizontal, alvos de toque e resumo fixo visível (A37)", async ({ browser }) => {
+test("celular: sem rolagem horizontal, alvos de toque e resumo fixo visível (A37)", async ({ browser, request }) => {
   const context = await browser.newContext({ viewport: { width: 375, height: 667 } });
   const page = await context.newPage();
-  const family = await createTestUser("e2e-celular", "guardian");
+  const family = (await createFamily(request, "e2e-celular")).guardian;
   await login(page, "/portal/cardapio", family.email);
   const plus = page.getByRole("button", { name: "Aumentar Suco de laranja (exemplo)" });
   await expect(plus).toBeVisible({ timeout: 20000 });
@@ -104,10 +112,10 @@ test("celular: sem rolagem horizontal, alvos de toque e resumo fixo visível (A3
   await context.close();
 });
 
-test("reduced motion: sem transições e a ação não depende de animação (A37)", async ({ browser }) => {
+test("reduced motion: sem transições e a ação não depende de animação (A37)", async ({ browser, request }) => {
   const context = await browser.newContext({ reducedMotion: "reduce" });
   const page = await context.newPage();
-  const family = await createTestUser("e2e-movimento", "guardian");
+  const family = (await createFamily(request, "e2e-movimento")).guardian;
   await login(page, "/portal/cardapio", family.email);
   const plus = page.getByRole("button", { name: "Aumentar Suco de laranja (exemplo)" });
   await expect(plus).toBeVisible({ timeout: 20000 });

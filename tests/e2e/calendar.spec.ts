@@ -57,6 +57,28 @@ test("administração: horários por turno, dia extra e janela de compra pela in
   await page.screenshot({ path: "test-results/f05-calendario-375.png", fullPage: true });
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.screenshot({ path: "test-results/f05-calendario-desktop.png", fullPage: true });
+
+  // Homologação compartilhada: o horário do turno criado por este teste sai da configuração (os demais ficam como estavam),
+  // para o mapa de horários não crescer a cada execução (limite de 50 turnos).
+  const headers = { authorization: `Bearer ${admin.idToken}` };
+  const shiftId = ((await created.json()) as { id: string }).id;
+  const current = (await (await request.get("/api/school/settings", { headers })).json()) as {
+    version: number;
+    schoolName: string;
+    weekdays: number[];
+    shiftPolicies: Record<string, unknown>;
+  };
+  const cleaned = await request.post("/api/school/settings", {
+    headers,
+    data: {
+      key: `e2e-settings-${tag}-0002`,
+      expectedVersion: current.version,
+      schoolName: current.schoolName,
+      weekdays: current.weekdays,
+      shiftPolicies: Object.fromEntries(Object.entries(current.shiftPolicies).filter(([id]) => id !== shiftId)),
+    },
+  });
+  expect(cleaned.status()).toBe(200);
 });
 
 test("não administração não vê nem usa o calendário", async ({ page }) => {

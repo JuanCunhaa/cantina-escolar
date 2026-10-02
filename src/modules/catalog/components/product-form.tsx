@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import type { User } from "firebase/auth";
 import { api, errorText, newKey } from "@/lib/api-client";
 import type { Unit } from "@/modules/school/use-units";
-import { AVAILABILITY_MODES, CHANNEL_LABEL, CHANNELS, MODE_LABEL, parseBRLInput, type Category, type PublicProduct } from "../model";
+import { AVAILABILITY_MODES, CHANNEL_LABEL, CHANNELS, MAX_PRODUCT_SHIFTS, MODE_LABEL, parseBRLInput, type Category, type PublicProduct } from "../model";
 import type { ProductPrivate } from "../use-catalog";
 
 type Props = {
@@ -37,6 +37,7 @@ export function ProductForm({ user, categories, shifts, product, privateData, on
     const shiftIds = data.getAll("shiftIds").map(String);
     if (channels.length === 0) return setError("Escolha ao menos um canal de venda.");
     if (shiftIds.length === 0) return setError("Escolha ao menos um turno.");
+    if (shiftIds.length > MAX_PRODUCT_SHIFTS) return setError(`Escolha no máximo ${MAX_PRODUCT_SHIFTS} turnos.`);
     const body: Record<string, unknown> = {
       key: newKey(),
       name: String(data.get("name")).trim(),

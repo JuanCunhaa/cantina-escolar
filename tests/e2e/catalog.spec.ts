@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import { createTestUser, TEST_PASSWORD } from "../helpers/auth-emulator";
-import { prepareCatalog } from "../helpers/catalog-fixtures.ts";
+import { fixtureIds, prepareCatalog, productIdByName } from "../helpers/catalog-fixtures.ts";
+import { warmRoutes } from "../helpers/dev-server.ts";
+import { adminPost, createFamily } from "../helpers/menu-fixtures.ts";
 
 async function login(page: Page, path: string, email: string) {
   await page.goto(path);
@@ -12,18 +14,25 @@ async function login(page: Page, path: string, email: string) {
 
 // Roda no emulador e na homologação: cria só os próprios dados (categoria/produto com sufixo aleatório) e os encerra pelo
 // fluxo autorizado; os produtos "(exemplo)" são apenas lidos.
-test.beforeAll(async () => {
+test.beforeAll(async ({ request }) => {
   await prepareCatalog();
+  // TODAS as rotas do fluxo compiladas antes de abrir as páginas (a família recarrega com o painel da administração aberto).
+  await warmRoutes(request, {
+    post: ["/api/students", "/api/links", "/api/menu", "/api/catalog/categories", "/api/catalog/products"],
+    get: ["/api/catalog/photo?productId=x", "/api/menu", "/portal/cardapio", "/operacao/produtos"],
+  });
 });
 
-test("administração: categoria, produto, preço com histórico e desativação; família vê só o público (A16/A37)", async ({ browser }) => {
+test("administração: categoria, produto, preço com histórico e desativação; família vê só o público (A16/A37)", async ({ browser, request }) => {
   const tag = randomUUID().slice(0, 6);
   const product = `Brigadeiro ${tag}`;
   const admin = await createTestUser("e2e-catalogo-adm", "admin");
-  const family = await createTestUser("e2e-catalogo-familia", "guardian");
+  const family = (await createFamily(request, "e2e-catalogo-familia")).guardian;
+  const morning = (await fixtureIds()).shift("Manhã (exemplo)");
   test.setTimeout(150_000);
   // Família entra primeiro: no dev server a 1ª compilação de uma rota recarrega as outras páginas abertas (HMR) e
-  // descartaria o painel aberto da administração. O listener do portal acompanha as mudanças ao vivo.
+  // descartaria o painel aberto da administração. O portal (F07) mostra o cardápio do aluno resolvido pelo servidor e
+  // é recarregado para ver as mudanças.
   const familyPage = await (await browser.newContext()).newPage();
   await login(familyPage, "/portal/cardapio", family.email);
   await expect(familyPage.getByTestId("product").first()).toBeVisible({ timeout: 30000 });
@@ -44,6 +53,11 @@ test("administração: categoria, produto, preço com histórico e desativação
   await page.locator("#new-product-description").fill("Doce de chocolate (teste).");
   await page.getByRole("radio", { name: "Planejado por data/turno" }).check();
   await page.locator("#new-product-supplier").fill(`Fornecedor e2e ${tag}`);
+  // Só o turno de que o teste precisa: a homologação compartilhada acumula turnos de outras execuções (limite de 10 por
+  // produto), e o formulário marca todos os ativos por padrão.
+  const shiftsGroup = page.getByRole("group", { name: "Turnos", exact: true });
+  for (const box of await shiftsGroup.getByRole("checkbox").all()) await box.uncheck();
+  await shiftsGroup.getByRole("checkbox", { name: "Manhã (exemplo)" }).check();
   await page.getByRole("button", { name: "Cadastrar produto" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Produto cadastrado." })).toBeVisible();
   const row = page.getByTestId("photo-row").filter({ hasText: product });
@@ -65,17 +79,21 @@ test("administração: categoria, produto, preço com histórico e desativação
   // O formulário de edição mostra o fornecedor interno só para a administração.
   await expect(page.getByLabel("Fornecedor padrão (interno)")).toHaveValue(`Fornecedor e2e ${tag}`);
 
-  // Família: vê o produto com o preço novo e nada interno.
+  // Família: com o produto no cardápio padrão da manhã (F07), vê o preço novo e nada interno.
+  await adminPost(request, admin, "/api/menu", { action: "setDefault", productId: await productIdByName(product), shiftIds: [morning], expectedVersion: 0 });
+  await familyPage.reload();
   const item = familyPage.getByTestId("product").filter({ hasText: product });
-  await expect(item).toContainText(/R\$\s9,00/);
+  await expect(item).toContainText(/R\$\s9,00/, { timeout: 20000 });
   await expect(familyPage.getByText(`Fornecedor e2e ${tag}`)).toHaveCount(0);
 
-  // Desativar: some das novas vendas (portal ao vivo), continua consultável com histórico na operação.
+  // Desativar: some das novas vendas (o portal recarregado não o mostra), continua consultável com histórico na operação.
   await page.locator("#deactivate-reason").fill("Fim da temporada");
   await page.getByRole("button", { name: "Desativar produto" }).click();
   await expect(page.getByRole("status").filter({ hasText: "O histórico foi mantido." })).toBeVisible();
   await expect(row).toHaveCount(0);
-  await expect(item).toHaveCount(0, { timeout: 15000 });
+  await familyPage.reload();
+  await expect(familyPage.getByTestId("product").first()).toBeVisible({ timeout: 20000 });
+  await expect(item).toHaveCount(0);
   await page.locator("#product-status-filter").selectOption("inactive");
   await expect(row).toContainText("Desativado");
   await row.getByRole("button", { name: `Gerenciar ${product}` }).click();

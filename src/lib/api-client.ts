@@ -62,6 +62,17 @@ const MESSAGES: Record<string, string> = {
   product_not_found: "Produto não encontrado.",
   stale_product: "O produto foi alterado por outra pessoa. Abra novamente para ver a versão atual.",
   stale_price: "O preço foi alterado por outra pessoa. Confira o preço atual antes de salvar.",
+  stale_menu: "O cardápio foi alterado por outra pessoa. A tela já mostra a versão atual: revise e tente de novo.",
+  already_in_default: "Este produto já está no cardápio padrão deste turno.",
+  not_in_default: "O produto não faz parte do cardápio padrão deste turno.",
+  shift_not_allowed: "O produto não é vendido neste turno (ajuste os turnos no cadastro do produto).",
+  product_inactive: "Produto desativado.",
+  past_date: "Não é possível alterar uma data passada.",
+  too_far: "Data distante demais.",
+  too_many_items: "Exceções demais nesta data e turno.",
+  shift_not_configured: "Os horários do turno deste aluno ainda não foram configurados pela escola.",
+  student_required: "Selecione o aluno.",
+  beyond_window: "Compras só de hoje até 7 dias à frente.",
   internal: "Não foi possível concluir agora. Tente novamente.",
 };
 

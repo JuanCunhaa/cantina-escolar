@@ -1,10 +1,10 @@
 "use client";
 
-import { MenuView } from "@/modules/catalog/components/menu-view";
 import { useSession } from "@/modules/access/use-session";
+import { FamilyMenu } from "@/modules/menu/components/family-menu";
 
 export default function CardapioPage() {
   const session = useSession();
   if (session.status !== "signedIn") return null;
-  return <MenuView uid={session.user.uid} />;
+  return <FamilyMenu user={session.user} role={session.role} />;
 }

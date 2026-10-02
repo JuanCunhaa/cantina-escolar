@@ -58,7 +58,9 @@ function UnitSection({ user, kind, title, label, units }: { user: User; kind: Ki
       <h2>{title}</h2>
       <form onSubmit={(event) => void create(event)} className="inline-form">
         <label htmlFor={`new-${kind}`}>{label}</label>
-        <input id={`new-${kind}`} name="name" type="text" required maxLength={60} autoComplete="off" />
+        {/* Somente leitura durante o envio: a limpeza após o sucesso não pode apagar texto digitado nesse intervalo (a lista
+            já mostra o item novo pelo listener antes da resposta HTTP chegar). */}
+        <input id={`new-${kind}`} name="name" type="text" required maxLength={60} autoComplete="off" readOnly={busy} aria-busy={busy} />
         <button type="submit" disabled={busy}>
           Adicionar
         </button>

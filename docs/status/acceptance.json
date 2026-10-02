@@ -110,9 +110,11 @@
       "npm run test:e2e 17/17",
       "npm run build:webpack exit 0",
       "npm run audit:prod 0 vulnerabilidades",
-      "Homologação real 01/10/2026 (projeto cantina-escolar-hml, app local, docs/status/firebase-homologation.md): calendar.spec.ts e janela de compra por rota no Firestore real (sem índice composto)"
+      "Homologação real 01/10/2026 (projeto cantina-escolar-hml, app local, docs/status/firebase-homologation.md): calendar.spec.ts e janela de compra por rota no Firestore real (sem índice composto)",
+      "F07 (02/10/2026) tests/integration/menu-api.test.ts (relógio fixo, quinta 09:00 local): cardápio do aluno da manhã com hoje 'after_cutoff' (exibido, sem compra) e amanhã permitido com prazos UTC 10:00/11:00; aluno da tarde compra hoje até 14:00 (17:00 UTC)",
+      "F07 tests/e2e/menu.spec.ts + tests/staging/menu-api.spec.ts: portal mostra o estado de cada data (Aberto/Encerrado/Fechado/Suspenso) com os prazos do turno do aluno; homologação real 02/10/2026 (app local × cantina-escolar-hml)"
     ],
-    "notes": "Parcial (F05, 01/10/2026): regra/limites/revalidação no servidor provados; carrinho/checkout real e PDV (F11/F15) pendentes; manter not_run."
+    "notes": "Parcial (F05+F07): regra/limites/revalidação no servidor provados e expostos no cardápio do portal; carrinho/checkout real e PDV (F11/F15) pendentes; manter not_run."
   },
   "A13": {
     "status": "not_run",
@@ -146,12 +148,18 @@
       "npm run build:webpack exit 0",
       "npm run audit:prod 0 vulnerabilidades"
     ],
-    "notes": "Parcial (F05, 01/10/2026): janela, dias letivos e fuso provados em regra/servidor/interface admin; negação no checkout real depende de F11; manter not_run."
+    "notes": "Parcial (F05+F07): janela, dias letivos e fuso provados em regra/servidor/interface admin e no cardápio do portal (F07: GET /api/menu só devolve hoje…hoje+7; hoje+8 → 422 beyond_window, passado → 422 past_date, fim de semana 'closed' sem itens, 23:30 local ainda é hoje — integração com relógio fixo, e2e e homologação real 02/10/2026); negação no checkout real depende de F11; manter not_run."
   },
   "A15": {
     "status": "not_run",
-    "evidence": [],
-    "notes": "F06 não cobre: cardápio por data/turno, extras e ocultação são da F07. O catálogo fornece canais/turnos/situação usados pela F07. Manter not_run."
+    "evidence": [
+      "F07 (02/10/2026) tests/unit/menu.test.ts: extra aparece só na data/turno da exceção; ocultação só nela; suspensão esvazia; catálogo continua valendo; venda recusa fora do cardápio (not_on_menu) e suspenso (service_suspended)",
+      "F07 tests/integration/menu-api.test.ts (emulador): readMenuForSale na transação — extra vendável só em D/manhã (outra data e outro turno → not_on_menu, ID manual recusado); oculto recusado só na data; GET /api/menu da família mostra o extra 'limitado' só na data e sem o oculto; ocultar não altera produto, regra padrão nem outras datas; comandos só admin, versão esperada (3 simultâneas → 1×200 + 2×409), replay e auditoria appliesTo new_orders_only",
+      "F07 tests/rules/menu.rules.test.ts: configuração do cardápio legível só por cantina/administração; família/aluno/secretaria negados; ninguém escreve pelo cliente",
+      "F07 tests/e2e/menu.spec.ts (emulador e homologação): administração monta padrão, extra com limite, ocultação e suspensão pela tela; família vê extra só em D1 e o oculto só em D2; aluno da tarde não recebe nada da manhã; capturas 375 px/desktop",
+      "F07 homologação real 02/10/2026 (app local × cantina-escolar-hml, Rules expandidas publicadas): tests/staging/menu-api.spec.ts 3/3 — comandos sem permissão 401/403 sem efeito, Rules publicadas fecham a configuração à família, extra/oculto/suspensão só na data/turno e motivo interno fora da resposta da família"
+    ],
+    "notes": "Parcial (F07): extra/ocultação por data/turno provados no servidor, Rules, portal e homologação. 'Sem apagar pedidos pagos' depende de pedidos (F11): hoje nenhum comando de cardápio toca pedidos e a revisão dos afetados com decisão explícita fica para F11. Manter not_run."
   },
   "A16": {
     "status": "not_run",
