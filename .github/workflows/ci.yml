@@ -1,5 +1,5 @@
 # CI da Cantina Escolar. Nunca usa credencial real: só emuladores com projeto demo-cantina.
-# Não executado localmente (sem GitHub Actions nesta máquina); validar no primeiro push.
+# Executado no GitHub Actions desde 01/10/2026 (repositório privado JuanCunhaa/cantina-escolar).
 name: ci
 
 on:
@@ -74,7 +74,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - name: Semgrep (regras do registry; fixar versão/regras ao homologar CI)
+      # Versão fixada na 1ª execução real do CI (01/10/2026); as regras de --config=auto vêm do registry e podem mudar.
+      - name: Semgrep 1.179.0 (regras do registry)
         run: |
-          pip install semgrep
+          pip install semgrep==1.179.0
           semgrep scan --config=auto --error src
