@@ -12,7 +12,7 @@ export type SweepResult = { scanned: number; referenced: number; orphans: string
  * Remove objetos de foto sem referência no Firestore (resíduo de envios interrompidos ou de limpeza que falhou).
  * Ordem importa: lista o bucket ANTES de ler as referências — um objeto confirmado entre as duas leituras aparece
  * como referenciado, e um ainda não confirmado é protegido pela carência. Dry-run por padrão.
- * Ao criar o catálogo real (F06), acrescentar as novas coleções que apontam para fotos em `referencedPhotoKeys`.
+ * Toda coleção que passar a apontar para fotos precisa entrar em `referencedPhotoKeys` (hoje só `products`, F06).
  */
 export async function sweepOrphanPhotos(
   deps: { db: Firestore; store: ObjectStore },
@@ -45,7 +45,7 @@ export async function sweepOrphanPhotos(
 /** Todas as chaves de foto hoje referenciadas por documentos. */
 export async function referencedPhotoKeys(db: Firestore): Promise<Set<string>> {
   const keys = new Set<string>();
-  const snap = await db.collection("demoProducts").select("photoPath").get();
+  const snap = await db.collection("products").select("photoPath").get();
   for (const doc of snap.docs) {
     const value = doc.get("photoPath");
     if (typeof value === "string") keys.add(value);

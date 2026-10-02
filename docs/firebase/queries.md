@@ -15,3 +15,9 @@ Busca por nome: `students` por intervalo de prefixo em `nameNormalized` (custo =
 ### Calendário (F05)
 
 `GET /api/school/calendar?shiftId=` (qualquer perfil ativo): lê o turno, `settings/school` e `calendarDays` por intervalo de ID (hoje…hoje+7, ≤ 8 documentos). `checkPurchase(db, {shiftId, date, now?}, tx?)` faz as mesmas leituras (turno, settings, 1 dia) e pode rodar dentro da transação do checkout. Tela admin escuta `calendarDays` inteira (≤ ~400 documentos por limite de data).
+
+### Catálogo (F06)
+
+- Portal: listener `products where status == active` + `categories` (perfil ativo; ordenação no cliente). Operação: listener de `products` inteiro (catálogo de uma escola: dezenas a poucas centenas de documentos) + `productPrivate` só para administração.
+- Histórico de preço: leitura sob demanda `products/{id}/priceHistory orderBy priceVersion desc limit 50` (cantina/administração).
+- Servidor: arquivar categoria consulta `products where categoryId == X and status == active limit 1` na transação; venda lê produtos por ID na transação (`readSellableProducts`).

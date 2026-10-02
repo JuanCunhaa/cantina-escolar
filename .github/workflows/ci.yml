@@ -79,11 +79,25 @@ jobs:
         run: |
           pip install semgrep==1.179.0
           semgrep scan --config=auto --error src
-      # Semgrep AppSec Platform: políticas do painel, resultados enviados à conta do dono. O token fica só nesta etapa.
-      # Sem o segredo (ex.: PR do Dependabot) a etapa avisa e não roda; o scan acima continua obrigatório.
+
+  # Semgrep AppSec Platform: políticas do painel, resultados enviados à conta do dono. Job isolado porque o `semgrep ci`
+  # diff-aware de PR busca commits (git fetch) no repositório privado: só aqui o checkout mantém o GITHUB_TOKEN
+  # (permissions: contents: read, válido só durante o job) e nenhum outro passo roda neste job. Sem o segredo (ex.: PR
+  # do Dependabot) a etapa avisa e não roda; o scan do job security continua obrigatório.
+  semgrep-appsec:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
       - name: Semgrep CI (AppSec Platform)
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
         run: |
           if [ -z "$SEMGREP_APP_TOKEN" ]; then echo "::warning::SEMGREP_APP_TOKEN indisponível; semgrep ci não executado."; exit 0; fi
+          pip install semgrep==1.179.0
           semgrep ci

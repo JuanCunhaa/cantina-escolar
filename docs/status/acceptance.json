@@ -151,12 +151,16 @@
   "A15": {
     "status": "not_run",
     "evidence": [],
-    "notes": ""
+    "notes": "F06 não cobre: cardápio por data/turno, extras e ocultação são da F07. O catálogo fornece canais/turnos/situação usados pela F07. Manter not_run."
   },
   "A16": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "F06 (02/10/2026) tests/integration/catalog-api.test.ts (emulador): preço só em centavos inteiros (8.5 e \"800\" → 400); R$ 8 → R$ 9 cria priceHistory v2 (previousPriceCents 800, motivo, autor) e mantém a v1 intacta; versão de preço desatualizada 409; mesmo preço não cria entrada; replay idempotente sem nova entrada e mesma chave com outro preço 409; 6 alterações simultâneas da mesma versão → 1×200 + 5×409 e histórico contíguo; readSellableProducts devolve o preço/priceVersion atuais do servidor dentro da transação",
+      "F06 tests/unit/catalog.test.ts: schema recusa preço fracionário/string/zero/negativo/acima do teto; edição comum não aceita preço; parseBRLInput converte reais em centavos sem ponto flutuante; evaluateSellable nega desativado/canal/turno/preço inválido",
+      "F06 tests/rules: cliente (inclusive administração) não grava preço nem histórico; tests/e2e/catalog.spec.ts: administração muda R$ 8,00 → R$ 9,00 pela tela, histórico mostra as duas entradas e a família vê R$ 9,00"
+    ],
+    "notes": "Parcial (F06): catálogo com preço em centavos, histórico imutável e leitura canônica de venda provados. Snapshot no pedido (R$ 8 permanece R$ 8), cancelamento devolvendo R$ 8 e recusa de total/preço manipulado no request dependem do checkout (F11) e cancelamento (F14). Manter not_run."
   },
   "A17": {
     "status": "not_run",
@@ -324,24 +328,27 @@
   "A36": {
     "status": "not_run",
     "evidence": [
-      "tests/integration/photo-route.test.ts (24 testes, emulador Auth/Firestore + armazenamento local double do R2): 401/403 (responsável, aluno, secretaria, sem perfil, conta desativada), envio por cantina/admin, chave gerada no servidor com uid/papel/caminho do cliente ignorados, troca com remoção da foto anterior só após o commit, sem sobrescrita, conteúdo falso/tipo divergente/truncado/vazio/dimensões absurdas (422), >2 MB por Content-Length e por stream (413), leitura autorizada por perfil ativo e negada sem perfil/desativada, ETag/304, 404 em produção",
+      "tests/integration/photo-route.test.ts (24 testes, emulador Auth/Firestore + armazenamento local double do R2): 401/403 (responsável, aluno, secretaria, sem perfil, conta desativada), envio por cantina/admin, chave gerada no servidor com uid/papel/caminho do cliente ignorados, troca com remoção da foto anterior só após o commit, sem sobrescrita, conteúdo falso/tipo divergente/truncado/vazio/dimensões absurdas (422), >2 MB por Content-Length e por stream (413), leitura autorizada por perfil ativo e negada sem perfil/desativada, ETag/304",
       "falhas entre armazenamento e Firestore (mesmo arquivo): falha no PUT, objeto não confirmado, permissão revogada/conta desativada/produto removido durante o envio, commit com resultado incerto (objeto mantido), falha ao apagar a anterior + sweep, envio interrompido (órfão) + sweep, rota de sweep só da administração",
       "tests/unit/storage.test.ts (22): configuração por ambiente fechada, chaves, inspeção de imagem (PNG/JPEG/WebP), corpo limitado, armazenamento local e cliente S3 real contra servidor S3 duplo (If-None-Match: *, sem checksum CRC32, 412→ObjectExistsError, erros sem vazar segredo)",
       "tests/rules: Firestore nega ao cliente (inclusive equipe) qualquer escrita de metadados de foto; claim forjada sem efeito (Storage Rules removidas)",
       "tests/e2e/shell-photos.spec.ts: 3 fotos reais (blob com ID token) + 1 fallback; funcionário envia PNG válido; txt e >2 MB recusados no cliente; PNG falso recusado pelo servidor",
       "tests/r2/r2-integration.test.ts (R2 REAL, bucket de homologação, 01/10/2026): 3/3 — PUT com If-None-Match recusa sobrescrita (412) e preserva os bytes, ETag = MD5, HEAD/GET/DELETE/LIST, objeto de 2 MB, endpoint S3 nega leitura anônima; limpeza só das chaves criadas",
-      "Homologação real 01/10/2026 (projeto cantina-escolar-hml, app local, docs/status/firebase-homologation.md): upload/leitura/troca pelas rotas do app com o R2 real (bytes idênticos, nosniff, ETag/304, anterior removida), recusas 401/403, 10 entradas inválidas recusadas sem alterar o bucket"
+      "Homologação real 01/10/2026 (projeto cantina-escolar-hml, app local, docs/status/firebase-homologation.md): upload/leitura/troca pelas rotas do app com o R2 real (bytes idênticos, nosniff, ETag/304, anterior removida), recusas 401/403, 10 entradas inválidas recusadas sem alterar o bucket",
+      "F06 (02/10/2026): fotos agora no produto real (`products`); photo-route.test.ts adaptado e verde; rota disponível em todos os ambientes e, sem armazenamento configurado (produção sem R2 ou sem APP_ENV), responde 503 storage_unavailable sem gravar nem apontar o produto; sweep de órfãs lê `products`; tests/e2e/catalog.spec.ts: cantina troca foto mas não cadastra/preço",
+      "F06 homologação dirigida 02/10/2026 (app local × Firebase cantina-escolar-hml com Rules F06 publicadas + R2 cantina-fotos-staging): 22/22 — catalog/shell-photos/access e2e + photos-r2/isolation; upload/leitura/troca/rejeições no produto real, cardápio com 3 fotos + fallback, cantina sem cadastro/preço"
     ],
-    "notes": "Parcial. Migração de Firebase Storage para Cloudflare R2 aprovada em 01/10/2026. Camada de armazenamento comprovada no R2 real de homologação; rotas/regras de negócio provadas com double local + emulador Auth/Firestore. Pendentes: app completo em homologação (F24), confirmação de ausência de acesso público (r2.dev/domínio) no painel e comportamento do SDK com checksum padrão. Decisão sobre fotos antigas de pedidos: F06/F11. Manter not_run. Homologação local×nuvem concluída em 01/10/2026; servidor publicado (F24) pendente — manter not_run."
+    "notes": "Parcial. Migração de Firebase Storage para Cloudflare R2 aprovada em 01/10/2026. Camada de armazenamento comprovada no R2 real de homologação; rotas/regras de negócio provadas com double local + emulador Auth/Firestore. Pendentes: app completo em homologação (F24), confirmação de ausência de acesso público (r2.dev/domínio) no painel e comportamento do SDK com checksum padrão. Decisão sobre fotos antigas de pedidos (F06): snapshot do pedido não inclui foto; a anterior é apagada após o commit. Manter not_run. Homologação local×nuvem concluída em 01/10/2026; servidor publicado (F24) pendente — manter not_run."
   },
   "A37": {
     "status": "not_run",
     "evidence": [
       "tests/e2e/shell-photos.spec.ts: skip link/Tab/Enter/Space operam o cardápio sem mouse, foco com contorno 3px, aria-current; viewport 375px sem rolagem horizontal, alvos >=40px, resumo fixo visível; prefers-reduced-motion zera transição e a ação responde <1s; sem a preferência a transição é 150 ms e também não atrasa; responsável não acessa a operação",
       "tests/unit/photo-navigation.test.ts: navegação por papel",
-      "inspeção visual de capturas desktop/mobile (lista aberta com separadores, cards só nas fotos)"
+      "inspeção visual de capturas desktop/mobile (lista aberta com separadores, cards só nas fotos)",
+      "F06 (02/10/2026): tests/e2e/catalog.spec.ts — operação de produtos a 375 px sem rolagem horizontal (tabela vira blocos), formulários com labels/fieldsets/legends, rádio e checkboxes por teclado; portal com catálogo real (só balcão sem controle, etiqueta de turno); capturas test-results/f06-{portal,operacao}-{375,1280}.png inspecionadas"
     ],
-    "notes": "Parcial: cobre portal de demonstração e tela de produtos/fotos. Contraste conferido por tokens (muted 6.3:1, accent/branco 6.0:1), sem axe automatizado. PDV, entrega, pedidos e demais telas (F11–F16) devem repetir a prova; manter not_run."
+    "notes": "Parcial: cobre portal (catálogo real F06) e tela de produtos (cadastro, preço, histórico, fotos). Contraste conferido por tokens (muted 6.3:1, accent/branco 6.0:1), sem axe automatizado. PDV, entrega, pedidos e demais telas (F11–F16) devem repetir a prova; manter not_run."
   },
   "A38": {
     "status": "not_run",

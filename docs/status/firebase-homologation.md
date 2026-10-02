@@ -43,7 +43,7 @@ Comandos (`package.json`):
 | --- | --- |
 | `npm run staging:preflight` | Somente leitura: destino, Auth, Firestore, login e-mail/senha e R2 |
 | `npm run staging:deploy` | Publica regras/índices do Firestore no projeto confirmado (login do CLI) |
-| `npm run staging:fixtures` | Contas fictícias `@hml.example.test` + catálogo fictício (idempotente; senhas aleatórias só em `.staging-fixtures.<projeto>.local.json`) |
+| `npm run staging:fixtures` | Contas fictícias `@hml.example.test` (idempotente; senhas aleatórias só em `.staging-fixtures.<projeto>.local.json`). Desde a F06 o catálogo fictício é garantido no `verify` pelas rotas do app (ver abaixo) |
 | `npm run staging:dev` | Servidor Next (webpack, porta 3300) conectado ao staging, para prova manual |
 | `npm run staging:verify` | Suíte completa (e2e existente + `tests/staging/*`) contra o staging real |
 | `npm run staging:cleanup` | Remove contas efêmeras (`@*.example.test` que não sejam fixtures) e seus perfis |
@@ -51,7 +51,7 @@ Comandos (`package.json`):
 
 Os scripts de seed/reset dos emuladores (`npm run seed`, `emulators`) **não** foram usados na nuvem (recusam alvo não local).
 
-Fixtures duráveis (`staging:fixtures`): admin, secretaria, cantina, familia-a, familia-b, aluno (login de aluno), semperfil, desativada — todas `@hml.example.test`, sem caixa de correio real; mais 4 produtos fictícios (`demoProducts`) com 3 fotos no R2. Contas efêmeras de cada execução (`@e2e.example.test`, senha fictícia fixa) são apagadas no teardown.
+Fixtures duráveis (`staging:fixtures`): admin, secretaria, cantina, familia-a, familia-b, aluno (login de aluno), semperfil, desativada — todas `@hml.example.test`, sem caixa de correio real; mais 4 produtos fictícios (`demoProducts`) com 3 fotos no R2 (até a F05). **Desde a F06 (02/10/2026)**: o catálogo de exemplo — turnos `Manhã/Tarde (exemplo)`, 3 categorias e 5 produtos `(exemplo)` (3 com foto, 1 só de balcão sem foto, 1 desativado) — é garantido pelo `global-setup` do `verify` através das rotas autorizadas do app com a fixture `admin` (`tests/helpers/catalog-fixtures.ts`): só cria o que falta, reativa/desativa e envia foto ausente; nunca reseta por Admin SDK nem grava direto no R2. Os testes não alteram esses produtos; quem precisa mudar foto/preço/situação cria um produto temporário (sufixo aleatório) pela API e o deixa desativado. Consequência: cada `verify` deixa alguns produtos/categorias temporários **desativados/arquivados** (nada é apagado, por regra do produto). Contas efêmeras de cada execução (`@e2e.example.test`, senha fictícia fixa) são apagadas no teardown.
 
 ## Resultado
 

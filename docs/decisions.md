@@ -35,7 +35,7 @@ Acrescentar decisão com contexto breve, opção adotada, efeito e fonte oficial
 
 - Papel provisório: custom claim `role` (guardian|cantina|secretaria|admin) no ID token, definida só pelo servidor/Admin. Serve Storage Rules, `requireActor` (`Actor.role`) e navegação. F03 formaliza papéis/permissões e pode substituir; Rules não checam revogação (vale até o token expirar).
 - (SUBSTITUÍDA em 01/10/2026 pela decisão de R2 abaixo; mantida como histórico) Fotos: upload direto ao Storage em `products/{productId}/{nome-aleatório}.{jpg|png|webp}`; Rules só `create` (sem sobrescrever; substituir = novo arquivo), cantina/admin, tipo e ≤ 2 MB. Servidor (`/api/catalog/photo`) revalida papel, caminho do produto, tipo, tamanho e assinatura dos bytes antes de gravar `photoPath`; arquivo reprovado é apagado. SVG nunca aceito. Leitura: contas autenticadas; qualquer outro caminho (comprovantes) fechado.
-- Catálogo de demonstração: coleção `demoProducts` (fictícia, marcada `isDemo`, leitura autenticada, escrita só seed/servidor); imagens de exemplo geradas em código (sem terceiros). Substituída pelo catálogo real em F06; remover coleção/rota/regra então. `/api/catalog/photo` indisponível em produção.
+- (SUBSTITUÍDA em F06, 02/10/2026) Catálogo de demonstração: coleção `demoProducts` (fictícia, marcada `isDemo`, leitura autenticada, escrita só seed/servidor); imagens de exemplo geradas em código (sem terceiros). Substituída pelo catálogo real em F06; remover coleção/rota/regra então. `/api/catalog/photo` indisponível em produção.
 - UI: tokens em src/app/globals.css; seções abertas e listas, cards só na foto do produto; sem Tailwind/Radix (CSS próprio suficiente); reduced motion zera transições via tokens. Navegação por papel em src/modules/access/navigation.ts (itens de tarefas futuras aparecem "em breve", sem link).
 
 ## Decisões de F03 (30/09/2026)
@@ -81,3 +81,27 @@ Mudança de arquitetura autorizada pelo dono do projeto: SOMENTE o armazenamento
 - Firestore guarda `photoPath` (CHAVE do objeto, não URL) + `photoContentType/Size/Sha256/UpdatedBy/UpdatedAt`, escritos só pelo servidor; Rules continuam negando escrita do cliente.
 - Consistência R2 × Firestore (sem transação compartilhada): (1) objeto novo gravado e conferido por HEAD (tamanho, tipo, MD5) antes de qualquer referência; (2) transação Firestore relê o perfil ATUAL do ator e o produto e só então aponta para a chave nova; (3) negativa determinística no commit (permissão revogada, produto removido) → objeto novo apagado; erro de resultado incerto → objeto mantido se o produto já o referencia (nunca deixar referência quebrada); (4) foto anterior só é apagada DEPOIS do commit, e falha vira órfão; (5) órfãos (crash entre gravar e confirmar, limpeza falha) são recolhidos por `sweepOrphanPhotos` (`POST /api/admin/storage/sweep`, capacidade `storage.maintain` só da administração, dry-run por padrão, lista o bucket ANTES de ler as referências, carência de 60 min). F06 deve acrescentar suas coleções em `referencedPhotoKeys`.
 - Removidos: Storage Rules, Storage Emulator, `firebase/storage` no cliente e `firebase-admin/storage`. `@google-cloud/storage` continua só como dependência transitiva do `firebase-admin` (override de `gaxios>uuid` mantido).
+
+## Decisões de F06 (02/10/2026)
+
+- Catálogo real substitui `demoProducts` (coleção, regra, hook e tela removidos). `/api/catalog/photo` passa a existir em todos os ambientes e responde 503 se o armazenamento não estiver configurado (falha fechada, sem fallback). Exemplos fictícios só pelo seed de emulador e pelo harness de homologação, com nomes `(exemplo)` e IDs `*_exemplo_*`.
+- Papéis: cadastro, preço, categorias e situação = só administração (`catalog.manage`, docs/domains/access.md §4.1); cantina consulta, vê histórico de preço e troca fotos (`catalog.photos.manage`). Secretaria, família e aluno não alteram nada.
+- Público × interno: `products` só com dados de vitrine; fornecedor, observações e motivo/autor da desativação em `productPrivate` (só administração). Custo médio/entradas ficam para F10, também fora do documento público.
+- Preço: centavos inteiros (1 centavo…R$ 500,00 por unidade); digitação em reais convertida sem ponto flutuante (`parseBRLInput`). Preço muda só pelo comando próprio, com motivo, `expectedPriceVersion` e entrada imutável em `priceHistory`; a edição comum não aceita preço. Concorrência: mesma versão esperada → uma vence e as demais recebem 409 (testado com 6 simultâneas).
+- Desativar nunca apaga (não existe comando de exclusão): o produto sai das novas vendas (`evaluateSellable` → `product_inactive`) e mantém histórico, foto e dados internos; o nome continua reservado (reativar em vez de recriar).
+- Canais `advance`/`counter` e turnos por produto; modo `physical`/`planned` visível no cadastro e nas telas de operação. Trocar o modo é livre na F06; a F10 deve bloquear a troca quando houver estoque/reservas.
+- Foto substituída: a anterior continua sendo apagada após o commit. Decisão: o snapshot do pedido (F11) guarda nome/preço/quantidade, não a foto, então pedidos antigos não dependem da chave antiga.
+- Portal (até a F07): mostra produtos ativos; produto só de balcão aparece sem controle de quantidade ("Só no balcão"); turno restrito ganha etiqueta pequena. A quantidade continua sendo prévia sem cobrança.
+- O sweep de fotos órfãs lê `products`: objetos antigos de `demoProducts` (homologação) viram órfãos e são recolhidos por `POST /api/admin/storage/sweep` com `apply`.
+
+## Coordenação de Rules × aplicação na homologação (02/10/2026)
+
+Contexto: os deployments de **preview** (branches/PRs) e da **main** (Production do projeto Vercel `cantina-escolar-hml`) usam o MESMO backend — Firebase `cantina-escolar-hml` e R2 `cantina-fotos-staging`. As Firestore Rules (e os índices) são um artefato único por projeto Firebase; o código do app é um por deployment. Na F06 as Rules novas (sem `demoProducts`) foram publicadas antes do merge e o cardápio da main publicada (código F05) ficou indisponível até o merge — falha de transição que não deve se repetir.
+
+Regra (expandir → migrar → contrair):
+1. **Expandir**: o PR que muda o acesso publica (`npm run staging:deploy`) Rules que liberam o que o código novo precisa SEM retirar o que a versão publicada da main ainda usa (ex.: manter a leitura de uma coleção antiga até o merge). Índice novo entra antes do código que o usa.
+2. **Migrar**: merge → deployment da main → validação pela URL publicada (`npm run staging:verify:published`, dirigida aos fluxos alterados). Dados novos são aditivos e o código tolera o formato antigo durante a transição; migração de dados só explícita, com prévia e no ambiente autorizado.
+3. **Contrair**: só depois que a main publicada roda o código novo, um PR pequeno remove a permissão/coleção/índice antigo e republica as Rules.
+- Nunca publicar Rules mais restritas do que a versão publicada da main exige. Se a restrição for urgente por segurança, publicar mesmo assim e registrar a indisponibilidade esperada no PROGRESS.md.
+- Registrar no PROGRESS.md cada `staging:deploy` (data, commit das Rules, motivo) e qual versão do app cada Rule atende.
+- Produção futura (outro projeto Firebase/Vercel, F24): mesma ordem — Rules expandidas → deploy do app → Rules contraídas.

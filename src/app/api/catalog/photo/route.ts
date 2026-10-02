@@ -1,6 +1,6 @@
 import { ZodError } from "zod";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { getObjectStore, StorageUnavailableError } from "@/lib/storage";
+import { getObjectStore, StorageUnavailableError, type ObjectStore } from "@/lib/storage";
 import { PayloadTooLargeError, readBodyLimited } from "@/lib/storage/body";
 import { requireActor } from "@/modules/access/actor";
 import { accessErrorResponse } from "@/modules/access/http";
@@ -14,8 +14,15 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// Catálogo de demonstração (F02): indisponível em produção até o catálogo real (F06).
-const demoCatalogDisabled = (): boolean => process.env.APP_ENV === "production" || !process.env.APP_ENV;
+/** Armazenamento ausente ou mal configurado (ex.: produção sem R2) = indisponível (503), nunca fallback silencioso. */
+function photoStore(): ObjectStore {
+  try {
+    return getObjectStore();
+  } catch (error) {
+    if (error instanceof StorageUnavailableError) throw error;
+    throw new StorageUnavailableError("Armazenamento de fotos não configurado.");
+  }
+}
 
 function errorResponse(error: unknown, what: string): Response {
   const denied = accessErrorResponse(error);
@@ -38,11 +45,10 @@ function errorResponse(error: unknown, what: string): Response {
  * verificado + perfil atual; a chave do objeto é gerada no servidor. Limite real: 2 MB (a Vercel aceita até 4,5 MB).
  */
 export async function POST(request: Request): Promise<Response> {
-  if (demoCatalogDisabled()) return Response.json({ error: "not_found" }, { status: 404 });
   try {
     const actor = await requireActor(adminAuth(), adminDb(), request);
     const declaredType = request.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? null;
-    const result = await uploadProductPhoto({ db: adminDb(), store: getObjectStore() }, actor, {
+    const result = await uploadProductPhoto({ db: adminDb(), store: photoStore() }, actor, {
       productId: new URL(request.url).searchParams.get("productId"),
       declaredType,
       readBody: (limit) => readBodyLimited(request, limit),
@@ -55,11 +61,10 @@ export async function POST(request: Request): Promise<Response> {
 
 /** Leitura autenticada da foto atual do produto (`?productId=`); o bucket é privado e nunca exposto ao navegador. */
 export async function GET(request: Request): Promise<Response> {
-  if (demoCatalogDisabled()) return Response.json({ error: "not_found" }, { status: 404 });
   try {
     const actor = await requireActor(adminAuth(), adminDb(), request);
     const photo = await readProductPhoto(
-      { db: adminDb(), store: getObjectStore() },
+      { db: adminDb(), store: photoStore() },
       actor,
       new URL(request.url).searchParams.get("productId"),
       request.headers.get("if-none-match"),

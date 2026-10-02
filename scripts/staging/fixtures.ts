@@ -1,8 +1,9 @@
-// Fixtures pequenas e DURÁVEIS da homologação: contas fictícias (@hml.example.test) com perfis + catálogo fictício com fotos.
+// Fixtures pequenas e DURÁVEIS da homologação: contas fictícias (@hml.example.test) com perfis. O catálogo fictício é
+// garantido depois, pelas rotas autorizadas do app (tests/helpers/catalog-fixtures.ts, chamado pelo global-setup).
 // Senhas aleatórias ficam só no manifesto local ignorado pelo Git (nunca impressas). Idempotente; só opera no alvo confirmado.
 import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { seedCloudCatalog, writeProfile } from "../../tests/helpers/cloud.ts";
+import { writeProfile } from "../../tests/helpers/cloud.ts";
 import type { DemoProfile } from "../lib/demo-seed.ts";
 import { admin } from "./admin.ts";
 import { FIXTURE_DOMAIN, type Target } from "./target.ts";
@@ -48,6 +49,5 @@ export async function ensureFixtures(target: Target): Promise<FixtureManifest> {
     manifest.accounts[spec.name] = { uid, email, password, role: spec.role };
   }
   writeFileSync(target.fixturesFile, JSON.stringify(manifest, null, 2), { mode: 0o600 });
-  await seedCloudCatalog();
   return manifest;
 }

@@ -1,7 +1,10 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { createTestUser } from "../helpers/auth-emulator";
-import { makePng, seedDemoCatalog, DEFAULT_TARGET } from "../../scripts/lib/demo-seed.ts";
-import { isCloud, seedCloudCatalog } from "../helpers/cloud.ts";
+import { makePng } from "../../scripts/lib/demo-seed.ts";
+import { createTempProduct, prepareCatalog, retireTempProduct } from "../helpers/catalog-fixtures.ts";
+
+// Roda no emulador (catálogo semeado) e na homologação (catálogo compartilhado, garantido pela API no global-setup):
+// as asserções miram os produtos "(exemplo)" por nome, nunca a contagem total, e nenhum teste altera esses produtos.
 
 async function login(page: Page, path: string, email: string) {
   await page.goto(path);
@@ -10,59 +13,72 @@ async function login(page: Page, path: string, email: string) {
   await page.getByRole("button", { name: "Entrar" }).click();
 }
 
+const brl = (cents: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100).replace(/ /g, " ");
+const product = (page: Page, name: string) => page.getByTestId("product").filter({ hasText: name });
+/** Preço exibido no item (centavos), para calcular o total esperado sem fixar o cadastro da homologação. */
+async function priceOf(item: Locator): Promise<number> {
+  const text = (await item.locator(".product-price").innerText()).replace(/[^\d,]/g, "");
+  const [reais = "0", centavos = "00"] = text.split(",");
+  return Number(reais) * 100 + Number(centavos.padEnd(2, "0"));
+}
+
 test.beforeAll(async () => {
-  if (isCloud()) await seedCloudCatalog();
-  else await seedDemoCatalog(DEFAULT_TARGET);
+  await prepareCatalog();
 });
 
-test("portal: cardápio fictício com fotos, fallback, indisponibilidade e total em BRL (A36/A37)", async ({ page }) => {
+test("portal: catálogo real (fictício) com fotos, fallback, canal só balcão, turno e total em BRL (A36/A37)", async ({ page }) => {
   const family = await createTestUser("e2e-familia", "guardian");
   await login(page, "/portal/cardapio", family.email);
-
   await expect(page.getByRole("heading", { name: "Cardápio" })).toBeVisible();
-  await expect(page.getByTestId("product")).toHaveCount(4);
 
-  // Três produtos têm foto real servida pelo servidor (bucket privado, blob com o ID token); o quarto cai no fallback discreto.
-  const photos = page.locator(".photo img");
-  await expect(photos).toHaveCount(3);
-  for (const img of await photos.all()) {
+  // Produtos com foto: servida pelo servidor (bucket privado, blob com o ID token), nunca um endereço do bucket.
+  for (const name of ["Suco de laranja (exemplo)", "Pão com queijo (exemplo)", "Salada de frutas (exemplo)"]) {
+    const img = product(page, name).locator(".photo img");
+    await expect(img).toHaveAttribute("src", /^blob:/, { timeout: 20000 });
     await expect(img).toHaveJSProperty("complete", true);
     expect(await img.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
-    await expect(img).toHaveAttribute("alt", /\(exemplo\)/);
-    await expect(img).toHaveAttribute("src", /^blob:/); // nunca um endereço direto do bucket
+    await expect(img).toHaveAttribute("alt", name);
   }
-  await expect(page.locator('[data-fallback="true"]')).toHaveCount(1);
+  // Sem foto: fallback discreto; só de balcão: sem controle de quantidade no portal.
+  const bolo = product(page, "Bolo de cenoura (exemplo)");
+  await expect(bolo.locator('[data-fallback="true"]')).toBeVisible();
   await expect(page.getByRole("img", { name: /Bolo de cenoura.*sem foto/ })).toBeVisible();
-  await expect(page.getByText("Indisponível")).toBeVisible();
-  await expect(page.getByText("Especial · sexta, manhã")).toBeVisible();
+  await expect(bolo.getByText("Só no balcão")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Aumentar Bolo de cenoura/ })).toHaveCount(0);
+  await expect(product(page, "Salada de frutas (exemplo)").getByText("Só Manhã (exemplo)", { exact: true })).toBeVisible();
+  // Produto desativado não aparece para a família; custo/fornecedor nunca chegam à tela.
+  await expect(page.getByText("Pipoca (exemplo)")).toHaveCount(0);
+  await expect(page.getByText("Fornecedor fictício")).toHaveCount(0);
 
-  // Quantidade e total respondem imediatamente; produto indisponível não tem controle.
+  // Quantidade e total respondem imediatamente, com o preço exibido.
+  const suco = await priceOf(product(page, "Suco de laranja (exemplo)"));
+  const pao = await priceOf(product(page, "Pão com queijo (exemplo)"));
   await page.getByRole("button", { name: "Aumentar Suco de laranja (exemplo)" }).click();
   await page.getByRole("button", { name: "Aumentar Suco de laranja (exemplo)" }).click();
   await page.getByRole("button", { name: "Aumentar Pão com queijo (exemplo)" }).click();
-  await expect(page.getByTestId("summary-total")).toContainText("R$ 15,50");
-  await expect(page.getByRole("button", { name: /Aumentar Bolo/ })).toHaveCount(0);
+  await expect(page.getByTestId("summary-total")).toContainText(brl(2 * suco + pao));
 });
 
 test("teclado: pular para o conteúdo, navegação e quantidade sem mouse (A37)", async ({ page }) => {
   const family = await createTestUser("e2e-teclado", "guardian");
   await login(page, "/portal/cardapio", family.email);
-  await expect(page.getByTestId("product")).toHaveCount(4);
+  const plus = page.getByRole("button", { name: "Aumentar Salada de frutas (exemplo)" });
+  await expect(plus).toBeVisible({ timeout: 20000 });
 
   // Nova carga (sessão persistida): o foco começa no topo do documento, como para quem chega pelo teclado.
   await page.goto("/portal/cardapio");
-  await expect(page.getByTestId("product")).toHaveCount(4);
+  await expect(plus).toBeVisible({ timeout: 20000 });
+  const fruta = await priceOf(product(page, "Salada de frutas (exemplo)"));
   await page.keyboard.press("Tab");
   const skip = page.getByRole("link", { name: "Pular para o conteúdo" });
   await expect(skip).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator("#conteudo")).toBeFocused();
 
-  const plus = page.getByRole("button", { name: "Aumentar Salada de frutas (exemplo)" });
   await plus.focus();
   await page.keyboard.press("Enter");
   await page.keyboard.press("Space");
-  await expect(page.getByTestId("summary-total")).toContainText("R$ 10,00");
+  await expect(page.getByTestId("summary-total")).toContainText(brl(2 * fruta));
   // Foco visível: contorno de 3px no elemento focado.
   const outline = await plus.evaluate((el) => getComputedStyle(el).outlineWidth);
   expect(outline).toBe("3px");
@@ -76,11 +92,12 @@ test("celular: sem rolagem horizontal, alvos de toque e resumo fixo visível (A3
   const page = await context.newPage();
   const family = await createTestUser("e2e-celular", "guardian");
   await login(page, "/portal/cardapio", family.email);
-  await expect(page.getByTestId("product")).toHaveCount(4);
+  const plus = page.getByRole("button", { name: "Aumentar Suco de laranja (exemplo)" });
+  await expect(plus).toBeVisible({ timeout: 20000 });
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
-  const box = await page.getByRole("button", { name: "Aumentar Suco de laranja (exemplo)" }).boundingBox();
+  const box = await plus.boundingBox();
   expect(box?.width).toBeGreaterThanOrEqual(40);
   expect(box?.height).toBeGreaterThanOrEqual(40);
   await expect(page.getByRole("complementary", { name: "Resumo da seleção" })).toBeInViewport();
@@ -93,20 +110,22 @@ test("reduced motion: sem transições e a ação não depende de animação (A3
   const family = await createTestUser("e2e-movimento", "guardian");
   await login(page, "/portal/cardapio", family.email);
   const plus = page.getByRole("button", { name: "Aumentar Suco de laranja (exemplo)" });
-  await expect(plus).toBeVisible();
+  await expect(plus).toBeVisible({ timeout: 20000 });
+  const suco = brl(await priceOf(product(page, "Suco de laranja (exemplo)")));
   const duration = await plus.evaluate((el) => parseFloat(getComputedStyle(el).transitionDuration));
   expect(duration).toBeLessThan(0.01);
   await plus.click({ timeout: 1000 });
-  await expect(page.getByTestId("summary-total")).toContainText("R$ 4,50", { timeout: 1000 });
+  await expect(page.getByTestId("summary-total")).toContainText(suco, { timeout: 1000 });
   await context.close();
 
   // Sem a preferência, a transição curta (150 ms) existe e também não bloqueia a ação.
   const normal = await (await browser.newContext({ reducedMotion: "no-preference" })).newPage();
   await login(normal, "/portal/cardapio", family.email);
   const button = normal.getByRole("button", { name: "Aumentar Suco de laranja (exemplo)" });
+  await expect(button).toBeVisible({ timeout: 20000 });
   expect(await button.evaluate((el) => parseFloat(getComputedStyle(el).transitionDuration))).toBeCloseTo(0.15, 2);
   await button.click({ timeout: 1000 });
-  await expect(normal.getByTestId("summary-total")).toContainText("R$ 4,50", { timeout: 1000 });
+  await expect(normal.getByTestId("summary-total")).toContainText(suco, { timeout: 1000 });
 });
 
 test("perfis: responsável não acessa a operação; navegação mostra só o que o papel tem (A37)", async ({ page }) => {
@@ -124,44 +143,38 @@ test("perfis: responsável não acessa a operação; navegação mostra só o qu
   await expect(page.getByText("Meus pedidos (em breve)")).toBeVisible();
 });
 
-test("operação: funcionário envia foto válida; arquivo inválido e grande demais são recusados (A36)", async ({ page }) => {
-  const staff = await createTestUser("e2e-cantina", "cantina");
-  await login(page, "/operacao/produtos", staff.email);
-  await expect(page.getByTestId("photo-row")).toHaveCount(4);
-  await expect(page.locator('[data-fallback="true"]')).toHaveCount(1);
+test("operação: funcionário envia foto válida; arquivo inválido e grande demais são recusados (A36)", async ({ page, request }) => {
+  // Produto temporário criado pela administração (API): o envio de foto não altera os produtos de exemplo.
+  const admin = await createTestUser("e2e-foto-adm", "admin");
+  const name = `Foto e2e ${crypto.randomUUID().slice(0, 6)}`;
+  const id = await createTempProduct(request, admin.idToken, name);
+  try {
+    const staff = await createTestUser("e2e-cantina", "cantina");
+    await login(page, "/operacao/produtos", staff.email);
+    const row = page.getByTestId("photo-row").filter({ hasText: name });
+    await expect(row.locator('[data-fallback="true"]')).toBeVisible({ timeout: 20000 });
+    const input = page.getByLabel(`Enviar foto de ${name}`);
 
-  // Tipo inválido: recusado antes de qualquer envio.
-  await page.getByLabel("Enviar foto de Bolo de cenoura (exemplo)").setInputFiles({
-    name: "nota.txt",
-    mimeType: "text/plain",
-    buffer: Buffer.from("não sou imagem"),
-  });
-  await expect(page.locator("#conteudo").getByRole("alert")).toContainText("JPEG, PNG ou WebP");
+    // Tipo inválido: recusado antes de qualquer envio.
+    await input.setInputFiles({ name: "nota.txt", mimeType: "text/plain", buffer: Buffer.from("não sou imagem") });
+    await expect(row.getByRole("alert")).toContainText("JPEG, PNG ou WebP");
 
-  // Acima de 2 MB: recusado.
-  await page.getByLabel("Enviar foto de Bolo de cenoura (exemplo)").setInputFiles({
-    name: "grande.png",
-    mimeType: "image/png",
-    buffer: Buffer.concat([makePng(8, 8, [1, 2, 3]), Buffer.alloc(2 * 1024 * 1024)]),
-  });
-  await expect(page.locator("#conteudo").getByRole("alert")).toContainText("2 MB");
-  await expect(page.locator('[data-fallback="true"]')).toHaveCount(1);
+    // Acima de 2 MB: recusado.
+    await input.setInputFiles({ name: "grande.png", mimeType: "image/png", buffer: Buffer.concat([makePng(8, 8, [1, 2, 3]), Buffer.alloc(2 * 1024 * 1024)]) });
+    await expect(row.getByRole("alert")).toContainText("2 MB");
+    await expect(row.locator('[data-fallback="true"]')).toBeVisible();
 
-  // PNG válido: o servidor valida os bytes, grava no armazenamento privado e registra; o listener troca o fallback pela foto.
-  await page.getByLabel("Enviar foto de Bolo de cenoura (exemplo)").setInputFiles({
-    name: "bolo.png",
-    mimeType: "image/png",
-    buffer: makePng(240, 180, [200, 120, 60]),
-  });
-  await expect(page.getByRole("status").filter({ hasText: "Foto atualizada." })).toBeVisible();
-  await expect(page.locator('[data-fallback="true"]')).toHaveCount(0);
-  await expect(page.locator(".photo img")).toHaveCount(4);
+    // Conteúdo que finge ser PNG passa na checagem do navegador (só tipo/tamanho), mas o servidor inspeciona os bytes e recusa.
+    await input.setInputFiles({ name: "falso.png", mimeType: "image/png", buffer: Buffer.from("<svg onload=alert(1)></svg>") });
+    await expect(row.getByRole("alert")).toContainText("servidor recusou");
+    await expect(row.locator('[data-fallback="true"]')).toBeVisible();
 
-  // Conteúdo que finge ser PNG passa na checagem do navegador (só tipo/tamanho), mas o servidor inspeciona os bytes e recusa.
-  await page.getByLabel("Enviar foto de Suco de laranja (exemplo)").setInputFiles({
-    name: "falso.png",
-    mimeType: "image/png",
-    buffer: Buffer.from("<svg onload=alert(1)></svg>"),
-  });
-  await expect(page.locator("#conteudo").getByRole("alert")).toContainText("servidor recusou");
+    // PNG válido: o servidor valida os bytes, grava no armazenamento privado e registra; o listener troca o fallback pela foto.
+    await input.setInputFiles({ name: "foto.png", mimeType: "image/png", buffer: makePng(240, 180, [200, 120, 60]) });
+    await expect(row.getByRole("status").filter({ hasText: "Foto atualizada." })).toBeVisible();
+    await expect(row.locator(".photo img")).toHaveAttribute("src", /^blob:/, { timeout: 20000 });
+    await expect(row.locator('[data-fallback="true"]')).toHaveCount(0);
+  } finally {
+    await retireTempProduct(request, admin.idToken, id);
+  }
 });

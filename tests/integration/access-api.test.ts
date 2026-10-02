@@ -49,7 +49,7 @@ beforeAll(async () => {
   guardian = await createTestUser("responsavel", "guardian");
   student = await createTestUser("aluno", "student");
   noProfile = await createTestUser("sem-perfil");
-  await adminDb().doc("demoProducts/it-produto").set({ name: "Produto de teste", isDemo: true });
+  await adminDb().doc("products/it-produto").set({ name: "Produto de teste" });
 });
 
 function post(handler: Handler, url: string, token: string | null, body: unknown): Promise<Response> {

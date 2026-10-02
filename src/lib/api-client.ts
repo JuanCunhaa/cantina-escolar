@@ -53,6 +53,15 @@ const MESSAGES: Record<string, string> = {
   empty_file: "O arquivo está vazio.",
   missing_columns: "O arquivo precisa das colunas matrícula, nome, turma e turno.",
   unterminated_quote: "Aspas sem fechamento no arquivo.",
+  invalid_name: "O nome precisa ter letras ou números.",
+  category_name_taken: "Já existe uma categoria com este nome.",
+  category_in_use: "Há produtos ativos nesta categoria. Mude ou desative os produtos antes de arquivar.",
+  category_not_found: "Categoria não encontrada.",
+  category_unavailable: "Categoria inexistente ou arquivada.",
+  product_name_taken: "Já existe um produto com este nome (talvez desativado). Reative-o em vez de criar outro.",
+  product_not_found: "Produto não encontrado.",
+  stale_product: "O produto foi alterado por outra pessoa. Abra novamente para ver a versão atual.",
+  stale_price: "O preço foi alterado por outra pessoa. Confira o preço atual antes de salvar.",
   internal: "Não foi possível concluir agora. Tente novamente.",
 };
 

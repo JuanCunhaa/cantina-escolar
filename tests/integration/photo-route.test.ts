@@ -70,12 +70,12 @@ function read(token: string | null, productId: string | null, headers: Record<st
 }
 
 async function newProduct(id: string): Promise<string> {
-  await adminDb().doc(`demoProducts/${id}`).set({ name: `Produto ${id}`, isDemo: true, photoPath: null });
+  await adminDb().doc(`products/${id}`).set({ name: `Produto ${id}`, photoPath: null });
   return id;
 }
 
 async function photoPathOf(id: string): Promise<string | null> {
-  return ((await adminDb().doc(`demoProducts/${id}`).get()).get("photoPath") as string | null) ?? null;
+  return ((await adminDb().doc(`products/${id}`).get()).get("photoPath") as string | null) ?? null;
 }
 
 async function keysOf(productId: string): Promise<string[]> {
@@ -122,7 +122,7 @@ describe("POST /api/catalog/photo — envio autorizado (A36)", () => {
     expect(photoPath).not.toContain("escolhida");
     expect(await photoPathOf(id)).toBe(photoPath);
 
-    const doc = (await adminDb().doc(`demoProducts/${id}`).get()).data()!;
+    const doc = (await adminDb().doc(`products/${id}`).get()).data()!;
     expect(doc.photoUpdatedBy).toBe(staff.uid);
     expect(doc.photoContentType).toBe("image/png");
     expect(doc.photoSize).toBe(bytes.byteLength);
@@ -219,12 +219,12 @@ describe("POST /api/catalog/photo — validação", () => {
 
 describe("GET /api/catalog/photo — leitura autorizada", () => {
   it("recusa sem token (401), conta sem perfil e conta desativada (403)", async () => {
-    expect((await read(null, "demo-suco")).status).toBe(401);
-    expect((await read("lixo", "demo-suco")).status).toBe(401);
-    expect((await read(noProfile.idToken, "demo-suco")).status).toBe(403);
+    expect((await read(null, "prd_exemplo_suco")).status).toBe(401);
+    expect((await read("lixo", "prd_exemplo_suco")).status).toBe(401);
+    expect((await read(noProfile.idToken, "prd_exemplo_suco")).status).toBe(403);
     const off = await createTestUser("familia-off", "guardian");
     await adminDb().doc(`users/${off.uid}`).update({ status: "disabled" });
-    const response = await read(off.idToken, "demo-suco");
+    const response = await read(off.idToken, "prd_exemplo_suco");
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: "account_inactive" });
   });
@@ -245,12 +245,12 @@ describe("GET /api/catalog/photo — leitura autorizada", () => {
   });
 
   it("o caminho vem do Firestore: parâmetros extras não leem outro objeto; traversal é recusado", async () => {
-    const pao = await read(guardian.idToken, "demo-pao", {}, "&path=products/demo-suco/demo.png&key=products/demo-suco/demo.png");
-    const suco = await read(guardian.idToken, "demo-suco");
+    const pao = await read(guardian.idToken, "prd_exemplo_pao", {}, "&path=products/prd_exemplo_suco/demo.png&key=products/prd_exemplo_suco/demo.png");
+    const suco = await read(guardian.idToken, "prd_exemplo_suco");
     const paoBytes = Buffer.from(await pao.arrayBuffer());
     expect(paoBytes.equals(Buffer.from(await suco.arrayBuffer()))).toBe(false); // cada produto serve a própria foto
     expect((await read(guardian.idToken, "../etc/passwd")).status).toBe(400);
-    expect((await read(guardian.idToken, null, {}, "?path=products/demo-suco/demo.png")).status).toBe(400);
+    expect((await read(guardian.idToken, null, {}, "?path=products/prd_exemplo_suco/demo.png")).status).toBe(400);
   });
 
   it("revalida com ETag (304 sem ler o bucket) e muda de ETag quando a foto é trocada", async () => {
@@ -271,7 +271,7 @@ describe("GET /api/catalog/photo — leitura autorizada", () => {
     expect((await read(guardian.idToken, semFoto)).status).toBe(404);
     expect((await read(guardian.idToken, "nao-existe")).status).toBe(404);
     const quebrado = await newProduct("it-quebrado");
-    await adminDb().doc(`demoProducts/${quebrado}`).update({ photoPath: `products/${quebrado}/${"a".repeat(32)}.png` });
+    await adminDb().doc(`products/${quebrado}`).update({ photoPath: `products/${quebrado}/${"a".repeat(32)}.png` });
     expect((await read(guardian.idToken, quebrado)).status).toBe(404);
   });
 });
@@ -329,7 +329,7 @@ describe("falhas entre armazenamento e Firestore", () => {
 
   it("produto removido durante o envio: commit negado e objeto novo removido (sem foto inexistente registrada)", async () => {
     const id = await newProduct("it-f-sumiu");
-    const remove = () => adminDb().doc(`demoProducts/${id}`).delete().then(() => undefined);
+    const remove = () => adminDb().doc(`products/${id}`).delete().then(() => undefined);
     await expect(uploadProductPhoto({ db: adminDb(), store: getObjectStore() }, actorOf(staff), input(id, png(74), remove))).rejects.toThrow();
     expect(await keysOf(id)).toEqual([]);
   });
@@ -415,19 +415,22 @@ describe("POST /api/admin/storage/sweep", () => {
   });
 });
 
-describe("catálogo de demonstração em produção", () => {
-  it("fica indisponível (404) em produção ou sem APP_ENV, mesmo com funcionário válido", async () => {
+describe("armazenamento ausente ou mal configurado", () => {
+  it("responde 503 (falha fechada) em produção sem R2 ou sem APP_ENV, sem gravar nem apontar o produto", async () => {
     const id = await newProduct("it-prod");
     for (const value of ["production", undefined]) {
       if (value) process.env.APP_ENV = value;
       else delete process.env.APP_ENV;
       try {
-        expect((await upload(staff.idToken, id, png(90))).status).toBe(404);
-        expect((await read(staff.idToken, "demo-suco")).status).toBe(404);
+        const up = await upload(staff.idToken, id, png(90));
+        expect(up.status).toBe(503);
+        expect(await up.json()).toEqual({ error: "storage_unavailable" });
+        expect((await read(staff.idToken, "prd_exemplo_suco")).status).toBe(503);
       } finally {
         process.env.APP_ENV = "emulator";
       }
     }
     expect(await keysOf(id)).toEqual([]);
+    expect(await photoPathOf(id)).toBeNull();
   });
 });

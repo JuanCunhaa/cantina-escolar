@@ -84,10 +84,26 @@ service cloud.firestore {
       }
     }
 
-    // F02: exemplo de catálogo claramente fictício (isolado de relatórios/dados reais). Leitura por conta com perfil
-    // ativo; escrita nunca pelo cliente (seed/servidor). Substituído pelo catálogo real em F06.
-    match /demoProducts/{productId} {
+    // F06: catálogo. Categorias e o cadastro PÚBLICO do produto (nome, descrição, preço em centavos, canais, turnos,
+    // modo, foto) são legíveis por qualquer conta com perfil ativo; nunca contêm custo nem fornecedor. Escrita só pelo
+    // servidor (administração; foto pela cantina), com auditoria.
+    match /categories/{categoryId} {
       allow get, list: if active();
+      allow write: if false;
+    }
+    match /products/{productId} {
+      allow get, list: if active();
+      allow write: if false;
+      // Histórico imutável de preço: operação da cantina e administração (inclui o autor da mudança).
+      match /priceHistory/{entryId} {
+        allow get, list: if hasRole(['cantina', 'admin']);
+        allow write: if false;
+      }
+    }
+    // Dados internos do produto (fornecedor padrão, observações): só administração. Rules autorizam documento inteiro,
+    // por isso ficam em coleção separada do cadastro público.
+    match /productPrivate/{productId} {
+      allow get, list: if hasRole(['admin']);
       allow write: if false;
     }
 

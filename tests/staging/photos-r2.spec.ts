@@ -1,16 +1,19 @@
 // Fotos pelas rotas do aplicativo com o armazenamento do alvo (R2 de staging na homologação real): upload, leitura,
 // recusas sem autorização e de imagens inválidas, e prova de que o bucket não é acessível sem as credenciais do servidor.
+// Usa um produto TEMPORÁRIO criado pela API (administração) e desativado no fim: os produtos "(exemplo)" não mudam.
 import { expect, test } from "@playwright/test";
 import { admin } from "../../scripts/staging/admin.ts";
 import { makePng } from "../../scripts/lib/demo-seed.ts";
 import { createObjectStore } from "../../src/lib/storage/factory.ts";
 import { createTestUser, type TestUser } from "../helpers/auth-emulator";
-import { isCloud, seedCloudCatalog } from "../helpers/cloud.ts";
+import { createTempProduct, fixtureIds, retireTempProduct } from "../helpers/catalog-fixtures.ts";
+import { isCloud } from "../helpers/cloud.ts";
 import { bearer } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
-const PRODUCT = "demo-bolo";
+let PRODUCT = "";
+let adminUser: TestUser;
 let cantina: TestUser;
 let family: TestUser;
 let noProfile: TestUser;
@@ -22,16 +25,22 @@ async function keys(): Promise<string[]> {
   return out.sort();
 }
 
-const photoOf = async () => ((await admin().db.doc(`demoProducts/${PRODUCT}`).get()).data()?.photoPath ?? null) as string | null;
+const photoOf = async () => ((await admin().db.doc(`products/${PRODUCT}`).get()).data()?.photoPath ?? null) as string | null;
 
-test.beforeAll(async () => {
+test.beforeAll(async ({ request }) => {
   expect(isCloud()).toBe(true);
-  await seedCloudCatalog();
-  [cantina, family, noProfile] = await Promise.all([createTestUser("hml-cantina", "cantina"), createTestUser("hml-fam-foto", "guardian"), createTestUser("hml-sem-perfil")]);
+  [adminUser, cantina, family, noProfile] = await Promise.all([
+    createTestUser("hml-adm-foto", "admin"),
+    createTestUser("hml-cantina", "cantina"),
+    createTestUser("hml-fam-foto", "guardian"),
+    createTestUser("hml-sem-perfil"),
+  ]);
+  PRODUCT = await createTempProduct(request, adminUser.idToken, `Foto R2 ${crypto.randomUUID().slice(0, 6)}`);
 });
 
-test.afterAll(async () => {
-  await seedCloudCatalog(); // restaura o catálogo e apaga a foto enviada pelo teste (sem órfãos no bucket)
+// O produto temporário fica desativado com a última foto (referenciada, não órfã); a anterior já foi apagada pelo app.
+test.afterAll(async ({ request }) => {
+  if (PRODUCT) await retireTempProduct(request, adminUser.idToken, PRODUCT);
 });
 
 test("upload válido grava no armazenamento privado e a leitura autenticada devolve os mesmos bytes (A36)", async ({ request }) => {
@@ -123,7 +132,9 @@ test("o bucket privado não responde a acesso anônimo (A33)", async () => {
   const { storage } = admin().target;
   test.skip(storage.driver !== "r2", "só existe bucket real na homologação");
   if (storage.driver !== "r2") return;
-  const key = (await photoOf()) ?? "products/demo-suco/demo.png";
+  const suco = (await fixtureIds()).product("Suco de laranja (exemplo)");
+  const key = (await photoOf()) ?? ((await admin().db.doc(`products/${suco}`).get()).get("photoPath") as string);
+  expect(key).toMatch(/^products\//);
   for (const url of [`${storage.endpoint}/${storage.bucket}/${key}`, `${storage.endpoint}/${storage.bucket}?list-type=2&prefix=products/`]) {
     const response = await fetch(url);
     expect(response.status, url).toBeGreaterThanOrEqual(400);

@@ -53,3 +53,9 @@ Sem execução de testes da aplicação nesta entrega. Adicionar tarefa, commit/
 
 ## Migração do armazenamento de arquivos para Cloudflare R2 (01/10/2026)
 - Ver docs/status/r2-migration.md (arquivos, comandos reais, resultados, pendências) e docs/decisions.md ("Armazenamento de arquivos em Cloudflare R2").
+
+## F06 — catálogo, preço histórico e canais (02/10/2026)
+- Branch `feature/f06-catalogo`. Arquivos e decisões: PROGRESS.md (seção F06) e docs/decisions.md ("Decisões de F06").
+- Local (emulador demo-cantina): typecheck 0; lint 0; unit 112/112; rules 28/28; integration 115/115; e2e 19/19; build:webpack 0; audit:prod 0; Gitleaks dir (src/tests/scripts/firebase) 0. Logs brutos: .agent-logs/f06-*.log.
+- Falhas resolvidas: limite de canais rejeitava lista com repetição (schema); e2e admin perdia o painel aberto quando o dev server recompilava outra rota (HMR) — portal da família aberto antes do fluxo; 1ª execução estourou 60 s por compilação (timeout do teste 150 s).
+- Homologação: `npm run staging:deploy` (Rules F06 no cantina-escolar-hml); `staging:verify` dirigido (catalog, shell-photos, access, photos-r2, isolation) 22/22. Log: .agent-logs/f06-staging-local.log.

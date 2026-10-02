@@ -9,6 +9,7 @@ import type { Actor } from "@/modules/access/actor";
 import { authorize } from "@/modules/access/authorize";
 import { ForbiddenError } from "@/modules/access/errors";
 import { parseProfile } from "@/modules/access/profile";
+import { PRODUCTS } from "./commands";
 
 export class PhotoRejectedError extends Error {}
 export class ProductNotFoundError extends Error {}
@@ -19,7 +20,7 @@ export type PhotoDeps = { db: Firestore; store: ObjectStore };
 const productIdSchema = z.string().regex(PRODUCT_ID_PATTERN);
 const CONTENT_TYPE_BY_EXTENSION: Record<string, ImageType> = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
 
-const productRef = (db: Firestore, productId: string) => db.doc(`demoProducts/${productId}`);
+const productRef = (db: Firestore, productId: string) => db.doc(`${PRODUCTS}/${productId}`);
 
 /** Falha de limpeza nunca derruba a operação já confirmada: vira objeto órfão, tratado por sweepOrphanPhotos. */
 async function bestEffortDelete(store: ObjectStore, key: string, why: string): Promise<void> {

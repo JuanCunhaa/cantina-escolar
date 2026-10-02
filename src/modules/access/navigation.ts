@@ -13,7 +13,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/operacao/alunos", label: "Alunos", roles: ["cantina", "secretaria", "admin"], ready: true },
   { href: "/operacao/pedidos", label: "Pedidos do dia", roles: ["cantina", "admin"], ready: false },
   { href: "/operacao/pdv", label: "PDV", roles: ["cantina", "admin"], ready: false },
-  { href: "/operacao/produtos", label: "Produtos e fotos", roles: ["cantina", "admin"], ready: true },
+  { href: "/operacao/produtos", label: "Produtos", roles: ["cantina", "admin"], ready: true },
   { href: "/operacao/recebimentos", label: "Recebimentos", roles: ["secretaria", "admin"], ready: false },
   { href: "/operacao/responsaveis", label: "Responsáveis", roles: ["admin"], ready: true },
   { href: "/operacao/escola", label: "Turmas e turnos", roles: ["admin"], ready: true },

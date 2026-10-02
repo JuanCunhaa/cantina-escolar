@@ -58,9 +58,21 @@ Escritas só pelo servidor (Admin SDK) em transação com auditoria; o cliente l
 - Leitura por qualquer conta com perfil ativo; escrita só pelo servidor (admin) via `POST /api/school/settings` e `POST /api/school/calendar`, idempotentes, com auditoria (`school.settings.update`, `school.calendar.{set|clear}`; `after.appliesTo = "new_orders_only"`). Sem índice composto (consulta de janela por intervalo no ID do documento).
 - Snapshot de política para o pedido (F11 grava; calculado por `snapshotPolicy`): `timezone`, `consumptionDate` (data local), `shiftId`, `purchaseCutoff/cancelCutoff` (HH:MM), `purchaseCutoffAt/cancelCutoffAt` (instantes UTC), `settingsVersion`. Cancelamento familiar usa SEMPRE o snapshot, nunca a configuração atual.
 
+## Catálogo (F06)
+
+Escritas só pelo servidor (Admin SDK) em transação idempotente com auditoria; capacidade `catalog.manage` (só administração); foto: `catalog.photos.manage` (cantina e administração). Nada é apagado.
+
+- `categories/{cat_…}`: `name` (≤ 60), `nameSlug`, `status` (`active|archived`), `createdAt`, `updatedAt`. Unicidade por `uniquenessKeys/category_{slug}` → `{categoryId}` (trocada na renomeação). Arquivar é recusado (409 `category_in_use`) com produto ativo na categoria; categoria arquivada não recebe produto novo nem reativação.
+- `products/{prd_…}` (ID derivado de ator+chave; imutável) — cadastro PÚBLICO, legível por qualquer perfil ativo: `name` (≤ 80, único por `uniquenessKeys/product_{slug}` → `{productId}`, inclusive desativados), `nameSlug`, `description` (≤ 280), `categoryId`, `priceCents` (inteiro 1…50 000), `priceVersion` (+1 a cada mudança de preço), `channels` (subconjunto ordenado de `advance` = antecipado/portal e `counter` = balcão/PDV), `shiftIds` (1–10 turnos ativos, ordenados), `availabilityMode` (`physical` = estoque físico | `planned` = planejado por data/turno), `status` (`active|inactive`), `version` (+1 a cada mudança pública, inclusive preço/situação; edição exige `expectedVersion`), `deactivatedAt`, `createdBy`, `updatedBy`, `createdAt`, `updatedAt`, `priceUpdatedAt` + campos de foto (abaixo). NUNCA contém custo, fornecedor, observações internas ou motivo de desativação.
+- `products/{id}/priceHistory/v{priceVersion}`: `productId`, `priceVersion`, `priceCents`, `previousPriceCents` (null na v1), `reason` (v1 = "Cadastro inicial"), `changedBy`, `effectiveAt`. Imutável (criado com `create` na mesma transação que muda o preço; Rules negam escrita). Leitura: cantina e administração. Mudança exige `expectedPriceVersion` (409 `stale_price`) e vale só para novas vendas.
+- `productPrivate/{productId}`: `defaultSupplier` (≤ 80), `internalNotes` (≤ 500), `deactivationReason`, `deactivatedBy`, `updatedBy`, `updatedAt`. Só administração lê (Rules autorizam documento inteiro, por isso fica separado do público). Auditoria registra `privateUpdated: true` sem copiar o conteúdo. Custo real (Decimal) virá das entradas de estoque da F10, em coleções só da administração.
+- `auditLog`: `catalog.category.{create|rename|archive|restore}`, `catalog.product.{create|update|price|deactivate|reactivate}` (`price` grava `after.appliesTo = "new_sales_only"`).
+- Venda (F11/F15): `readSellableProducts(db, tx, ids, {channel, shiftId})` (src/modules/catalog/commands.ts) lê os produtos NA transação do comando e devolve preço/`priceVersion`/`version` atuais ou o motivo da recusa (`product_not_found|product_inactive|channel_not_allowed|shift_not_allowed|invalid_price`). O snapshot do item (nome, unidade, quantidade, preço unitário, subtotal) é gravado pelo comando de checkout/PDV, não pela tela nem pelo catálogo. Cardápio por data (F07) e estoque/cotas (F10) aplicam suas regras por cima.
+- Índices: nenhum composto (portal: `where status == active`; arquivar categoria: igualdade em `categoryId` + `status`; histórico: `orderBy priceVersion desc limit 50`).
+
 ## Fotos de produto — metadados no Firestore, arquivo no R2 (migração 01/10/2026)
 
-Hoje só em `demoProducts/{productId}` (catálogo real: F06). Campos escritos exclusivamente pelo servidor (Rules negam escrita do cliente):
+Em `products/{productId}` (desde F06; `demoProducts` foi removido). Campos escritos exclusivamente pelo servidor (Rules negam escrita do cliente):
 
 - `photoPath` (string | null): CHAVE do objeto no bucket R2 privado, formato `products/{productId}/{uuid32hex}.{jpg|png|webp}`. Não é URL; nunca gravar URL assinada ou pública como endereço permanente.
 - `photoContentType`, `photoSize`, `photoSha256`, `photoUpdatedBy` (uid), `photoUpdatedAt` (timestamp do servidor).
