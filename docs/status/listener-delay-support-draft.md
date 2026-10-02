@@ -25,21 +25,21 @@ collection (`onSnapshot(collection(db, "calendarDays"))`, plus a few other liste
 document with the Admin SDK ~2 s after the initial snapshot and measures when the listener sees it. Source and sanitized
 results are attached.
 
-- 162 browser runs on the minimal page (Chromium 153, Firefox 155, Edge): 7 delayed deliveries (24.0–27.2 s after commit;
-  24.8–29.7 s after channel open). Delays happen in both Chromium and Firefox and in bursts over time (several within a few
+- 156 browser runs of the minimal page with default settings (Chromium 153: 115, Firefox 155: 33, Edge: 8): 7 delayed
+  deliveries (24.0–27.2 s after commit; 26.3–29.7 s after channel open): 4 in Chromium, 3 in Firefox, 0 in Edge. Delays happen in both Chromium and Firefox and in bursts over time (several within a few
   minutes, then none for a while).
-- Same listeners and writes from Node with the same Web SDK (gRPC transport): 0 of 40 delayed (statistically inconclusive
+- Same listeners and writes from Node with the same Web SDK (gRPC transport): 0 of 30 archived runs delayed (plus 0 of 10 in an earlier, unarchived session; statistically inconclusive
   at the observed rate).
 - In one delayed browser run, the forward channel and the backchannel used the same server address (IPv6), with a single
   backchannel GET; the client's first acknowledgment (`AID`) after the write only happened at ~28 s.
-- In the full application (same SDK and project) with `experimentalForceLongPolling: true`, a delayed case was also
-  observed: the backchannel GET stayed pending ~28 s and completed only then, carrying the change — i.e., the response was
-  not available earlier on the wire. (20 later long-polling runs of the minimal page had no delayed case.)
+- In the full application (same SDK and project) with `experimentalForceLongPolling: true`, one delayed case was also
+  observed (trace not archived): no channel request is visible between ~0.6 s and ~28.8 s after the channel opened, and
+  the client acknowledged receipt only at ~28 s. We cannot tell from it whether the server, the network path or the
+  client held the data back. (20 later long-polling runs of the minimal page had no delayed case.)
 - Delays occur with a plain Admin SDK `set` (also seen when the application writes through a transaction).
 - Not affected by: rapid listen/unlisten of the same query (React Strict Mode pattern), bursts of listen requests during
   channel setup, creating Firestore before sign-in, number of listeners, or
-  `experimentalLongPollingOptions.timeoutSeconds` (in the application, the pending GET still lasted ~28 s with 10 s
-  requested).
+  `experimentalLongPollingOptions.timeoutSeconds: 10` (one application run still showed a ~26 s delay; single observation).
 
 **Questions**
 

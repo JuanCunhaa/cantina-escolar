@@ -12,8 +12,11 @@ Data de referência: 02/10/2026. Este arquivo descreve código entregue, não ap
 - F07 — cardápio por data, turno e exceções: PR #3 mesclado em 02/10/2026 (merge `9553e62`, checks verdes no head `9e3215c`; CI da main verde, run 37070776248), publicada no projeto Vercel `cantina-escolar-hml`. Validação pela URL publicada: 31/32 (menu-api, menu, catalog, shell-photos, access, students, catalog-api, isolation verdes; `calendar.spec` falha na exibição atrasada do dia salvo — gravação confirmada no Firestore, ver pendência do listener). A12/A14/A15 parciais (not_run). Detalhes: docs/status/history.md.
 
 ## Em andamento
-- Investigação do atraso de listener (branch `investigacao/atraso-listener`): causa NÃO identificada; reprodução mínima e relato para revisão. Diagnóstico: docs/status/listener-delay-investigation.md; rascunho ao suporte (não enviado): docs/status/listener-delay-support-draft.md. Nenhuma mudança no app.
-- F08 NÃO iniciada.
+- Nenhuma. F07 mesclada e validada pela URL publicada; investigação do atraso de listener encerrada como **INCONCLUSIVA** (PR #4). F08 NÃO iniciada.
+
+## Atraso conhecido dos listeners (inconclusivo)
+- No navegador, contra a homologação, a 1ª alteração após abrir o canal chega às vezes ~24–30 s depois (7/156 rodadas da página mínima, só com o Web SDK; também no app: calendário local 2/4, foto publicada 1/4). O snapshot inicial e as alterações seguintes são imediatos; a gravação é correta. Causa NÃO identificada: reproduz sem a aplicação em Chromium e Firefox; transporte (WebChannel × gRPC), Rules e rede desta máquina NÃO descartados. Limitações (uma rede, amostras pequenas, sem captura de bytes nos casos lentos, escrita sempre 2 s após o 1º snapshot): docs/status/listener-delay-investigation.md. Rascunho ao suporte NÃO enviado: docs/status/listener-delay-support-draft.md.
+- Falha conhecida na homologação: `calendar.spec` (exibição do dia salvo em 5 s). Não foi mascarada: sem aumento de timeout; a gravação é confirmada no Firestore.
 
 ## Aceite (parcial; todos permanecem not_run globalmente — evidência em docs/status/acceptance.json)
 - A01: só a independência de cadastro/política entre irmãos (F04); saldos independentes dependem da carteira (F08).
@@ -43,9 +46,8 @@ Data de referência: 02/10/2026. Este arquivo descreve código entregue, não ap
 - Dica de ambiente: `npm run test:e2e` não aceita filtro; para um spec use `npx firebase emulators:exec --only auth,firestore --project demo-cantina "npx playwright test <arquivo>"`. Seed local agora cria também secretaria@/admin@example.test (perfis em `users`).
 
 ## Próxima ação
-- Atraso do listener: o dono revisa o relato e decide (a) rodar a reprodução de outra rede, (b) série longa navegador × Node num período de muitos eventos, (c) envio ao suporte, (d) mitigação de UX (refletir o resultado confirmado do comando). Enquanto isso, `calendar.spec` pode falhar na HML sem afetar a gravação.
+- **F08 — carteira, livro e transferências** (primeira elegível; não iniciada), considerando o atraso conhecido dos listeners: (1) o resultado de qualquer comando financeiro (recarga, transferência, estorno) deve ser mostrado a partir da RESPOSTA confirmada do servidor, nunca só do listener — saldo/extrato por listener podem aparecer 24–30 s depois e a tela deve indicar "atualizando" em vez de parecer falha ou saldo errado; (2) nenhum dado de listener atrasado confirma ou desfaz cobrança; (3) os testes e2e da carteira verificam o estado financeiro pela API/Admin e a propagação ao listener à parte, sem aumentar timeouts para esconder o atraso e sem depender de janelas curtas na homologação (no emulador o atraso não aparece); (4) a transação idempotente, as Rules e a consistência saldo × livro não dependem do listener. Decisões do dono ainda abertas sobre o atraso: outra rede, série longa, envio ao suporte, mitigação de UX (docs/status/listener-delay-investigation.md).
 - Turnos de teste acumulados na HML (>10 ativos): arquivar/limpar em tarefa autorizada de limpeza (não feito: instrução de não limpar dados antigos).
-- F08 — carteira (próxima elegível; não iniciada).
 - Limpeza das fotos antigas `products/demo-*/demo.png` no R2 de homologação (`POST /api/admin/storage/sweep` dry-run e depois `apply`). Não feita no fechamento da F06.
 - Fixar as GitHub Actions do workflow por SHA de commit (2 achados não bloqueantes do Semgrep AppSec).
 - Homologação publicada com o catálogo real: https://cantina-escolar-hml.vercel.app (login Vercel + contas fictícias `@hml.example.test`).
