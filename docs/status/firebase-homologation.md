@@ -75,9 +75,26 @@ Uma primeira execução real falhou (10 falhas, todas `400 invalid_input`): caus
 
 Estado final conferido por consulta direta: Auth só com as 8 fixtures; R2 só com as 3 fotos de demonstração (fotos enviadas pelos testes removidas).
 
+## Homologação publicada (Vercel) — 01/10/2026
+
+| Item | Valor |
+| --- | --- |
+| Repositório | https://github.com/JuanCunhaa/cantina-escolar (privado; histórico local enviado após Gitleaks local em histórico e árvore: 0 achados) |
+| CI | GitHub Actions `ci` — run 36954778551 (commit `561c8ff`) verde: lint, typecheck, unit 89, rules 24, integration 101, e2e 17, build padrão (Turbopack), audit:prod 0, Gitleaks v8.30.1 0, Semgrep 1.179.0 0 |
+| Projeto Vercel | `cantina-escolar-hml` (time pessoal, plano **Hobby**, sem domínio próprio), ligado ao repositório; branch de produção `main`; região de Functions `gru1` (São Paulo, perto do Firestore `southamerica-east1`); Node 24.x |
+| URL | https://cantina-escolar-hml.vercel.app (alias de produção do projeto de homologação) |
+| Proteção | Vercel Authentication em **All Deployments** (produção, branch e deployment URLs exigem login Vercel com acesso ao time; anônimo → 302). Senha por deployment não existe no Hobby. "Protection Bypass for Automation" criado só para a suíte; segredo em `.secrets/vercel-hml-bypass.txt` (ignorado) |
+| Variáveis | 15 variáveis em **Production e Preview** (Development vazio): `APP_ENV=staging`, `FIREBASE_PROJECT_ID`/`NEXT_PUBLIC_*` = `cantina-escolar-hml`, `R2_BUCKET=cantina-fotos-staging`, credenciais (`FIREBASE_PRIVATE_KEY`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`) como *Sensitive*; enviadas pela API da Vercel a partir de `.env.staging.local` sem impressão. Nada commitado |
+
+Por que “Production” da Vercel não alcança a escola: este projeto só contém valores de homologação; o build roda com `NODE_ENV=production`, mas o app decide pelo `APP_ENV=staging`, e `src/lib/env.ts`/`src/lib/storage/config.ts` recusam em staging projeto Firebase ou bucket sem `staging|homolog|hml|test` no nome. Produção real exigirá **outro** projeto Vercel.
+
+Diferença de ambiente encontrada e corrigida: no 1º deploy toda rota com Admin SDK respondia 500 (`ERR_REQUIRE_ESM` ao carregar `firebase-admin/auth`: `jwks-rsa@4` faz `require('jose')` e o jose 6 é só ESM; local em dev não aparece). Correção: override `jwks-rsa>jose` 5.10.0 + teste `tests/unit/runtime-compat.test.ts` (detalhes em docs/status/dependency-audit.md). Também corrigidos 3 achados do Semgrep (`unsafe-formatstring` em `console.error`).
+
+Validação pela URL publicada: `npm run staging:verify:published` (mesma suíte de 28 testes do item anterior; harness com `STAGING_PUBLISHED_URL` restrita a `https://cantina-escolar-hml*.vercel.app`, sem servidor local; o bypass vira cookie do host, nunca vai a Google/Cloudflare): **28 passaram, 0 falharam, 5,5 min**, teardown removeu 33 contas efêmeras; o setup confirmou antes que o acesso anônimo é bloqueado (302). Cobre login/logout e papéis, isolamento e Rules publicadas, conta desativada e vínculo revogado, cadastros/convites, calendário, consultas e listeners, comandos transacionais (12 escritores) e upload/leitura/troca/rejeições de fotos no R2. Logs de runtime da Vercel durante a execução: nenhum 5xx. Log local: `.agent-logs/staging-published-1.log`.
+
 ## Limites e pendências (não concluir mais do que foi provado)
 
-1. **Servidor publicado (Vercel): NÃO executado.** Rodou-se apenas local conectado aos serviços reais. Pendente para F24: variáveis `APP_ENV=staging`, `R2_*` e credencial Firebase no gerenciador de segredos, domínio nos “Domínios autorizados” do Auth, limite de corpo de 4,5 MB da Vercel × teto de 2 MB do app, WAF/rate limit.
+1. **Servidor publicado (Vercel): executado em 01/10/2026** — ver “Homologação publicada (Vercel)” abaixo. Continuam pendentes para F24: projeto/variáveis de produção, WAF/rate limit, plano Vercel adequado ao uso comercial. Domínio nos “Domínios autorizados” do Auth não é necessário hoje (o app não usa `continueUrl`, popup nem redirect).
 2. **E-mail de redefinição de senha real: não testado** (fixtures sem caixa de correio; a recuperação com conta existente é pulada em staging para não enviar e-mail). O fluxo com e-mail desconhecido (mensagem genérica) rodou. Requer um endereço do dono.
 3. **Auto-cadastro público do Auth não foi desabilitado** (Console → Authentication → Configurações → ações do usuário). Mitigado: conta sem perfil não acessa nada (e2e e Rules acima). Convite usa o Admin SDK e não depende dessa opção.
 4. **Primeiro administrador real e bootstrap**: aqui o admin é fixture criada pelo Admin SDK; script de bootstrap segue em F24.
@@ -85,7 +102,7 @@ Estado final conferido por consulta direta: Auth só com as 8 fixtures; R2 só c
 6. **Concorrência**: 1 execução de 12 escritores (4,2 s, 0 falhas) no Firestore real; não prova capacidade maior nem substitui medição com a carteira (F08).
 7. **Dados de teste persistem** no projeto HML (turmas, alunos, vínculos, convites, `auditLog`, `foundationProbes`); só contas efêmeras e fotos enviadas são removidas. Sem scripts de reset da nuvem por segurança; apagar o projeto/coleções é decisão manual.
 8. Limites conhecidos mantidos (F03): “sair de todos os dispositivos” não derruba na hora listeners de outra aba com ID token vigente (≤ 1 h); desativar a conta sim.
-9. Backup/PITR/restauração, quotas do plano Spark e monitoramento: não avaliados. Gitleaks/Semgrep: não executados.
+9. Backup/PITR/restauração, quotas do plano Spark e monitoramento: não avaliados. Gitleaks/Semgrep: executados no CI do GitHub em 01/10/2026 (0 achados após correção).
 10. A recuperação de senha e login com contas efêmeras usam a senha fictícia fixa `senha-fake-123`: aceitável só neste projeto exclusivo e pelo tempo da execução (apagadas no teardown).
 
 ## Reproduzir
@@ -95,6 +112,7 @@ Estado final conferido por consulta direta: Auth só com as 8 fixtures; R2 só c
 npm run staging:preflight
 npm run staging:deploy      # só se firebase/firestore.rules ou índices mudarem
 npm run staging:verify      # cria fixtures, roda 28 testes, remove contas efêmeras
+npm run staging:verify:published   # mesma suíte contra https://cantina-escolar-hml.vercel.app (ou STAGING_PUBLISHED_URL)
 npm run staging:selftest    # ensaio local sem nuvem
 ```
 

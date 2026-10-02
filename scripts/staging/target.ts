@@ -18,6 +18,8 @@ export type Target = {
   kind: "staging" | "emulator";
   projectId: string;
   baseUrl: string;
+  /** true = servidor já publicado (Vercel) em STAGING_PUBLISHED_URL; nenhum servidor local é iniciado. */
+  published: boolean;
   /** Variáveis do processo do servidor Next (completas: o que não é do alvo vai em branco, ver `blankUnrelatedKeys`). */
   serverEnv: Record<string, string>;
   /** Chave pública do Web SDK (usada no login por REST dos testes). */
@@ -91,6 +93,7 @@ function emulatorTarget(): Target {
     kind: "emulator",
     projectId: "demo-cantina",
     baseUrl: `http://127.0.0.1:${STAGING_PORT}`,
+    published: false,
     serverEnv,
     apiKey: "demo-key",
     storage: { driver: "local", dir: storageDir },
@@ -133,7 +136,8 @@ function stagingTarget(): Target {
     R2_BUCKET: need(file, "R2_BUCKET"),
   };
   if (r2.R2_BUCKET !== AUTHORIZED_BUCKET) throw new Error(`Só o bucket ${AUTHORIZED_BUCKET} está autorizado para a homologação.`);
-  const baseUrl = `http://127.0.0.1:${STAGING_PORT}`;
+  const published = publishedUrl();
+  const baseUrl = published ?? `http://127.0.0.1:${STAGING_PORT}`;
   const appEnv = {
     APP_ENV: "staging",
     APP_BASE_URL: baseUrl,
@@ -158,12 +162,40 @@ function stagingTarget(): Target {
     kind: "staging",
     projectId,
     baseUrl,
+    published: published !== null,
     serverEnv: blankUnrelatedKeys(appEnv),
     apiKey: appEnv.NEXT_PUBLIC_FIREBASE_API_KEY,
     storage,
     adminCredential: { clientEmail, privateKey },
     fixturesFile: `.staging-fixtures.${projectId}.local.json`,
   };
+}
+
+/** Único projeto Vercel autorizado para a homologação publicada (URLs de produção, branch e deployment dele). */
+export const AUTHORIZED_VERCEL_PROJECT = "cantina-escolar-hml";
+/** Segredo do "Protection Bypass for Automation" do projeto: variável ou arquivo local ignorado pelo Git. */
+export const BYPASS_SECRET_FILE = ".secrets/vercel-hml-bypass.txt";
+/** Cookie de bypass da Vercel (escopo do host do deployment), gerado pelo global-setup; ignorado pelo Git. */
+export const PUBLISHED_STATE_FILE = ".secrets/vercel-hml-bypass-state.json";
+
+/**
+ * Homologação publicada: STAGING_PUBLISHED_URL precisa ser https em *.vercel.app do projeto cantina-escolar-hml
+ * (nunca domínio da escola nem outro projeto). Ausente = servidor local de homologação.
+ */
+export function publishedUrl(): string | null {
+  const raw = process.env.STAGING_PUBLISHED_URL?.trim();
+  if (!raw) return null;
+  const url = new URL(raw);
+  if (url.protocol !== "https:" || url.pathname !== "/" || url.search || !url.hostname.endsWith(".vercel.app") || !url.hostname.startsWith(`${AUTHORIZED_VERCEL_PROJECT}`)) {
+    throw new Error(`STAGING_PUBLISHED_URL deve ser https://${AUTHORIZED_VERCEL_PROJECT}….vercel.app (projeto de homologação).`);
+  }
+  return url.origin;
+}
+
+export function bypassSecret(): string {
+  const secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim() || (existsSync(BYPASS_SECRET_FILE) ? readFileSync(BYPASS_SECRET_FILE, "utf8").trim() : "");
+  if (!secret) throw new Error(`Falta o segredo de bypass da Vercel (VERCEL_AUTOMATION_BYPASS_SECRET ou ${BYPASS_SECRET_FILE}).`);
+  return secret;
 }
 
 /** STAGING_TARGET é obrigatório e explícito: `staging` (serviços reais) ou `emulator` (ensaio do harness nos emuladores). */
@@ -181,6 +213,6 @@ export function describeTarget(target: Target): string[] {
   } else {
     lines.push(`armazenamento: disco local ${target.storage.dir} (double do R2, só ensaio)`);
   }
-  lines.push(`servidor de teste: ${target.baseUrl}`);
+  lines.push(`servidor de teste: ${target.baseUrl}${target.published ? " (publicado, Vercel)" : ""}`);
   return lines;
 }

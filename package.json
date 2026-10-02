@@ -28,6 +28,7 @@
     "staging:fixtures": "node scripts/staging/run.ts fixtures",
     "staging:dev": "node scripts/staging/run.ts dev",
     "staging:verify": "node scripts/staging/run.ts verify",
+    "staging:verify:published": "node scripts/staging/run.ts verify --published",
     "staging:cleanup": "node scripts/staging/run.ts cleanup",
     "staging:selftest": "firebase emulators:exec --only auth,firestore --project demo-cantina \"node scripts/staging/run.ts verify --emulator\""
   },

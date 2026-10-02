@@ -5,6 +5,11 @@ import { createRequire } from "node:module";
 
 const [command, ...flags] = process.argv.slice(2);
 process.env.STAGING_TARGET = flags.includes("--emulator") ? "emulator" : "staging";
+// --published: valida o deployment da Vercel (URL de produção do projeto de homologação, ou STAGING_PUBLISHED_URL).
+if (flags.includes("--published")) {
+  if (flags.includes("--emulator")) throw new Error("--published e --emulator são exclusivos.");
+  process.env.STAGING_PUBLISHED_URL ||= "https://cantina-escolar-hml.vercel.app";
+}
 
 const { loadTarget, describeTarget, STAGING_PORT } = await import("./target.ts");
 const target = loadTarget();
@@ -41,7 +46,7 @@ switch (command) {
     break;
   }
   case "verify": {
-    const args = ["playwright", "test", "-c", "playwright.staging.config.ts", ...flags.filter((f) => f !== "--emulator")];
+    const args = ["playwright", "test", "-c", "playwright.staging.config.ts", ...flags.filter((f) => f !== "--emulator" && f !== "--published")];
     const result = spawnSync("npx", args, { stdio: "inherit", shell: true, env: process.env });
     process.exit(result.status ?? 1);
     break;

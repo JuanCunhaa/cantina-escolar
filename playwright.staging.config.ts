@@ -1,8 +1,10 @@
 import { defineConfig } from "@playwright/test";
-import { loadTarget } from "./scripts/staging/target.ts";
+import { loadTarget, PUBLISHED_STATE_FILE } from "./scripts/staging/target.ts";
 
 // Suíte de homologação integrada: reaproveita as specs e2e (fluxo real da aplicação) e acrescenta tests/staging/*.
 // Alvo escolhido por STAGING_TARGET (definido por `node scripts/staging/run.ts verify [--emulator]`).
+// Com STAGING_PUBLISHED_URL o servidor é o deployment da Vercel (cantina-escolar-hml): nenhum servidor local sobe e o
+// bypass da proteção vai num cookie do próprio host (gravado pelo global-setup), nunca em requisições a terceiros.
 const target = loadTarget();
 
 export default defineConfig({
@@ -14,12 +16,16 @@ export default defineConfig({
   reporter: [["list"]],
   globalSetup: "./tests/staging/global-setup.ts",
   globalTeardown: "./tests/staging/global-teardown.ts",
-  use: { baseURL: target.baseUrl },
-  webServer: {
-    command: "npx next dev --webpack -p 3300",
-    url: target.baseUrl,
-    reuseExistingServer: false,
-    timeout: 180000,
-    env: target.serverEnv,
-  },
+  use: { baseURL: target.baseUrl, ...(target.published ? { storageState: PUBLISHED_STATE_FILE } : {}) },
+  ...(target.published
+    ? {}
+    : {
+        webServer: {
+          command: "npx next dev --webpack -p 3300",
+          url: target.baseUrl,
+          reuseExistingServer: false,
+          timeout: 180000,
+          env: target.serverEnv,
+        },
+      }),
 });
