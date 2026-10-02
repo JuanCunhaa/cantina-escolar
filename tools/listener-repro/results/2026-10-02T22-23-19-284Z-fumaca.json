@@ -1,0 +1,51 @@
+{
+ "scenario": "fumaca",
+ "browser": "chromium 153.0.8010.12",
+ "transport": "default",
+ "listeners": [
+  "calendar",
+  "probe"
+ ],
+ "measure": "calendar",
+ "delayMs": 2000,
+ "runs": [
+  {
+   "run": 1,
+   "authMs": 1103,
+   "subscribeToFirstSnapshotMs": 186,
+   "writeAfterFirstSnapshotMs": 2046,
+   "commitMs": 284,
+   "commitToSnapshotMs": 14,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2519,
+   "deliveringBackchannel": null,
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 96,
+     "status": 200,
+     "aid": null,
+     "bytes": 452
+    },
+    {
+     "kind": "FWD",
+     "start": 2676,
+     "end": 2685,
+     "status": 200,
+     "aid": "17",
+     "bytes": 52
+    },
+    {
+     "kind": "FWD",
+     "start": 2706,
+     "end": 2713,
+     "status": 200,
+     "aid": "21",
+     "bytes": 50
+    }
+   ],
+   "errors": []
+  }
+ ]
+}

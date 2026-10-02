@@ -1,0 +1,241 @@
+{
+ "scenario": "M1-chromium-padrao",
+ "browser": "chromium 153.0.8010.12",
+ "transport": "default",
+ "listeners": [
+  "calendar",
+  "probe"
+ ],
+ "measure": "calendar",
+ "delayMs": 2000,
+ "runs": [
+  {
+   "run": 1,
+   "authMs": 1055,
+   "subscribeToFirstSnapshotMs": 167,
+   "writeAfterFirstSnapshotMs": 2073,
+   "commitMs": 327,
+   "commitToSnapshotMs": 42,
+   "snapshotToRenderMs": 1,
+   "channelOpenToDeliveryMs": 2599,
+   "deliveringBackchannel": null,
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 99,
+     "status": 200,
+     "aid": null,
+     "bytes": 450
+    },
+    {
+     "kind": "FWD",
+     "start": 2730,
+     "end": 2743,
+     "status": 200,
+     "aid": "14",
+     "bytes": 52
+    },
+    {
+     "kind": "FWD",
+     "start": 2762,
+     "end": 2775,
+     "status": 200,
+     "aid": "18",
+     "bytes": 50
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 2,
+   "authMs": 1110,
+   "subscribeToFirstSnapshotMs": 176,
+   "writeAfterFirstSnapshotMs": 2062,
+   "commitMs": 34,
+   "commitToSnapshotMs": 33,
+   "snapshotToRenderMs": 1,
+   "channelOpenToDeliveryMs": 2297,
+   "deliveringBackchannel": null,
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 106,
+     "status": 200,
+     "aid": null,
+     "bytes": 452
+    },
+    {
+     "kind": "FWD",
+     "start": 2436,
+     "end": 2449,
+     "status": 200,
+     "aid": "13",
+     "bytes": 52
+    },
+    {
+     "kind": "FWD",
+     "start": 2482,
+     "end": 2494,
+     "status": 200,
+     "aid": "17",
+     "bytes": 50
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 3,
+   "authMs": 1103,
+   "subscribeToFirstSnapshotMs": 142,
+   "writeAfterFirstSnapshotMs": 2088,
+   "commitMs": 38,
+   "commitToSnapshotMs": 10,
+   "snapshotToRenderMs": 1,
+   "channelOpenToDeliveryMs": 2269,
+   "deliveringBackchannel": null,
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 83,
+     "status": 200,
+     "aid": null,
+     "bytes": 451
+    },
+    {
+     "kind": "FWD",
+     "start": 2428,
+     "end": 2444,
+     "status": 200,
+     "aid": "10",
+     "bytes": 50
+    },
+    {
+     "kind": "FWD",
+     "start": 2473,
+     "end": 2483,
+     "status": 200,
+     "aid": "14",
+     "bytes": 50
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 4,
+   "authMs": 1050,
+   "subscribeToFirstSnapshotMs": 143,
+   "writeAfterFirstSnapshotMs": 2087,
+   "commitMs": 44,
+   "commitToSnapshotMs": 22,
+   "snapshotToRenderMs": 1,
+   "channelOpenToDeliveryMs": 2287,
+   "deliveringBackchannel": null,
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 89,
+     "status": 200,
+     "aid": null,
+     "bytes": 453
+    },
+    {
+     "kind": "FWD",
+     "start": 2427,
+     "end": 2438,
+     "status": 200,
+     "aid": "13",
+     "bytes": 50
+    },
+    {
+     "kind": "FWD",
+     "start": 2470,
+     "end": 2486,
+     "status": 200,
+     "aid": "17",
+     "bytes": 50
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 5,
+   "authMs": 1878,
+   "subscribeToFirstSnapshotMs": 129,
+   "writeAfterFirstSnapshotMs": 2103,
+   "commitMs": 47,
+   "commitToSnapshotMs": 16,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2286,
+   "deliveringBackchannel": null,
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 75,
+     "status": 200,
+     "aid": null,
+     "bytes": 451
+    },
+    {
+     "kind": "FWD",
+     "start": 2429,
+     "end": 2443,
+     "status": 200,
+     "aid": "14",
+     "bytes": 50
+    },
+    {
+     "kind": "FWD",
+     "start": 2459,
+     "end": 2471,
+     "status": 200,
+     "aid": "18",
+     "bytes": 50
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 6,
+   "authMs": 1143,
+   "subscribeToFirstSnapshotMs": 141,
+   "writeAfterFirstSnapshotMs": 2082,
+   "commitMs": 38,
+   "commitToSnapshotMs": 12,
+   "snapshotToRenderMs": 1,
+   "channelOpenToDeliveryMs": 2264,
+   "deliveringBackchannel": null,
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 85,
+     "status": 200,
+     "aid": null,
+     "bytes": 452
+    },
+    {
+     "kind": "FWD",
+     "start": 2404,
+     "end": 2413,
+     "status": 200,
+     "aid": "11",
+     "bytes": 52
+    },
+    {
+     "kind": "FWD",
+     "start": 2447,
+     "end": 2459,
+     "status": 200,
+     "aid": "15",
+     "bytes": 50
+    }
+   ],
+   "errors": []
+  }
+ ]
+}

@@ -1,0 +1,457 @@
+{
+ "scenario": "APP-calendario",
+ "runs": [
+  {
+   "run": 1,
+   "gotoToVisibleMs": 6439,
+   "visibleToFirstSnapshotMs": 3,
+   "commitConfirmedToRowMs": 4,
+   "channelOpenToRowMs": 4153,
+   "sessions": 1,
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "method": "POST",
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "session": "-"
+    },
+    {
+     "kind": "BACK",
+     "at": 92,
+     "method": "GET",
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "session": "88c6b4"
+    },
+    {
+     "kind": "FWD",
+     "at": 212,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "88c6b4"
+    },
+    {
+     "kind": "FWD",
+     "at": 213,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "88c6b4"
+    },
+    {
+     "kind": "FWD",
+     "at": 213,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "88c6b4"
+    },
+    {
+     "kind": "FWD",
+     "at": 213,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "88c6b4"
+    },
+    {
+     "kind": "FWD",
+     "at": 213,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "88c6b4"
+    },
+    {
+     "kind": "FWD",
+     "at": 213,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "88c6b4"
+    },
+    {
+     "kind": "FWD",
+     "at": 213,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "88c6b4"
+    },
+    {
+     "kind": "FWD",
+     "at": 214,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "88c6b4"
+    },
+    {
+     "kind": "FWD",
+     "at": 215,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "88c6b4"
+    },
+    {
+     "kind": "FWD",
+     "at": 4633,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "88c6b4"
+    },
+    {
+     "kind": "FWD",
+     "at": 4713,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "88c6b4"
+    }
+   ],
+   "otherGoogleRequests": [
+    {
+     "host": "identitytoolkit.googleapis.com",
+     "path": "/v1/accounts:signInWithPassword",
+     "at": -1260
+    },
+    {
+     "host": "identitytoolkit.googleapis.com",
+     "path": "/v1/accounts:lookup",
+     "at": -529
+    }
+   ]
+  },
+  {
+   "run": 2,
+   "gotoToVisibleMs": 3010,
+   "visibleToFirstSnapshotMs": 6,
+   "commitConfirmedToRowMs": 23563,
+   "channelOpenToRowMs": 26841,
+   "sessions": 1,
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "method": "POST",
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "session": "-"
+    },
+    {
+     "kind": "BACK",
+     "at": 82,
+     "method": "GET",
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "session": "72b6d9"
+    },
+    {
+     "kind": "FWD",
+     "at": 148,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "72b6d9"
+    },
+    {
+     "kind": "FWD",
+     "at": 149,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "72b6d9"
+    },
+    {
+     "kind": "FWD",
+     "at": 149,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "72b6d9"
+    },
+    {
+     "kind": "FWD",
+     "at": 149,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "72b6d9"
+    },
+    {
+     "kind": "FWD",
+     "at": 149,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "72b6d9"
+    },
+    {
+     "kind": "FWD",
+     "at": 149,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "72b6d9"
+    },
+    {
+     "kind": "FWD",
+     "at": 149,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "72b6d9"
+    },
+    {
+     "kind": "FWD",
+     "at": 150,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "72b6d9"
+    },
+    {
+     "kind": "FWD",
+     "at": 150,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "72b6d9"
+    },
+    {
+     "kind": "FWD",
+     "at": 27408,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "72b6d9"
+    },
+    {
+     "kind": "FWD",
+     "at": 27449,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "72b6d9"
+    }
+   ],
+   "otherGoogleRequests": [
+    {
+     "host": "identitytoolkit.googleapis.com",
+     "path": "/v1/accounts:signInWithPassword",
+     "at": -1074
+    },
+    {
+     "host": "identitytoolkit.googleapis.com",
+     "path": "/v1/accounts:lookup",
+     "at": -485
+    }
+   ]
+  },
+  {
+   "run": 3,
+   "gotoToVisibleMs": 2828,
+   "visibleToFirstSnapshotMs": 2,
+   "commitConfirmedToRowMs": 6,
+   "channelOpenToRowMs": 3327,
+   "sessions": 1,
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "method": "POST",
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "session": "-"
+    },
+    {
+     "kind": "BACK",
+     "at": 83,
+     "method": "GET",
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "session": "166a93"
+    },
+    {
+     "kind": "FWD",
+     "at": 150,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "166a93"
+    },
+    {
+     "kind": "FWD",
+     "at": 150,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "166a93"
+    },
+    {
+     "kind": "FWD",
+     "at": 150,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "166a93"
+    },
+    {
+     "kind": "FWD",
+     "at": 150,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "166a93"
+    },
+    {
+     "kind": "FWD",
+     "at": 150,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "166a93"
+    },
+    {
+     "kind": "FWD",
+     "at": 150,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "166a93"
+    },
+    {
+     "kind": "FWD",
+     "at": 151,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "166a93"
+    },
+    {
+     "kind": "FWD",
+     "at": 151,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "166a93"
+    },
+    {
+     "kind": "FWD",
+     "at": 151,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "166a93"
+    },
+    {
+     "kind": "FWD",
+     "at": 3790,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "166a93"
+    },
+    {
+     "kind": "FWD",
+     "at": 3832,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "166a93"
+    }
+   ],
+   "otherGoogleRequests": [
+    {
+     "host": "identitytoolkit.googleapis.com",
+     "path": "/v1/accounts:signInWithPassword",
+     "at": -1533
+    },
+    {
+     "host": "identitytoolkit.googleapis.com",
+     "path": "/v1/accounts:lookup",
+     "at": -916
+    }
+   ]
+  },
+  {
+   "run": 4,
+   "gotoToVisibleMs": 2410,
+   "visibleToFirstSnapshotMs": 5,
+   "commitConfirmedToRowMs": 21527,
+   "channelOpenToRowMs": 24759,
+   "sessions": 1,
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "method": "POST",
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "session": "-"
+    },
+    {
+     "kind": "BACK",
+     "at": 86,
+     "method": "GET",
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "session": "294268"
+    },
+    {
+     "kind": "FWD",
+     "at": 169,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "294268"
+    },
+    {
+     "kind": "FWD",
+     "at": 170,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "294268"
+    },
+    {
+     "kind": "FWD",
+     "at": 170,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "294268"
+    },
+    {
+     "kind": "FWD",
+     "at": 171,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "294268"
+    },
+    {
+     "kind": "FWD",
+     "at": 171,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "294268"
+    },
+    {
+     "kind": "FWD",
+     "at": 171,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "294268"
+    },
+    {
+     "kind": "FWD",
+     "at": 171,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "294268"
+    },
+    {
+     "kind": "FWD",
+     "at": 171,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "294268"
+    },
+    {
+     "kind": "FWD",
+     "at": 171,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "294268"
+    },
+    {
+     "kind": "FWD",
+     "at": 25337,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "294268"
+    },
+    {
+     "kind": "FWD",
+     "at": 25381,
+     "method": "POST",
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "session": "294268"
+    }
+   ],
+   "otherGoogleRequests": [
+    {
+     "host": "identitytoolkit.googleapis.com",
+     "path": "/v1/accounts:signInWithPassword",
+     "at": -1119
+    },
+    {
+     "host": "identitytoolkit.googleapis.com",
+     "path": "/v1/accounts:lookup",
+     "at": -514
+    }
+   ]
+  }
+ ]
+}

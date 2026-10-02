@@ -1,0 +1,5684 @@
+{
+ "scenario": "LP-chromium-longpolling",
+ "browser": "chromium 153.0.8010.12",
+ "transport": "forceLongPolling",
+ "listeners": [
+  "calendar",
+  "probe",
+  "page"
+ ],
+ "measure": "calendar",
+ "delayMs": 2000,
+ "churn": false,
+ "firestoreBeforeAuth": false,
+ "writeMode": "admin",
+ "staggerMs": 0,
+ "burstAfterMs": 0,
+ "pin": "none",
+ "runs": [
+  {
+   "run": 1,
+   "authMs": 1117,
+   "subscribeToFirstSnapshotMs": 164,
+   "writeAfterFirstSnapshotMs": 2059,
+   "commitMs": 281,
+   "commitToSnapshotMs": 21,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2517,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 6,
+    "endedAfterCommitMs": 17,
+    "bytes": 161
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 79,
+     "status": 200,
+     "aid": null,
+     "bytes": 451
+    },
+    {
+     "kind": "BACK",
+     "start": 81,
+     "end": 92,
+     "status": 200,
+     "aid": "0",
+     "bytes": 254
+    },
+    {
+     "kind": "BACK",
+     "start": 95,
+     "end": 108,
+     "status": 200,
+     "aid": "5",
+     "bytes": 504
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 110,
+     "end": null,
+     "status": null,
+     "aid": "7",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 118,
+     "end": 129,
+     "status": 200,
+     "aid": "9",
+     "bytes": 1023
+    },
+    {
+     "kind": "BACK",
+     "start": 130,
+     "end": 147,
+     "status": 200,
+     "aid": "20",
+     "bytes": 2222
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 151,
+     "end": null,
+     "status": null,
+     "aid": "52",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2502,
+     "end": 2513,
+     "status": 200,
+     "aid": "54",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2517,
+     "end": null,
+     "status": null,
+     "aid": "55",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2654,
+     "end": 2667,
+     "status": 200,
+     "aid": "57",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2668,
+     "end": null,
+     "status": null,
+     "aid": "58",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2669,
+     "end": 2682,
+     "status": 200,
+     "aid": "58",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2682,
+     "end": null,
+     "status": null,
+     "aid": "60",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2697,
+     "end": null,
+     "status": null,
+     "aid": "62",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2710,
+     "end": 2723,
+     "status": 200,
+     "aid": "64",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK",
+     "start": 2711,
+     "end": 2724,
+     "status": 200,
+     "aid": "64",
+     "bytes": 123
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 81,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 95,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 109,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 118,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 130,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 156,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2502,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2518,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2654,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2670,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2670,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2682,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2696,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2710,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2710,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2724,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 2,
+   "authMs": 1087,
+   "subscribeToFirstSnapshotMs": 145,
+   "writeAfterFirstSnapshotMs": 2084,
+   "commitMs": 27,
+   "commitToSnapshotMs": 14,
+   "snapshotToRenderMs": 1,
+   "channelOpenToDeliveryMs": 2262,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 5,
+    "endedAfterCommitMs": 14,
+    "bytes": 161
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 76,
+     "status": 200,
+     "aid": null,
+     "bytes": 450
+    },
+    {
+     "kind": "BACK",
+     "start": 78,
+     "end": 94,
+     "status": 200,
+     "aid": "0",
+     "bytes": 254
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 96,
+     "end": null,
+     "status": null,
+     "aid": "5",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 106,
+     "end": 116,
+     "status": 200,
+     "aid": "8",
+     "bytes": 1662
+    },
+    {
+     "kind": "BACK",
+     "start": 117,
+     "end": 129,
+     "status": 200,
+     "aid": "31",
+     "bytes": 1582
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 131,
+     "end": null,
+     "status": null,
+     "aid": "52",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2253,
+     "end": 2262,
+     "status": 200,
+     "aid": "54",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2263,
+     "end": null,
+     "status": null,
+     "aid": "55",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2400,
+     "end": null,
+     "status": null,
+     "aid": "57",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2411,
+     "end": 2424,
+     "status": 200,
+     "aid": "58",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK",
+     "start": 2411,
+     "end": 2424,
+     "status": 200,
+     "aid": "58",
+     "bytes": 120
+    },
+    {
+     "kind": "BACK",
+     "start": 2429,
+     "end": 2449,
+     "status": 200,
+     "aid": "59",
+     "bytes": 247
+    },
+    {
+     "kind": "BACK",
+     "start": 2449,
+     "end": 2466,
+     "status": 200,
+     "aid": "61",
+     "bytes": 202
+    },
+    {
+     "kind": "BACK",
+     "start": 2468,
+     "end": 2484,
+     "status": 200,
+     "aid": "63",
+     "bytes": 121
+    },
+    {
+     "kind": "FWD",
+     "start": 2469,
+     "end": 2483,
+     "status": 200,
+     "aid": "63",
+     "bytes": 50
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 79,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 96,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 105,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 119,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 137,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2252,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2262,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2399,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2411,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2411,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2431,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2452,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2471,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2471,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2492,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 3,
+   "authMs": 1163,
+   "subscribeToFirstSnapshotMs": 152,
+   "writeAfterFirstSnapshotMs": 2086,
+   "commitMs": 27,
+   "commitToSnapshotMs": 18,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2276,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 149,
+    "endedAfterCommitMs": 157,
+    "bytes": 161
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 88,
+     "status": 200,
+     "aid": null,
+     "bytes": 451
+    },
+    {
+     "kind": "BACK",
+     "start": 90,
+     "end": 103,
+     "status": 200,
+     "aid": "0",
+     "bytes": 254
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 105,
+     "end": null,
+     "status": null,
+     "aid": "5",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 119,
+     "end": 126,
+     "status": 200,
+     "aid": "7",
+     "bytes": 528
+    },
+    {
+     "kind": "BACK",
+     "start": 127,
+     "end": 138,
+     "status": 200,
+     "aid": "10",
+     "bytes": 2758
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 139,
+     "end": null,
+     "status": null,
+     "aid": "53",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2266,
+     "end": null,
+     "status": null,
+     "aid": "55",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2277,
+     "end": null,
+     "status": null,
+     "aid": "56",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2407,
+     "end": 2415,
+     "status": 200,
+     "aid": "58",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK",
+     "start": 2415,
+     "end": 2428,
+     "status": 200,
+     "aid": "59",
+     "bytes": 118
+    },
+    {
+     "kind": "FWD",
+     "start": 2416,
+     "end": 2427,
+     "status": 200,
+     "aid": "59",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2428,
+     "end": null,
+     "status": null,
+     "aid": "60",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2443,
+     "end": null,
+     "status": null,
+     "aid": "62",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2453,
+     "end": 2463,
+     "status": 200,
+     "aid": "64",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2454,
+     "end": null,
+     "status": null,
+     "aid": "64",
+     "bytes": null
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 90,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 104,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 118,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 127,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 145,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2265,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2276,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2406,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2415,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2415,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2429,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2442,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2453,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2453,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2471,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 4,
+   "authMs": 1079,
+   "subscribeToFirstSnapshotMs": 168,
+   "writeAfterFirstSnapshotMs": 2063,
+   "commitMs": 38,
+   "commitToSnapshotMs": 23,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2283,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 11,
+    "endedAfterCommitMs": 23,
+    "bytes": 161
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 80,
+     "status": 200,
+     "aid": null,
+     "bytes": 453
+    },
+    {
+     "kind": "BACK",
+     "start": 82,
+     "end": 96,
+     "status": 200,
+     "aid": "0",
+     "bytes": 245
+    },
+    {
+     "kind": "BACK",
+     "start": 105,
+     "end": 127,
+     "status": 200,
+     "aid": "5",
+     "bytes": 2197
+    },
+    {
+     "kind": "BACK",
+     "start": 132,
+     "end": 152,
+     "status": 200,
+     "aid": "36",
+     "bytes": 1302
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 153,
+     "end": null,
+     "status": null,
+     "aid": "52",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2271,
+     "end": 2283,
+     "status": 200,
+     "aid": "54",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2283,
+     "end": null,
+     "status": null,
+     "aid": "55",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2415,
+     "end": 2435,
+     "status": 200,
+     "aid": "57",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2437,
+     "end": null,
+     "status": null,
+     "aid": "58",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2438,
+     "end": 2461,
+     "status": 200,
+     "aid": "58",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK",
+     "start": 2462,
+     "end": 2483,
+     "status": 200,
+     "aid": "60",
+     "bytes": 301
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2484,
+     "end": null,
+     "status": null,
+     "aid": "63",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2485,
+     "end": 2502,
+     "status": 200,
+     "aid": "63",
+     "bytes": 50
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 84,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 110,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 136,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 160,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2271,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2284,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2420,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2441,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2441,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2470,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2493,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2493,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2529,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 5,
+   "authMs": 1068,
+   "subscribeToFirstSnapshotMs": 140,
+   "writeAfterFirstSnapshotMs": 2094,
+   "commitMs": 29,
+   "commitToSnapshotMs": 21,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2276,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 10,
+    "endedAfterCommitMs": 20,
+    "bytes": 161
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 78,
+     "status": 200,
+     "aid": null,
+     "bytes": 451
+    },
+    {
+     "kind": "BACK",
+     "start": 80,
+     "end": 91,
+     "status": 200,
+     "aid": "0",
+     "bytes": 254
+    },
+    {
+     "kind": "BACK",
+     "start": 92,
+     "end": 103,
+     "status": 200,
+     "aid": "5",
+     "bytes": 454
+    },
+    {
+     "kind": "BACK",
+     "start": 104,
+     "end": 116,
+     "status": 200,
+     "aid": "7",
+     "bytes": 1765
+    },
+    {
+     "kind": "BACK",
+     "start": 117,
+     "end": 126,
+     "status": 200,
+     "aid": "31",
+     "bytes": 1601
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 127,
+     "end": null,
+     "status": null,
+     "aid": "53",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2265,
+     "end": 2275,
+     "status": 200,
+     "aid": "55",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2276,
+     "end": null,
+     "status": null,
+     "aid": "56",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2402,
+     "end": null,
+     "status": null,
+     "aid": "58",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2414,
+     "end": 2421,
+     "status": 200,
+     "aid": "59",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK",
+     "start": 2415,
+     "end": 2427,
+     "status": 200,
+     "aid": "59",
+     "bytes": 120
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2427,
+     "end": null,
+     "status": null,
+     "aid": "60",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2441,
+     "end": 2459,
+     "status": 200,
+     "aid": "62",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK",
+     "start": 2460,
+     "end": 2473,
+     "status": 200,
+     "aid": "63",
+     "bytes": 123
+    },
+    {
+     "kind": "FWD",
+     "start": 2461,
+     "end": 2472,
+     "status": 200,
+     "aid": "63",
+     "bytes": 50
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 80,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 92,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 103,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 117,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 132,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2264,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2275,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2401,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2413,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2414,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2426,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2441,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2460,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2460,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2473,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 6,
+   "authMs": 1068,
+   "subscribeToFirstSnapshotMs": 155,
+   "writeAfterFirstSnapshotMs": 2083,
+   "commitMs": 20,
+   "commitToSnapshotMs": 28,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2277,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 5,
+    "endedAfterCommitMs": 18,
+    "bytes": 351
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 100,
+     "status": 200,
+     "aid": null,
+     "bytes": 451
+    },
+    {
+     "kind": "BACK",
+     "start": 102,
+     "end": 118,
+     "status": 200,
+     "aid": "0",
+     "bytes": 673
+    },
+    {
+     "kind": "BACK",
+     "start": 119,
+     "end": 128,
+     "status": 200,
+     "aid": "8",
+     "bytes": 1584
+    },
+    {
+     "kind": "BACK",
+     "start": 129,
+     "end": 139,
+     "status": 200,
+     "aid": "30",
+     "bytes": 1621
+    },
+    {
+     "kind": "BACK",
+     "start": 141,
+     "end": 155,
+     "status": 200,
+     "aid": "52",
+     "bytes": 397
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 156,
+     "end": null,
+     "status": null,
+     "aid": "56",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 176,
+     "end": 186,
+     "status": 200,
+     "aid": "58",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 186,
+     "end": null,
+     "status": null,
+     "aid": "59",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2254,
+     "end": 2267,
+     "status": 200,
+     "aid": "61",
+     "bytes": 351
+    },
+    {
+     "kind": "BACK",
+     "start": 2268,
+     "end": 2276,
+     "status": 200,
+     "aid": "64",
+     "bytes": 353
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2277,
+     "end": null,
+     "status": null,
+     "aid": "67",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2406,
+     "end": 2421,
+     "status": 200,
+     "aid": "69",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK",
+     "start": 2421,
+     "end": 2434,
+     "status": 200,
+     "aid": "70",
+     "bytes": 143
+    },
+    {
+     "kind": "FWD",
+     "start": 2422,
+     "end": 2434,
+     "status": 200,
+     "aid": "70",
+     "bytes": 48
+    },
+    {
+     "kind": "BACK",
+     "start": 2435,
+     "end": 2449,
+     "status": 200,
+     "aid": "72",
+     "bytes": 300
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2450,
+     "end": null,
+     "status": null,
+     "aid": "75",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2451,
+     "end": 2461,
+     "status": 200,
+     "aid": "75",
+     "bytes": 50
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 103,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 119,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 131,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 146,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 156,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 176,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 188,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2254,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2267,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2277,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2406,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2422,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2422,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2435,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2450,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2450,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2465,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 7,
+   "authMs": 1061,
+   "subscribeToFirstSnapshotMs": 136,
+   "writeAfterFirstSnapshotMs": 2102,
+   "commitMs": 34,
+   "commitToSnapshotMs": 21,
+   "snapshotToRenderMs": 1,
+   "channelOpenToDeliveryMs": 2284,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 8,
+    "endedAfterCommitMs": 20,
+    "bytes": 161
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 77,
+     "status": 200,
+     "aid": null,
+     "bytes": 452
+    },
+    {
+     "kind": "BACK",
+     "start": 79,
+     "end": 91,
+     "status": 200,
+     "aid": "0",
+     "bytes": 255
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 92,
+     "end": null,
+     "status": null,
+     "aid": "5",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 108,
+     "end": 121,
+     "status": 200,
+     "aid": "30",
+     "bytes": 1584
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 122,
+     "end": null,
+     "status": null,
+     "aid": "52",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2271,
+     "end": 2283,
+     "status": 200,
+     "aid": "54",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2284,
+     "end": null,
+     "status": null,
+     "aid": "55",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2404,
+     "end": 2414,
+     "status": 200,
+     "aid": "57",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2415,
+     "end": null,
+     "status": null,
+     "aid": "58",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2417,
+     "end": 2433,
+     "status": 200,
+     "aid": "58",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK",
+     "start": 2433,
+     "end": 2447,
+     "status": 200,
+     "aid": "60",
+     "bytes": 292
+    },
+    {
+     "kind": "BACK",
+     "start": 2448,
+     "end": 2459,
+     "status": 200,
+     "aid": "62",
+     "bytes": 161
+    },
+    {
+     "kind": "FWD",
+     "start": 2460,
+     "end": 2485,
+     "status": 200,
+     "aid": "63",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2460,
+     "end": null,
+     "status": null,
+     "aid": "63",
+     "bytes": null
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 80,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 93,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 109,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 128,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2272,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2286,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2405,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2419,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2419,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2433,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2449,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2461,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2461,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2491,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 8,
+   "authMs": 1040,
+   "subscribeToFirstSnapshotMs": 134,
+   "writeAfterFirstSnapshotMs": 2110,
+   "commitMs": 31,
+   "commitToSnapshotMs": 20,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2287,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 142,
+    "endedAfterCommitMs": 154,
+    "bytes": 159
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 82,
+     "status": 200,
+     "aid": null,
+     "bytes": 451
+    },
+    {
+     "kind": "BACK",
+     "start": 83,
+     "end": 94,
+     "status": 200,
+     "aid": "0",
+     "bytes": 255
+    },
+    {
+     "kind": "BACK",
+     "start": 96,
+     "end": 107,
+     "status": 200,
+     "aid": "5",
+     "bytes": 1855
+    },
+    {
+     "kind": "BACK",
+     "start": 109,
+     "end": 119,
+     "status": 200,
+     "aid": "30",
+     "bytes": 1647
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 120,
+     "end": null,
+     "status": null,
+     "aid": "52",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2288,
+     "end": null,
+     "status": null,
+     "aid": "55",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2409,
+     "end": 2421,
+     "status": 200,
+     "aid": "57",
+     "bytes": 159
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2421,
+     "end": null,
+     "status": null,
+     "aid": "58",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2422,
+     "end": 2433,
+     "status": 200,
+     "aid": "58",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2434,
+     "end": null,
+     "status": null,
+     "aid": "60",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2457,
+     "end": null,
+     "status": null,
+     "aid": "62",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2474,
+     "end": 2486,
+     "status": 200,
+     "aid": "64",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK",
+     "start": 2475,
+     "end": 2488,
+     "status": 200,
+     "aid": "64",
+     "bytes": 123
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 83,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 95,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 109,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 126,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2287,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2409,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2422,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2422,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2434,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2456,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2475,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2475,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2489,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 9,
+   "authMs": 1050,
+   "subscribeToFirstSnapshotMs": 116,
+   "writeAfterFirstSnapshotMs": 2105,
+   "commitMs": 38,
+   "commitToSnapshotMs": 21,
+   "snapshotToRenderMs": 1,
+   "channelOpenToDeliveryMs": 2273,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 7,
+    "endedAfterCommitMs": 20,
+    "bytes": 159
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 75,
+     "status": 200,
+     "aid": null,
+     "bytes": 451
+    },
+    {
+     "kind": "BACK",
+     "start": 76,
+     "end": 90,
+     "status": 200,
+     "aid": "0",
+     "bytes": 690
+    },
+    {
+     "kind": "BACK",
+     "start": 92,
+     "end": 102,
+     "status": 200,
+     "aid": "10",
+     "bytes": 2763
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 103,
+     "end": null,
+     "status": null,
+     "aid": "52",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2259,
+     "end": 2272,
+     "status": 200,
+     "aid": "54",
+     "bytes": 159
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2274,
+     "end": null,
+     "status": null,
+     "aid": "55",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2402,
+     "end": 2418,
+     "status": 200,
+     "aid": "57",
+     "bytes": 159
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2419,
+     "end": null,
+     "status": null,
+     "aid": "58",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2421,
+     "end": 2432,
+     "status": 200,
+     "aid": "58",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK",
+     "start": 2434,
+     "end": 2444,
+     "status": 200,
+     "aid": "59",
+     "bytes": 302
+    },
+    {
+     "kind": "BACK",
+     "start": 2445,
+     "end": 2460,
+     "status": 200,
+     "aid": "62",
+     "bytes": 123
+    },
+    {
+     "kind": "FWD",
+     "start": 2446,
+     "end": 2459,
+     "status": 200,
+     "aid": "62",
+     "bytes": 50
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 77,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 92,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 109,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2259,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2274,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2402,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2421,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2421,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2434,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2446,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2447,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2462,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 10,
+   "authMs": 1038,
+   "subscribeToFirstSnapshotMs": 217,
+   "writeAfterFirstSnapshotMs": 2115,
+   "commitMs": 27,
+   "commitToSnapshotMs": 24,
+   "snapshotToRenderMs": 1,
+   "channelOpenToDeliveryMs": 2375,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 163,
+    "endedAfterCommitMs": 176,
+    "bytes": 161
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 85,
+     "status": 200,
+     "aid": null,
+     "bytes": 452
+    },
+    {
+     "kind": "BACK",
+     "start": 87,
+     "end": 98,
+     "status": 200,
+     "aid": "0",
+     "bytes": 245
+    },
+    {
+     "kind": "BACK",
+     "start": 99,
+     "end": 116,
+     "status": 200,
+     "aid": "5",
+     "bytes": 2734
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 117,
+     "end": null,
+     "status": null,
+     "aid": "47",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 192,
+     "end": null,
+     "status": null,
+     "aid": "49",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 209,
+     "end": null,
+     "status": null,
+     "aid": "53",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2376,
+     "end": null,
+     "status": null,
+     "aid": "56",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2514,
+     "end": 2527,
+     "status": 200,
+     "aid": "58",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK",
+     "start": 2528,
+     "end": 2541,
+     "status": 200,
+     "aid": "59",
+     "bytes": 120
+    },
+    {
+     "kind": "FWD",
+     "start": 2529,
+     "end": 2539,
+     "status": 200,
+     "aid": "59",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK",
+     "start": 2541,
+     "end": 2556,
+     "status": 200,
+     "aid": "60",
+     "bytes": 244
+    },
+    {
+     "kind": "BACK",
+     "start": 2557,
+     "end": 2568,
+     "status": 200,
+     "aid": "62",
+     "bytes": 202
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2568,
+     "end": null,
+     "status": null,
+     "aid": "64",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2569,
+     "end": 2579,
+     "status": 200,
+     "aid": "64",
+     "bytes": 50
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 87,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 99,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 118,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 191,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 208,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2376,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2514,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2529,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2529,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2541,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2556,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2568,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2569,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2580,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 11,
+   "authMs": 1014,
+   "subscribeToFirstSnapshotMs": 140,
+   "writeAfterFirstSnapshotMs": 2095,
+   "commitMs": 26,
+   "commitToSnapshotMs": 101,
+   "snapshotToRenderMs": 1,
+   "channelOpenToDeliveryMs": 2353,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 180,
+    "endedAfterCommitMs": 190,
+    "bytes": 161
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 79,
+     "status": 200,
+     "aid": null,
+     "bytes": 451
+    },
+    {
+     "kind": "BACK",
+     "start": 81,
+     "end": 92,
+     "status": 200,
+     "aid": "0",
+     "bytes": 253
+    },
+    {
+     "kind": "BACK",
+     "start": 94,
+     "end": 109,
+     "status": 200,
+     "aid": "5",
+     "bytes": 593
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 111,
+     "end": null,
+     "status": null,
+     "aid": "9",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 132,
+     "end": 141,
+     "status": 200,
+     "aid": "52",
+     "bytes": 292
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 143,
+     "end": null,
+     "status": null,
+     "aid": "56",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 160,
+     "end": 172,
+     "status": 200,
+     "aid": "58",
+     "bytes": 323
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 172,
+     "end": null,
+     "status": null,
+     "aid": "60",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2340,
+     "end": null,
+     "status": null,
+     "aid": "62",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2354,
+     "end": null,
+     "status": null,
+     "aid": "63",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2432,
+     "end": 2442,
+     "status": 200,
+     "aid": "65",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK",
+     "start": 2442,
+     "end": 2453,
+     "status": 200,
+     "aid": "66",
+     "bytes": 118
+    },
+    {
+     "kind": "FWD",
+     "start": 2443,
+     "end": 2452,
+     "status": 200,
+     "aid": "66",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2453,
+     "end": null,
+     "status": null,
+     "aid": "67",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2471,
+     "end": 2483,
+     "status": 200,
+     "aid": "69",
+     "bytes": 202
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2484,
+     "end": null,
+     "status": null,
+     "aid": "71",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2485,
+     "end": 2498,
+     "status": 200,
+     "aid": "71",
+     "bytes": 50
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 83,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 94,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 111,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 132,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 143,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 159,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 172,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2340,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2355,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2431,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2443,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2443,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2453,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2470,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2486,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2486,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2504,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 12,
+   "authMs": 1132,
+   "subscribeToFirstSnapshotMs": 135,
+   "writeAfterFirstSnapshotMs": 2092,
+   "commitMs": 28,
+   "commitToSnapshotMs": 31,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2279,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 3,
+    "endedAfterCommitMs": 29,
+    "bytes": 161
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 74,
+     "status": 200,
+     "aid": null,
+     "bytes": 451
+    },
+    {
+     "kind": "BACK",
+     "start": 76,
+     "end": 89,
+     "status": 200,
+     "aid": "0",
+     "bytes": 690
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 91,
+     "end": null,
+     "status": null,
+     "aid": "9",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 107,
+     "end": null,
+     "status": null,
+     "aid": "11",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 129,
+     "end": null,
+     "status": null,
+     "aid": "53",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2251,
+     "end": 2277,
+     "status": 200,
+     "aid": "55",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2279,
+     "end": null,
+     "status": null,
+     "aid": "56",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2404,
+     "end": 2416,
+     "status": 200,
+     "aid": "58",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2417,
+     "end": null,
+     "status": null,
+     "aid": "59",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2418,
+     "end": 2431,
+     "status": 200,
+     "aid": "59",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2431,
+     "end": null,
+     "status": null,
+     "aid": "61",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2453,
+     "end": 2465,
+     "status": 200,
+     "aid": "63",
+     "bytes": 201
+    },
+    {
+     "kind": "BACK",
+     "start": 2467,
+     "end": 2475,
+     "status": 200,
+     "aid": "65",
+     "bytes": 224
+    },
+    {
+     "kind": "FWD",
+     "start": 2467,
+     "end": 2479,
+     "status": 200,
+     "aid": "65",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK",
+     "start": 2476,
+     "end": 2485,
+     "status": 200,
+     "aid": "66",
+     "bytes": 224
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 76,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 91,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 107,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 128,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2250,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2279,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2404,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2417,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2418,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2431,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2452,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2467,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2467,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2475,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2485,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 13,
+   "authMs": 1034,
+   "subscribeToFirstSnapshotMs": 151,
+   "writeAfterFirstSnapshotMs": 2078,
+   "commitMs": 24,
+   "commitToSnapshotMs": 25,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2268,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 10,
+    "endedAfterCommitMs": 23,
+    "bytes": 218
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 93,
+     "status": 200,
+     "aid": null,
+     "bytes": 451
+    },
+    {
+     "kind": "BACK",
+     "start": 94,
+     "end": 105,
+     "status": 200,
+     "aid": "0",
+     "bytes": 254
+    },
+    {
+     "kind": "BACK",
+     "start": 108,
+     "end": 120,
+     "status": 200,
+     "aid": "5",
+     "bytes": 588
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 121,
+     "end": null,
+     "status": null,
+     "aid": "9",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 141,
+     "end": null,
+     "status": null,
+     "aid": "52",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2253,
+     "end": 2266,
+     "status": 200,
+     "aid": "54",
+     "bytes": 218
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2267,
+     "end": null,
+     "status": null,
+     "aid": "57",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2384,
+     "end": 2396,
+     "status": 200,
+     "aid": "59",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK",
+     "start": 2398,
+     "end": 2414,
+     "status": 200,
+     "aid": "60",
+     "bytes": 120
+    },
+    {
+     "kind": "FWD",
+     "start": 2399,
+     "end": 2413,
+     "status": 200,
+     "aid": "60",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2415,
+     "end": null,
+     "status": null,
+     "aid": "61",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2428,
+     "end": 2443,
+     "status": 200,
+     "aid": "64",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK",
+     "start": 2429,
+     "end": 2444,
+     "status": 200,
+     "aid": "64",
+     "bytes": 121
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 95,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 107,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 119,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 140,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2252,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2268,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2383,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2399,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2399,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2415,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2428,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2428,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2445,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 14,
+   "authMs": 1029,
+   "subscribeToFirstSnapshotMs": 142,
+   "writeAfterFirstSnapshotMs": 2079,
+   "commitMs": 21,
+   "commitToSnapshotMs": 19,
+   "snapshotToRenderMs": 1,
+   "channelOpenToDeliveryMs": 2253,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 10,
+    "endedAfterCommitMs": 19,
+    "bytes": 161
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 84,
+     "status": 200,
+     "aid": null,
+     "bytes": 453
+    },
+    {
+     "kind": "BACK",
+     "start": 86,
+     "end": 98,
+     "status": 200,
+     "aid": "0",
+     "bytes": 255
+    },
+    {
+     "kind": "BACK",
+     "start": 99,
+     "end": 112,
+     "status": 200,
+     "aid": "5",
+     "bytes": 593
+    },
+    {
+     "kind": "BACK",
+     "start": 113,
+     "end": 126,
+     "status": 200,
+     "aid": "10",
+     "bytes": 2771
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 127,
+     "end": null,
+     "status": null,
+     "aid": "52",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2244,
+     "end": 2253,
+     "status": 200,
+     "aid": "54",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2254,
+     "end": null,
+     "status": null,
+     "aid": "55",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2386,
+     "end": 2395,
+     "status": 200,
+     "aid": "57",
+     "bytes": 161
+    },
+    {
+     "kind": "FWD",
+     "start": 2396,
+     "end": 2411,
+     "status": 200,
+     "aid": "58",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2396,
+     "end": null,
+     "status": null,
+     "aid": "58",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2413,
+     "end": null,
+     "status": null,
+     "aid": "60",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2424,
+     "end": null,
+     "status": null,
+     "aid": "62",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2439,
+     "end": 2446,
+     "status": 200,
+     "aid": "64",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK",
+     "start": 2440,
+     "end": 2452,
+     "status": 200,
+     "aid": "64",
+     "bytes": 123
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 86,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 99,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 112,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 134,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2244,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2253,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2386,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2397,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2397,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2412,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2424,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2438,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2439,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2453,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 15,
+   "authMs": 1084,
+   "subscribeToFirstSnapshotMs": 181,
+   "writeAfterFirstSnapshotMs": 2051,
+   "commitMs": 25,
+   "commitToSnapshotMs": 20,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2269,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 12,
+    "endedAfterCommitMs": 20,
+    "bytes": 161
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 136,
+     "status": 200,
+     "aid": null,
+     "bytes": 452
+    },
+    {
+     "kind": "BACK",
+     "start": 138,
+     "end": 150,
+     "status": 200,
+     "aid": "0",
+     "bytes": 690
+    },
+    {
+     "kind": "BACK",
+     "start": 152,
+     "end": 165,
+     "status": 200,
+     "aid": "10",
+     "bytes": 2750
+    },
+    {
+     "kind": "BACK",
+     "start": 167,
+     "end": 175,
+     "status": 200,
+     "aid": "52",
+     "bytes": 240
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 176,
+     "end": null,
+     "status": null,
+     "aid": "54",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2261,
+     "end": 2269,
+     "status": 200,
+     "aid": "56",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2269,
+     "end": null,
+     "status": null,
+     "aid": "57",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2403,
+     "end": null,
+     "status": null,
+     "aid": "59",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2420,
+     "end": 2434,
+     "status": 200,
+     "aid": "60",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK",
+     "start": 2422,
+     "end": 2435,
+     "status": 200,
+     "aid": "60",
+     "bytes": 120
+    },
+    {
+     "kind": "BACK",
+     "start": 2437,
+     "end": 2449,
+     "status": 200,
+     "aid": "61",
+     "bytes": 300
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2450,
+     "end": null,
+     "status": null,
+     "aid": "64",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2451,
+     "end": 2466,
+     "status": 200,
+     "aid": "64",
+     "bytes": 50
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 140,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 152,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 174,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 177,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2260,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2269,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2402,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2423,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2423,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2440,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2452,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2452,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2467,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 16,
+   "authMs": 1112,
+   "subscribeToFirstSnapshotMs": 133,
+   "writeAfterFirstSnapshotMs": 2096,
+   "commitMs": 38,
+   "commitToSnapshotMs": 5,
+   "snapshotToRenderMs": 2,
+   "channelOpenToDeliveryMs": 2264,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 148,
+    "endedAfterCommitMs": 156,
+    "bytes": 161
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 82,
+     "status": 200,
+     "aid": null,
+     "bytes": 452
+    },
+    {
+     "kind": "BACK",
+     "start": 84,
+     "end": 95,
+     "status": 200,
+     "aid": "0",
+     "bytes": 542
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 97,
+     "end": null,
+     "status": null,
+     "aid": "7",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 109,
+     "end": 118,
+     "status": 200,
+     "aid": "10",
+     "bytes": 2773
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 119,
+     "end": null,
+     "status": null,
+     "aid": "52",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2269,
+     "end": null,
+     "status": null,
+     "aid": "55",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2407,
+     "end": 2415,
+     "status": 200,
+     "aid": "57",
+     "bytes": 161
+    },
+    {
+     "kind": "FWD",
+     "start": 2418,
+     "end": 2427,
+     "status": 200,
+     "aid": "58",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK",
+     "start": 2418,
+     "end": 2433,
+     "status": 200,
+     "aid": "58",
+     "bytes": 120
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2431,
+     "end": null,
+     "status": null,
+     "aid": "59",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2460,
+     "end": 2471,
+     "status": 200,
+     "aid": "61",
+     "bytes": 202
+    },
+    {
+     "kind": "FWD",
+     "start": 2473,
+     "end": 2482,
+     "status": 200,
+     "aid": "63",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK",
+     "start": 2474,
+     "end": 2490,
+     "status": 200,
+     "aid": "63",
+     "bytes": 123
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 84,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 97,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 109,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 125,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2270,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2407,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2418,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2418,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2431,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2459,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2474,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2474,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2489,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 17,
+   "authMs": 1106,
+   "subscribeToFirstSnapshotMs": 136,
+   "writeAfterFirstSnapshotMs": 2095,
+   "commitMs": 28,
+   "commitToSnapshotMs": 24,
+   "snapshotToRenderMs": 1,
+   "channelOpenToDeliveryMs": 2276,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 7,
+    "endedAfterCommitMs": 24,
+    "bytes": 161
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 88,
+     "status": 200,
+     "aid": null,
+     "bytes": 451
+    },
+    {
+     "kind": "BACK",
+     "start": 90,
+     "end": 120,
+     "status": 200,
+     "aid": "0",
+     "bytes": 3081
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 122,
+     "end": null,
+     "status": null,
+     "aid": "52",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2259,
+     "end": 2276,
+     "status": 200,
+     "aid": "54",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2277,
+     "end": null,
+     "status": null,
+     "aid": "55",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2417,
+     "end": null,
+     "status": null,
+     "aid": "57",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2448,
+     "end": 2464,
+     "status": 200,
+     "aid": "58",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK",
+     "start": 2450,
+     "end": 2463,
+     "status": 200,
+     "aid": "58",
+     "bytes": 120
+    },
+    {
+     "kind": "BACK",
+     "start": 2470,
+     "end": 2510,
+     "status": 200,
+     "aid": "59",
+     "bytes": 301
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2508,
+     "end": null,
+     "status": null,
+     "aid": "62",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2509,
+     "end": 2523,
+     "status": 200,
+     "aid": "62",
+     "bytes": 50
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 103,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 129,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2257,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2276,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2414,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2448,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2449,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2492,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2509,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2509,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2524,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 18,
+   "authMs": 1106,
+   "subscribeToFirstSnapshotMs": 126,
+   "writeAfterFirstSnapshotMs": 2103,
+   "commitMs": 23,
+   "commitToSnapshotMs": 21,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2265,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 11,
+    "endedAfterCommitMs": 20,
+    "bytes": 159
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 90,
+     "status": 200,
+     "aid": null,
+     "bytes": 452
+    },
+    {
+     "kind": "BACK",
+     "start": 91,
+     "end": 100,
+     "status": 200,
+     "aid": "0",
+     "bytes": 255
+    },
+    {
+     "kind": "BACK",
+     "start": 102,
+     "end": 110,
+     "status": 200,
+     "aid": "5",
+     "bytes": 3023
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 112,
+     "end": null,
+     "status": null,
+     "aid": "52",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2255,
+     "end": 2264,
+     "status": 200,
+     "aid": "54",
+     "bytes": 159
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2265,
+     "end": null,
+     "status": null,
+     "aid": "55",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2396,
+     "end": 2407,
+     "status": 200,
+     "aid": "57",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2407,
+     "end": null,
+     "status": null,
+     "aid": "58",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2408,
+     "end": 2419,
+     "status": 200,
+     "aid": "58",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2420,
+     "end": null,
+     "status": null,
+     "aid": "60",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2434,
+     "end": 2447,
+     "status": 200,
+     "aid": "62",
+     "bytes": 202
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2447,
+     "end": null,
+     "status": null,
+     "aid": "64",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2448,
+     "end": 2458,
+     "status": 200,
+     "aid": "64",
+     "bytes": 50
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 92,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 101,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 118,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2255,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2265,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2395,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2408,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2408,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2420,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2433,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2448,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2448,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2460,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 19,
+   "authMs": 1095,
+   "subscribeToFirstSnapshotMs": 139,
+   "writeAfterFirstSnapshotMs": 2083,
+   "commitMs": 27,
+   "commitToSnapshotMs": 20,
+   "snapshotToRenderMs": 1,
+   "channelOpenToDeliveryMs": 2261,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 2,
+    "endedAfterCommitMs": 20,
+    "bytes": 161
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 82,
+     "status": 200,
+     "aid": null,
+     "bytes": 452
+    },
+    {
+     "kind": "BACK",
+     "start": 85,
+     "end": 103,
+     "status": 200,
+     "aid": "0",
+     "bytes": 602
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 104,
+     "end": null,
+     "status": null,
+     "aid": "7",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 132,
+     "end": null,
+     "status": null,
+     "aid": "52",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2243,
+     "end": 2261,
+     "status": 200,
+     "aid": "54",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2262,
+     "end": null,
+     "status": null,
+     "aid": "55",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2422,
+     "end": 2495,
+     "status": 200,
+     "aid": "57",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK",
+     "start": 2494,
+     "end": 2511,
+     "status": 200,
+     "aid": "58",
+     "bytes": 118
+    },
+    {
+     "kind": "FWD",
+     "start": 2495,
+     "end": 2509,
+     "status": 200,
+     "aid": "58",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2513,
+     "end": null,
+     "status": null,
+     "aid": "59",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2528,
+     "end": 2546,
+     "status": 200,
+     "aid": "62",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK",
+     "start": 2529,
+     "end": 2546,
+     "status": 200,
+     "aid": "62",
+     "bytes": 121
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 86,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 105,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 132,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2243,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2262,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2449,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2496,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2496,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2513,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2529,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2529,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2549,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 20,
+   "authMs": 1116,
+   "subscribeToFirstSnapshotMs": 133,
+   "writeAfterFirstSnapshotMs": 2105,
+   "commitMs": 20,
+   "commitToSnapshotMs": 28,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2276,
+   "deliveringBackchannel": {
+    "startedAfterCommitMs": 17,
+    "endedAfterCommitMs": 27,
+    "bytes": 161
+   },
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 87,
+     "status": 200,
+     "aid": null,
+     "bytes": 452
+    },
+    {
+     "kind": "BACK",
+     "start": 89,
+     "end": 102,
+     "status": 200,
+     "aid": "0",
+     "bytes": 2844
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 104,
+     "end": null,
+     "status": null,
+     "aid": "47",
+     "bytes": null
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 123,
+     "end": null,
+     "status": null,
+     "aid": "52",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2265,
+     "end": 2275,
+     "status": 200,
+     "aid": "54",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2276,
+     "end": null,
+     "status": null,
+     "aid": "55",
+     "bytes": null
+    },
+    {
+     "kind": "BACK",
+     "start": 2386,
+     "end": 2394,
+     "status": 200,
+     "aid": "57",
+     "bytes": 161
+    },
+    {
+     "kind": "BACK",
+     "start": 2395,
+     "end": 2405,
+     "status": 200,
+     "aid": "58",
+     "bytes": 118
+    },
+    {
+     "kind": "FWD",
+     "start": 2396,
+     "end": 2405,
+     "status": 200,
+     "aid": "58",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK",
+     "start": 2406,
+     "end": 2414,
+     "status": 200,
+     "aid": "59",
+     "bytes": 247
+    },
+    {
+     "kind": "BACK-FAILED",
+     "start": 2416,
+     "end": null,
+     "status": null,
+     "aid": "61",
+     "bytes": null
+    },
+    {
+     "kind": "FWD",
+     "start": 2431,
+     "end": 2451,
+     "status": 200,
+     "aid": "63",
+     "bytes": 50
+    },
+    {
+     "kind": "BACK",
+     "start": 2440,
+     "end": 2455,
+     "status": 200,
+     "aid": "63",
+     "bytes": 123
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 91,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 107,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 125,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2265,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2276,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2386,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2396,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2396,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2406,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2416,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2438,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 2439,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "BACK",
+     "at": 2455,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:81a::200a]"
+    }
+   ],
+   "errors": []
+  }
+ ]
+}
