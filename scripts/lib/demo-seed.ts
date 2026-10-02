@@ -1,5 +1,5 @@
-// Dados de demonstração CLARAMENTE FICTÍCIOS, só para emulador local (demo-*). Isolados em `demoProducts`,
-// fora de relatórios reais. Usado por scripts/seed.ts e pelos testes (e2e/integração). Escreve com o token
+// Dados de demonstração CLARAMENTE FICTÍCIOS (nomes "(exemplo)", IDs `*_exemplo_*`), só para emulador local (demo-*)
+// e, pelo harness, para a homologação. Nunca usados em produção. Usado por scripts/seed.ts e pelos testes. Escreve com o token
 // "owner" do emulador, que ignora Rules — por isso recusa qualquer alvo que não seja loopback. As fotos vão para o
 // armazenamento local de emulator (mesmo diretório que o servidor de dev/e2e lê), nunca para um bucket real.
 import { deflateSync, crc32 } from "node:zlib";
@@ -74,21 +74,81 @@ export type DemoProduct = {
   name: string;
   description: string;
   priceCents: number;
-  category: string;
-  available: boolean;
-  special: string | null;
+  categoryId: string;
+  channels: ("advance" | "counter")[];
+  shiftIds: string[];
+  availabilityMode: "physical" | "planned";
+  status: "active" | "inactive";
   color: [number, number, number] | null;
 };
 
+/** Turnos e categorias de exemplo com IDs fixos (re-executável) e as mesmas chaves de unicidade dos comandos reais. */
+export const DEMO_SHIFTS = [
+  { id: "shf_exemplo_manha", name: "Manhã (exemplo)", slug: "manha-exemplo" },
+  { id: "shf_exemplo_tarde", name: "Tarde (exemplo)", slug: "tarde-exemplo" },
+] as const;
+export const DEMO_CATEGORIES = [
+  { id: "cat_exemplo_bebidas", name: "Bebidas (exemplo)", slug: "bebidas-exemplo" },
+  { id: "cat_exemplo_lanches", name: "Lanches (exemplo)", slug: "lanches-exemplo" },
+  { id: "cat_exemplo_especiais", name: "Especiais (exemplo)", slug: "especiais-exemplo" },
+] as const;
+const BOTH_SHIFTS = DEMO_SHIFTS.map((s) => s.id);
+
+/**
+ * Catálogo fictício no modelo real (F06): cobre os dois modos, os dois canais, turno restrito, produto só de
+ * balcão (sem foto, para o fallback) e um produto desativado.
+ */
 export const DEMO_PRODUCTS: readonly DemoProduct[] = [
-  { id: "demo-suco", name: "Suco de laranja (exemplo)", description: "Copo de 300 ml, sem açúcar adicionado.", priceCents: 450, category: "Bebidas", available: true, special: null, color: [244, 162, 70] },
-  { id: "demo-pao", name: "Pão com queijo (exemplo)", description: "Pão macio com queijo, servido quente.", priceCents: 650, category: "Lanches", available: true, special: null, color: [214, 170, 112] },
-  { id: "demo-fruta", name: "Salada de frutas (exemplo)", description: "Porção individual de frutas da estação.", priceCents: 500, category: "Lanches", available: true, special: null, color: [122, 180, 110] },
-  { id: "demo-bolo", name: "Bolo de cenoura (exemplo)", description: "Fatia com cobertura, só neste dia.", priceCents: 550, category: "Especiais", available: false, special: "Especial · sexta, manhã", color: null },
+  { id: "prd_exemplo_suco", name: "Suco de laranja (exemplo)", description: "Copo de 300 ml, sem açúcar adicionado.", priceCents: 450, categoryId: "cat_exemplo_bebidas", channels: ["advance", "counter"], shiftIds: BOTH_SHIFTS, availabilityMode: "physical", status: "active", color: [244, 162, 70] },
+  { id: "prd_exemplo_pao", name: "Pão com queijo (exemplo)", description: "Pão macio com queijo, servido quente.", priceCents: 650, categoryId: "cat_exemplo_lanches", channels: ["advance", "counter"], shiftIds: BOTH_SHIFTS, availabilityMode: "planned", status: "active", color: [214, 170, 112] },
+  { id: "prd_exemplo_fruta", name: "Salada de frutas (exemplo)", description: "Porção individual de frutas da estação.", priceCents: 500, categoryId: "cat_exemplo_lanches", channels: ["advance"], shiftIds: ["shf_exemplo_manha"], availabilityMode: "planned", status: "active", color: [122, 180, 110] },
+  { id: "prd_exemplo_bolo", name: "Bolo de cenoura (exemplo)", description: "Fatia com cobertura, vendida no balcão.", priceCents: 550, categoryId: "cat_exemplo_especiais", channels: ["counter"], shiftIds: ["shf_exemplo_manha"], availabilityMode: "planned", status: "active", color: null },
+  { id: "prd_exemplo_pipoca", name: "Pipoca (exemplo)", description: "Saquinho individual.", priceCents: 300, categoryId: "cat_exemplo_especiais", channels: ["advance", "counter"], shiftIds: BOTH_SHIFTS, availabilityMode: "physical", status: "inactive", color: null },
 ];
 
 export function demoPhotoPath(productId: string): string {
   return `products/${productId}/demo.png`;
+}
+
+type Plain = string | number | boolean | null | Plain[];
+
+/** Documentos do catálogo fictício (sem timestamps: o seed não depende do relógio). Fotos são tratadas à parte. */
+export function demoCatalogDocs(): { path: string; data: Record<string, Plain> }[] {
+  const docs: { path: string; data: Record<string, Plain> }[] = [];
+  for (const shift of DEMO_SHIFTS) {
+    docs.push({ path: `shifts/${shift.id}`, data: { name: shift.name, nameSlug: shift.slug, status: "active" } });
+    docs.push({ path: `uniquenessKeys/shift_${shift.slug}`, data: { unitId: shift.id, kind: "shift" } });
+  }
+  for (const category of DEMO_CATEGORIES) {
+    docs.push({ path: `categories/${category.id}`, data: { name: category.name, nameSlug: category.slug, status: "active" } });
+    docs.push({ path: `uniquenessKeys/category_${category.slug}`, data: { categoryId: category.id } });
+  }
+  for (const p of DEMO_PRODUCTS) {
+    const slug = p.name.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    docs.push({
+      path: `products/${p.id}`,
+      data: {
+        name: p.name,
+        nameSlug: slug,
+        description: p.description,
+        categoryId: p.categoryId,
+        priceCents: p.priceCents,
+        priceVersion: 1,
+        channels: p.channels,
+        shiftIds: p.shiftIds,
+        availabilityMode: p.availabilityMode,
+        status: p.status,
+        version: 1,
+        photoPath: p.color ? demoPhotoPath(p.id) : null,
+        createdBy: "seed",
+        updatedBy: "seed",
+      },
+    });
+    docs.push({ path: `products/${p.id}/priceHistory/v1`, data: { productId: p.id, priceVersion: 1, priceCents: p.priceCents, previousPriceCents: null, reason: "Cadastro inicial", changedBy: "seed" } });
+    docs.push({ path: `productPrivate/${p.id}`, data: { defaultSupplier: "Fornecedor fictício", internalNotes: "", updatedBy: "seed" } });
+    docs.push({ path: `uniquenessKeys/product_${slug}`, data: { productId: p.id } });
+  }
+  return docs;
 }
 
 async function expectOk(response: Response, what: string): Promise<void> {
@@ -101,8 +161,6 @@ export type DemoProfile = {
   permissions?: string[];
   displayName?: string;
 };
-
-type Plain = string | number | boolean | null | Plain[];
 
 function toValue(value: Plain): Record<string, unknown> {
   if (value === null) return { nullValue: null };
@@ -159,24 +217,14 @@ async function uploadPhoto(target: EmulatorTarget, key: string, data: Buffer): P
   }
 }
 
-/** Grava o catálogo fictício e as fotos de exemplo (um produto fica sem foto para exercitar o fallback). Idempotente. */
+/**
+ * Grava o catálogo fictício (modelo real da F06: categorias, turnos, produtos, histórico de preço e dados internos) e
+ * as fotos de exemplo. Re-executável: restaura o estado inicial dos documentos de exemplo.
+ */
 export async function seedDemoCatalog(target: EmulatorTarget = DEFAULT_TARGET): Promise<void> {
   assertLocal(target);
   for (const product of DEMO_PRODUCTS) {
-    const photoPath = product.color ? demoPhotoPath(product.id) : null;
-    if (product.color && photoPath) await uploadPhoto(target, photoPath, makePng(240, 180, product.color));
-    const fields: Record<string, unknown> = {
-      name: { stringValue: product.name },
-      description: { stringValue: product.description },
-      priceCents: { integerValue: String(product.priceCents) },
-      category: { stringValue: product.category },
-      available: { booleanValue: product.available },
-      special: product.special ? { stringValue: product.special } : { nullValue: null },
-      photoPath: photoPath ? { stringValue: photoPath } : { nullValue: null },
-      isDemo: { booleanValue: true },
-    };
-    const url = `http://${target.firestoreHost}/v1/projects/${target.project}/databases/(default)/documents/demoProducts/${product.id}`;
-    const response = await fetch(url, { method: "PATCH", headers: { "content-type": "application/json", ...OWNER }, body: JSON.stringify({ fields }) });
-    await expectOk(response, `produto ${product.id}`);
+    if (product.color) await uploadPhoto(target, demoPhotoPath(product.id), makePng(240, 180, product.color));
   }
+  for (const { path, data } of demoCatalogDocs()) await writeDemoDoc(target, path, data);
 }

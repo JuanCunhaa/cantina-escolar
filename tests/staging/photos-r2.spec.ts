@@ -10,7 +10,7 @@ import { bearer } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
-const PRODUCT = "demo-bolo";
+const PRODUCT = "prd_exemplo_bolo";
 let cantina: TestUser;
 let family: TestUser;
 let noProfile: TestUser;
@@ -22,7 +22,7 @@ async function keys(): Promise<string[]> {
   return out.sort();
 }
 
-const photoOf = async () => ((await admin().db.doc(`demoProducts/${PRODUCT}`).get()).data()?.photoPath ?? null) as string | null;
+const photoOf = async () => ((await admin().db.doc(`products/${PRODUCT}`).get()).data()?.photoPath ?? null) as string | null;
 
 test.beforeAll(async () => {
   expect(isCloud()).toBe(true);
@@ -123,7 +123,7 @@ test("o bucket privado não responde a acesso anônimo (A33)", async () => {
   const { storage } = admin().target;
   test.skip(storage.driver !== "r2", "só existe bucket real na homologação");
   if (storage.driver !== "r2") return;
-  const key = (await photoOf()) ?? "products/demo-suco/demo.png";
+  const key = (await photoOf()) ?? "products/prd_exemplo_suco/demo.png";
   for (const url of [`${storage.endpoint}/${storage.bucket}/${key}`, `${storage.endpoint}/${storage.bucket}?list-type=2&prefix=products/`]) {
     const response = await fetch(url);
     expect(response.status, url).toBeGreaterThanOrEqual(400);

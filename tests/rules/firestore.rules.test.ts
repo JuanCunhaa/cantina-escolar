@@ -49,7 +49,10 @@ beforeEach(async () => {
     await setDoc(doc(db, "foundationProbes/familyB"), { balanceCents: 900 });
     await setDoc(doc(db, "wallets/student1"), { balanceCents: 1000 });
     await setDoc(doc(db, "idempotencyRecords/x"), { payloadHash: "h" });
-    await setDoc(doc(db, "demoProducts/p1"), { name: "Exemplo", priceCents: 450 });
+    await setDoc(doc(db, "products/p1"), { name: "Exemplo", priceCents: 450, status: "active" });
+    await setDoc(doc(db, "products/p1/priceHistory/v1"), { priceCents: 450, changedBy: "s1" });
+    await setDoc(doc(db, "productPrivate/p1"), { defaultSupplier: "Fornecedor X", internalNotes: "nota" });
+    await setDoc(doc(db, "categories/c1"), { name: "Bebidas", status: "active" });
     await setDoc(doc(db, "auditLog/a1"), { action: "x" });
     await setDoc(doc(db, "reportingDaily/2026-09-30"), { profitCents: 123 });
     await setDoc(doc(db, "stockReceipts/r1"), { unitCostCents: 99 });
@@ -99,21 +102,63 @@ describe("Firestore rules — F01 (A33)", () => {
     await assertFails(setDoc(doc(a, "students/s1"), { name: "x" }));
     await assertFails(setDoc(doc(a, "stockBalances/p1"), { qty: 1000 }));
     await assertFails(setDoc(doc(a, "products/p1"), { priceCents: 1 }));
+    await assertFails(getDoc(doc(a, "productPrivate/p1")));
     await assertFails(getDoc(doc(a, "auditLog/a1")));
   });
 });
 
-describe("Firestore rules — catálogo de demonstração (F02/F03)", () => {
-  it("conta com perfil ativo lê; anônimo, sem perfil e desativada não; ninguém escreve pelo cliente", async () => {
-    const staff = (await as("s1", "admin")).firestore();
+describe("Firestore rules — catálogo (F06; A33/A36)", () => {
+  it("cadastro público e categorias: conta com perfil ativo lê; anônimo, sem perfil e desativada não", async () => {
     const guardian = (await as("familyA", "guardian")).firestore();
-    await assertSucceeds(getDoc(doc(guardian, "demoProducts/p1")));
-    await assertSucceeds(getDocs(collection(guardian, "demoProducts")));
-    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "demoProducts/p1")));
-    await assertFails(getDoc(doc(env.authenticatedContext("semPerfil").firestore(), "demoProducts/p1")));
-    await assertFails(getDoc(doc((await as("off", "guardian", "disabled")).firestore(), "demoProducts/p1")));
-    await assertFails(updateDoc(doc(staff, "demoProducts/p1"), { photoPath: "products/p1/x.png" }));
-    await assertFails(setDoc(doc(guardian, "demoProducts/p2"), { priceCents: 1 }));
+    const student = (await as("aluno1", "student")).firestore();
+    for (const db of [guardian, student]) {
+      await assertSucceeds(getDoc(doc(db, "products/p1")));
+      await assertSucceeds(getDocs(query(collection(db, "products"), where("status", "==", "active"))));
+      await assertSucceeds(getDocs(collection(db, "categories")));
+    }
+    for (const path of ["products/p1", "categories/c1"]) {
+      await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), path)));
+      await assertFails(getDoc(doc(env.authenticatedContext("semPerfil").firestore(), path)));
+      await assertFails(getDoc(doc((await as("off", "guardian", "disabled")).firestore(), path)));
+    }
+  });
+
+  it("fornecedor/observações internas: só administração; família, aluno, cantina e secretaria não leem", async () => {
+    await assertSucceeds(getDoc(doc((await as("adm", "admin")).firestore(), "productPrivate/p1")));
+    await assertSucceeds(getDocs(collection((await as("adm", "admin")).firestore(), "productPrivate")));
+    for (const [uid, role] of [["familyA", "guardian"], ["aluno1", "student"], ["cz", "cantina"], ["sec", "secretaria"]] as const) {
+      const db = (await as(uid, role)).firestore();
+      await assertFails(getDoc(doc(db, "productPrivate/p1")));
+      await assertFails(getDocs(collection(db, "productPrivate")));
+    }
+    await assertFails(getDoc(doc(env.authenticatedContext("forjado", { role: "admin" }).firestore(), "productPrivate/p1")));
+  });
+
+  it("histórico de preço: cantina e administração leem; família, aluno e secretaria não", async () => {
+    await assertSucceeds(getDocs(collection((await as("cz", "cantina")).firestore(), "products/p1/priceHistory")));
+    await assertSucceeds(getDoc(doc((await as("adm", "admin")).firestore(), "products/p1/priceHistory/v1")));
+    for (const [uid, role] of [["familyA", "guardian"], ["aluno1", "student"], ["sec", "secretaria"]] as const) {
+      await assertFails(getDocs(collection((await as(uid, role)).firestore(), "products/p1/priceHistory")));
+    }
+  });
+
+  it("ninguém escreve catálogo pelo cliente (preço, histórico, categoria, dados internos), nem a administração", async () => {
+    const admin = (await as("adm", "admin")).firestore();
+    const guardian = (await as("familyA", "guardian")).firestore();
+    for (const db of [admin, guardian]) {
+      await assertFails(updateDoc(doc(db, "products/p1"), { priceCents: 1 }));
+      await assertFails(setDoc(doc(db, "products/p2"), { name: "Novo", priceCents: 1 }));
+      await assertFails(deleteDoc(doc(db, "products/p1")));
+      await assertFails(updateDoc(doc(db, "products/p1/priceHistory/v1"), { priceCents: 1 }));
+      await assertFails(setDoc(doc(db, "products/p1/priceHistory/v2"), { priceCents: 1 }));
+      await assertFails(deleteDoc(doc(db, "products/p1/priceHistory/v1")));
+      await assertFails(setDoc(doc(db, "categories/c2"), { name: "X" }));
+      await assertFails(setDoc(doc(db, "productPrivate/p1"), { defaultSupplier: "Y" }));
+    }
+  });
+
+  it("o catálogo de demonstração antigo (demoProducts) não é mais legível", async () => {
+    await assertFails(getDoc(doc((await as("familyA", "guardian")).firestore(), "demoProducts/p1")));
   });
 });
 
@@ -121,10 +166,10 @@ describe("Firestore rules — foto do produto só pelo servidor e claim forjada 
   it("nenhum cliente (nem equipe) grava metadados de foto; claim de papel no token não concede leitura sem perfil", async () => {
     const staff = (await as("staff-photo", "cantina")).firestore();
     for (const fields of [{ photoPath: "products/p1/x.png" }, { photoSha256: "0".repeat(64) }, { photoUpdatedBy: "staff-photo" }]) {
-      await assertFails(updateDoc(doc(staff, "demoProducts/p1"), fields));
+      await assertFails(updateDoc(doc(staff, "products/p1"), fields));
     }
     const forged = env.authenticatedContext("forjado", { role: "admin" });
-    await assertFails(getDoc(doc(forged.firestore(), "demoProducts/p1")));
+    await assertFails(getDoc(doc(forged.firestore(), "products/p1")));
   });
 });
 
@@ -273,7 +318,7 @@ describe("Firestore rules — alunos, vínculos e políticas (F03; A02/A33)", ()
     await setProfile("f9", "cantina", "disabled");
     await assertFails(getDoc(doc(db, "studentPolicies/s1")));
     await assertFails(getDoc(doc(db, "students/s1")));
-    await assertFails(getDoc(doc(db, "demoProducts/p1")));
+    await assertFails(getDoc(doc(db, "products/p1")));
   });
 });
 

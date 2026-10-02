@@ -15,7 +15,7 @@ test.beforeAll(async () => {
   else await seedDemoCatalog(DEFAULT_TARGET);
 });
 
-test("portal: cardápio fictício com fotos, fallback, indisponibilidade e total em BRL (A36/A37)", async ({ page }) => {
+test("portal: catálogo real (fictício) com fotos, fallback, canal só balcão, turno e total em BRL (A36/A37)", async ({ page }) => {
   const family = await createTestUser("e2e-familia", "guardian");
   await login(page, "/portal/cardapio", family.email);
 
@@ -33,10 +33,13 @@ test("portal: cardápio fictício com fotos, fallback, indisponibilidade e total
   }
   await expect(page.locator('[data-fallback="true"]')).toHaveCount(1);
   await expect(page.getByRole("img", { name: /Bolo de cenoura.*sem foto/ })).toBeVisible();
-  await expect(page.getByText("Indisponível")).toBeVisible();
-  await expect(page.getByText("Especial · sexta, manhã")).toBeVisible();
+  await expect(page.getByText("Só no balcão")).toBeVisible();
+  await expect(page.getByText("Só Manhã (exemplo)", { exact: true }).first()).toBeVisible();
+  // Produto desativado não aparece para a família; custo/fornecedor nunca chegam à tela.
+  await expect(page.getByText("Pipoca (exemplo)")).toHaveCount(0);
+  await expect(page.getByText("Fornecedor fictício")).toHaveCount(0);
 
-  // Quantidade e total respondem imediatamente; produto indisponível não tem controle.
+  // Quantidade e total respondem imediatamente; produto só de balcão não tem controle no portal.
   await page.getByRole("button", { name: "Aumentar Suco de laranja (exemplo)" }).click();
   await page.getByRole("button", { name: "Aumentar Suco de laranja (exemplo)" }).click();
   await page.getByRole("button", { name: "Aumentar Pão com queijo (exemplo)" }).click();

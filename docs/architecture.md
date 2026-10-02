@@ -33,7 +33,7 @@ Exemplo de estrutura, adaptável sem seguir mecanicamente:
 - src/lib/firebase/admin.ts: Admin SDK com server-only.
 - src/lib/money, dates, validation: utilitários compartilhados bem definidos.
 - firebase/firestore.rules, firestore.indexes.json: regras e índices versionados (não há mais storage.rules).
-- src/lib/storage: contrato `ObjectStore` + implementação R2 (staging/production) e disco local só para emulator; src/modules/catalog/photo*.ts: regras de negócio de fotos.
+- src/lib/storage: contrato `ObjectStore` + implementação R2 (staging/production) e disco local só para emulator; src/modules/catalog/photo*.ts: regras de negócio de fotos; src/modules/catalog/{model,commands}.ts: catálogo (F06) — validação, comandos idempotentes e leitura canônica de venda.
 - scripts: bootstrap, migrações documentais, reconciliação e seed TypeScript.
 - tests: domínio, integração, rules e E2E.
 - functions: somente se existir necessidade real de Functions, inteiramente TypeScript.

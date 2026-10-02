@@ -1,6 +1,6 @@
 # Estado do desenvolvimento
 
-Data de referência: 01/10/2026. Este arquivo descreve código entregue, não apenas intenção.
+Data de referência: 02/10/2026. Este arquivo descreve código entregue, não apenas intenção.
 
 ## Concluído
 - F01 — fundação técnica e prova de isolamento (escopo implementado; critérios A32–A35 seguem parciais).
@@ -8,9 +8,20 @@ Data de referência: 01/10/2026. Este arquivo descreve código entregue, não ap
 - F03 — autenticação, papéis e autorização (escopo implementado; A02/A08/A30/A33/A34 parciais, ver abaixo).
 - F04 — alunos, responsáveis, vínculos e convites (escopo implementado; A01/A02/A30/A33 parciais, ver abaixo).
 - F05 — escola, calendário e datas locais (escopo implementado; A12/A13/A14 parciais, ver abaixo).
+- F06 — catálogo, preço histórico e canais (escopo implementado na branch `feature/f06-catalogo`, PR aberto para revisão; A16/A36/A37 parciais, A15 é da F07).
 
 ## Em andamento
-- Nenhuma. Próximas elegíveis: F06 (catálogo) e F08 (carteira); F07 e F09 exigem também F06/F08 (conferir docs/tasks/index.md). Nenhuma iniciada nesta sessão.
+- Nenhuma. F06 aguarda revisão/merge do PR (sem merge automático). Próximas elegíveis após o merge: F07 (cardápio) e F08 (carteira). F07 não iniciada.
+
+## F06 — catálogo, preço histórico e canais (02/10/2026)
+- Entregue: `categories`, `products` (cadastro PÚBLICO: nome, descrição, categoria, `priceCents`+`priceVersion`, canais `advance`/`counter`, turnos, modo `physical`/`planned`, situação, foto), `products/{id}/priceHistory/v{n}` (imutável) e `productPrivate` (fornecedor/observações/motivo de desativação, só administração). Comandos idempotentes `POST /api/catalog/products` (create/update/setPrice/deactivate/reactivate; `expectedVersion`/`expectedPriceVersion`) e `POST /api/catalog/categories` (create/rename/archive/restore), capacidade nova `catalog.manage` (só admin), auditoria; sem exclusão. `readSellableProducts`/`evaluateSellable` = leitura canônica para F11/F15 (snapshot do item fica no checkout). Fotos pelo módulo R2 existente agora no produto real; rota sem armazenamento configurado → 503. `demoProducts` (regra, hook, tela) removido; seed/harness criam catálogo fictício `(exemplo)` no modelo real.
+- Telas: /operacao/produtos (filtros, tabela que vira blocos a 375 px, cadastro/edição, preço com motivo e histórico, desativar/reativar, foto; cantina só consulta/histórico/foto) com categorias; /portal/cardapio com catálogo real (sem custo/fornecedor; "Só no balcão"; etiqueta de turno). Capturas inspecionadas: test-results/f06-{portal,operacao}-{375,1280}.png.
+- Arquivos: src/modules/catalog/{model,commands,use-catalog}.ts, components/{product-catalog,product-form,category-manager,photo-upload,menu-view}.tsx, src/app/api/catalog/{products,categories}/route.ts, photo route/photo.ts/photo-sweep.ts, firebase/firestore.rules, scripts/lib/demo-seed.ts, tests/{unit/catalog,integration/catalog-api,e2e/catalog}.ts + testes adaptados; docs/firebase/{schema,queries,security-rules}.md, docs/decisions.md ("Decisões de F06").
+- Validação local (emulador, execução única após a última mudança de código; logs .agent-logs/f06-*.log): typecheck 0; lint 0; unit 112/112; rules 28/28; integration 115/115 (inclui 6 preços simultâneos → 1×200 + 5×409, replay/conflito de chave, arquivar categoria × criar produto concorrentes); e2e 19/19; build:webpack 0; audit:prod 0; Gitleaks (src/tests/scripts/firebase) 0. Semgrep: só no CI.
+- Homologação dirigida (dados fictícios): Rules publicadas no `cantina-escolar-hml` (`npm run staging:deploy`); `staging:verify` com catalog/shell-photos/access + photos-r2/isolation contra Firebase HML + R2 `cantina-fotos-staging`: 22/22 (2,6 min).
+- Revisão de segurança (cantina-security): achado corrigido — motivo/autor da desativação iam para o documento público; movidos para `productPrivate`. Uids de autor (createdBy/updatedBy/photoUpdatedBy) seguem no público (não são segredo).
+- Skills invocadas via ferramenta Skill: cantina-token-economy, cantina-testing, cantina-firebase, cantina-ui, cantina-security, cantina-verify.
+- Pendências F06: o HML publicado a partir da `main` (código F05) não lê mais `demoProducts` com as Rules novas — o cardápio dele falha até o merge; objetos antigos `products/demo-*/demo.png` no R2 HML viraram órfãos (recolher com `POST /api/admin/storage/sweep` `apply`); troca de modo físico/planejado deve ser bloqueada com estoque (F10); cardápio por data/extras/ocultação (A15) é F07; A16 completo depende de F11/F14.
 
 ## Publicação de homologação: GitHub + CI + Vercel (01/10/2026)
 - Repositório privado: https://github.com/JuanCunhaa/cantina-escolar (histórico local enviado; antes: Gitleaks local em histórico e árvore rastreada com redaction = 0 achados; valores dos `.env` locais conferidos ausentes do histórico; só o App ID público do Firebase HML aparece em docs).
@@ -74,7 +85,7 @@ Data de referência: 01/10/2026. Este arquivo descreve código entregue, não ap
 - Sem tela de administração de usuários/funcionários (só API `POST /api/admin/users`); papel `student` só tem portal de consulta.
 - F04: convite não é enviado por e-mail (a escola copia o link; nenhuma integração de e-mail inventada); resgate público sem limitação de taxa própria (WAF/edge em F24); tela de revisão de pedidos futuros após troca de turma/turno depende de pedidos (F11+); edição de contato do responsável e de matrícula não existe (matrícula é imutável); busca por trecho/sobrenome é filtro no navegador sobre a lista carregada; importação testada até 300 linhas (limite 500); Gitleaks/Semgrep não executados.
 - F05: horários vivem em `settings/school` (turno novo fora de manhã/tarde precisa de horário configurado, senão fica indisponível); sem tela de revisão de pedidos afetados (F11); sem sincronização automática de feriados; Gitleaks/Semgrep não executados.
-- Remover `demoProducts`, `/api/catalog/photo` e a regra quando o catálogo real (F06) existir (e estender `referencedPhotoKeys` do sweep de fotos órfãs); remover `/api/probe`/`foundationProbes` quando a carteira real (F08) existir.
+- `demoProducts` removido em F06 (sweep já lê `products`); remover `/api/probe`/`foundationProbes` quando a carteira real (F08) existir.
 - Concorrência no mesmo documento: transações leitura→escrita disputam a promoção do lock (≈3,4 s por impasse no emulador); com `COMMAND_TRANSACTION` 12 escritores/documento passam. Não medido no Firestore real; revalidar na homologação (F24) e ao implementar a carteira (F08).
 - Segurança no CI: Gitleaks e Semgrep (1.179.0, regras `--config=auto` do registry, que podem mudar) executados e verdes. Semgrep AppSec Platform ativo desde 01/10/2026 (`semgrep ci`, segredo `SEMGREP_APP_TOKEN` no GitHub; run 36956590251: 12 achados, 0 bloqueantes). Não bloqueantes a avaliar: actions por tag mutável (fixar SHA), `spawn` com `shell: true` em scripts/staging/run.ts (args internos), MD5 em ETag/integridade do R2 (não é uso criptográfico), basic-ftp e @opentelemetry/core só de desenvolvimento via firebase-tools.
 - Build: Turbopack comprovado no CI e na Vercel; local segue `build:webpack` (SWC nativo bloqueado nesta máquina).
@@ -86,4 +97,5 @@ Data de referência: 01/10/2026. Este arquivo descreve código entregue, não ap
 - Dica de ambiente: `npm run test:e2e` não aceita filtro; para um spec use `npx firebase emulators:exec --only auth,firestore --project demo-cantina "npx playwright test <arquivo>"`. Seed local agora cria também secretaria@/admin@example.test (perfis em `users`).
 
 ## Próxima ação
-- Testar a homologação publicada em https://cantina-escolar-hml.vercel.app (login Vercel + contas fictícias `@hml.example.test`, senhas em `.staging-fixtures.cantina-escolar-hml.local.json`). F06 NÃO iniciada. - (Opcional antes de F06) fechar as pendências manuais acima. - Ler docs/tasks/index.md e executar a próxima tarefa elegível (por exemplo /cantina-task F06 ou F08) em sessão nova.
+- Revisar e fazer merge do PR da F06 (CI verde exigido); depois do merge a Vercel publica o HML e o cardápio volta a funcionar com o catálogo real. Opcional: `POST /api/admin/storage/sweep` com `apply` no HML para remover as fotos demo antigas.
+- Em sessão nova: /cantina-task F07 (cardápio por data/turno) ou F08 (carteira).
