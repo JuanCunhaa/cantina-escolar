@@ -79,3 +79,11 @@ jobs:
         run: |
           pip install semgrep==1.179.0
           semgrep scan --config=auto --error src
+      # Semgrep AppSec Platform: políticas do painel, resultados enviados à conta do dono. O token fica só nesta etapa.
+      # Sem o segredo (ex.: PR do Dependabot) a etapa avisa e não roda; o scan acima continua obrigatório.
+      - name: Semgrep CI (AppSec Platform)
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        run: |
+          if [ -z "$SEMGREP_APP_TOKEN" ]; then echo "::warning::SEMGREP_APP_TOKEN indisponível; semgrep ci não executado."; exit 0; fi
+          semgrep ci
