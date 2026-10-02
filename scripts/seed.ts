@@ -17,7 +17,7 @@ try {
     console.log(`${account.email}: pronta${account.role ? ` (papel ${account.role})` : ""}`);
   }
   await seedDemoCatalog(target);
-  console.log("catálogo fictício (categorias, turnos, produtos) gravado + fotos no armazenamento local.");
+  console.log("catálogo fictício (categorias, turnos, turma, produtos, cardápio padrão e horários dos turnos) gravado + fotos no armazenamento local.");
 } catch (error) {
   console.error(error instanceof Error ? error.message : "seed falhou");
   process.exit(1);

@@ -107,6 +107,18 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // F07: configuração do cardápio (padrão por turno e exceções por data/turno, com motivos internos) — leitura da
+    // operação (cantina e administração); a família recebe só o cardápio RESOLVIDO pelo servidor (GET /api/menu).
+    // Escrita só pelo servidor (administração), com auditoria. Regras novas apenas acrescentam leitura (expandir).
+    match /defaultMenuRules/{productId} {
+      allow get, list: if hasRole(['cantina', 'admin']);
+      allow write: if false;
+    }
+    match /menuOverrides/{overrideId} {
+      allow get, list: if hasRole(['cantina', 'admin']);
+      allow write: if false;
+    }
+
     // Todo o resto (carteira, pedidos, custos, lucro, relatórios, auditoria, idempotência) permanece fechado ao
     // cliente: acesso só por servidor autorizado. Custos/lucro ficarão em coleções de administração (nunca abertas à secretaria).
     match /{document=**} { allow read, write: if false; }

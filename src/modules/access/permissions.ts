@@ -7,6 +7,7 @@ export const CAPABILITIES = [
   "pos.operate",
   "catalog.photos.manage",
   "catalog.manage",
+  "menu.manage",
   "topup.register",
   "topup.reverse",
   "costs.read",

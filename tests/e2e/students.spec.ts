@@ -1,5 +1,6 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { createTestUser, TEST_PASSWORD } from "../helpers/auth-emulator";
+import { warmRoutes } from "../helpers/dev-server.ts";
 
 async function login(page: Page, path: string, email: string, password: string = TEST_PASSWORD) {
   await page.goto(path);
@@ -12,16 +13,13 @@ const tag = Math.random().toString(36).slice(2, 7);
 
 test.describe.configure({ mode: "serial" });
 
-// O servidor de desenvolvimento recarrega a página aberta ao compilar uma rota pela primeira vez; compilar as APIs antes
-// (chamadas sem token, respondidas 401) evita recargas no meio dos fluxos.
+// Rotas e páginas compiladas antes dos fluxos (ver tests/helpers/dev-server.ts): evita recarga das páginas abertas e
+// navegação interrompida no servidor de desenvolvimento.
 test.beforeAll(async ({ request }) => {
-  for (const url of ["/api/school", "/api/students", "/api/students/import", "/api/policies", "/api/links", "/api/invitations", "/api/invitations/redeem", "/api/guardians", "/api/students/x"]) {
-    await request.post(url, { data: {} });
-  }
-  // Páginas também: compilar a rota no meio de um page.goto interrompe a navegação (net::ERR_ABORTED) no servidor de desenvolvimento.
-  for (const url of ["/operacao/alunos", "/operacao/alunos/importar", "/operacao/alunos/x", "/operacao/escola", "/operacao/responsaveis", "/portal/alunos", "/convite"]) {
-    await request.get(url);
-  }
+  await warmRoutes(request, {
+    post: ["/api/school", "/api/students", "/api/students/import", "/api/policies", "/api/links", "/api/invitations", "/api/invitations/redeem", "/api/guardians", "/api/students/x"],
+    get: ["/operacao/alunos", "/operacao/alunos/importar", "/operacao/alunos/x", "/operacao/escola", "/operacao/responsaveis", "/portal/alunos", "/convite"],
+  });
 });
 
 test("administração: turmas, turnos, alunos (homônimos com turma/turno) e importação CSV pela interface", async ({ page }) => {
@@ -90,6 +88,27 @@ test("administração: turmas, turnos, alunos (homônimos com turma/turno) e imp
   await page.goto("/operacao/alunos");
   await page.locator("#filter-text").fill(`pedro lima ${tag}`);
   await expect(page.getByTestId("student-row")).toHaveCount(2);
+});
+
+// Regressão da intermitência vista no CI (F06, "turma duplicada" sem alerta em 5 s): o listener mostra a turma nova ANTES
+// da resposta HTTP do envio; se o campo aceitasse digitação nesse intervalo, a limpeza pós-envio apagaria o texto novo e
+// o clique seguinte enviaria campo vazio (barrado pelo `required`, sem alerta). Segurar a resposta torna a corrida certa.
+test("turmas: o que se digita durante um envio pendente não é descartado; nome repetido mostra o erro (regressão)", async ({ page }) => {
+  const admin = await createTestUser("e2e-adm4-corrida", "admin");
+  await login(page, "/operacao/escola", admin.email);
+  await expect(page.getByRole("heading", { name: "Turmas e turnos" })).toBeVisible({ timeout: 20000 });
+  const classes = page.getByTestId("units-class");
+  await page.route("**/api/school", async (route) => {
+    const response = await route.fetch();
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.fulfill({ response });
+  });
+  await page.locator("#new-class").fill(`7C ${tag}`);
+  await classes.getByRole("button", { name: "Adicionar" }).click();
+  await expect(classes.getByRole("cell", { name: `7C ${tag}`, exact: true })).toBeVisible();
+  await page.locator("#new-class").fill(`7c ${tag}`);
+  await classes.getByRole("button", { name: "Adicionar" }).click();
+  await expect(classes.getByRole("alert")).toContainText("Já existe outra turma/turno com este nome");
 });
 
 async function newContextPage(browser: Browser) {

@@ -21,3 +21,9 @@ Busca por nome: `students` por intervalo de prefixo em `nameNormalized` (custo =
 - Portal: listener `products where status == active` + `categories` (perfil ativo; ordenação no cliente). Operação: listener de `products` inteiro (catálogo de uma escola: dezenas a poucas centenas de documentos) + `productPrivate` só para administração.
 - Histórico de preço: leitura sob demanda `products/{id}/priceHistory orderBy priceVersion desc limit 50` (cantina/administração).
 - Servidor: arquivar categoria consulta `products where categoryId == X and status == active limit 1` na transação; venda lê produtos por ID na transação (`readSellableProducts`).
+
+### Cardápio (F07)
+
+- Portal: `GET /api/menu?studentId=` (responsável vinculado, aluno do próprio cadastro sem `studentId`, equipe) — sem listener; o servidor lê aluno/vínculo/política (3), turno, `settings/school`, `calendarDays` da janela (≤ 8), as 8 exceções `menuOverrides/{data}__{turno}` por ID, `defaultMenuRules where shiftIds array-contains turno`, `products where status == active` e `categories` (≈ 30 + produtos + categorias leituras por abertura/foco da página; escola: dezenas a poucas centenas). A tela busca de novo ao voltar ao foco; o checkout revalida tudo.
+- Operação (cantina/administração): listeners de `defaultMenuRules` (coleção inteira, ≤ nº de produtos), `menuOverrides/{data}__{turno}` (1 documento) e `menuOverrides where date >= hoje orderBy date limit 100`, mais `settings/school` e `calendarDays/{data}` para avisar dia sem funcionamento.
+- Venda (F11/F15): `readMenuForSale` lê por ID na transação — 1 exceção + N produtos + N regras.

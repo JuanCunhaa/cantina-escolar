@@ -82,11 +82,17 @@ export type DemoProduct = {
   color: [number, number, number] | null;
 };
 
-/** Turnos e categorias de exemplo com IDs fixos (re-executável) e as mesmas chaves de unicidade dos comandos reais. */
+/**
+ * Turnos e categorias de exemplo com IDs fixos (re-executável) e as mesmas chaves de unicidade dos comandos reais. Os
+ * turnos de exemplo têm horários próprios em `settings/school.shiftPolicies` (o padrão por nome só vale para
+ * "Manhã"/"Tarde" exatos), com os mesmos limites iniciais de manhã/tarde.
+ */
 export const DEMO_SHIFTS = [
-  { id: "shf_exemplo_manha", name: "Manhã (exemplo)", slug: "manha-exemplo" },
-  { id: "shf_exemplo_tarde", name: "Tarde (exemplo)", slug: "tarde-exemplo" },
+  { id: "shf_exemplo_manha", name: "Manhã (exemplo)", slug: "manha-exemplo", cutoffs: { purchaseCutoff: "07:00", cancelCutoff: "08:00" } },
+  { id: "shf_exemplo_tarde", name: "Tarde (exemplo)", slug: "tarde-exemplo", cutoffs: { purchaseCutoff: "14:00", cancelCutoff: "15:00" } },
 ] as const;
+/** Turma de exemplo para os alunos fictícios criados pelos testes do portal. */
+export const DEMO_CLASS = { id: "cls_exemplo", name: "Turma (exemplo)", slug: "turma-exemplo" } as const;
 export const DEMO_CATEGORIES = [
   { id: "cat_exemplo_bebidas", name: "Bebidas (exemplo)", slug: "bebidas-exemplo" },
   { id: "cat_exemplo_lanches", name: "Lanches (exemplo)", slug: "lanches-exemplo" },
@@ -110,19 +116,27 @@ export function demoPhotoPath(productId: string): string {
   return `products/${productId}/demo.png`;
 }
 
-type Plain = string | number | boolean | null | Plain[];
+type Plain = string | number | boolean | null | Plain[] | { [key: string]: Plain };
 
 /** Mesma chave de unicidade dos comandos reais (src/modules/students/normalize.ts `unitSlug`), sem imports `@/`. */
 export function nameSlug(name: string): string {
   return name.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-/** Documentos do catálogo fictício (sem timestamps: o seed não depende do relógio). Fotos são tratadas à parte. */
+/**
+ * Documentos do catálogo fictício (sem timestamps: o seed não depende do relógio). Fotos são tratadas à parte. Inclui
+ * a turma de exemplo e o cardápio padrão (F07) dos produtos ativos de exemplo em todos os turnos em que são vendidos.
+ */
 export function demoCatalogDocs(): { path: string; data: Record<string, Plain> }[] {
   const docs: { path: string; data: Record<string, Plain> }[] = [];
   for (const shift of DEMO_SHIFTS) {
     docs.push({ path: `shifts/${shift.id}`, data: { name: shift.name, nameSlug: shift.slug, status: "active" } });
     docs.push({ path: `uniquenessKeys/shift_${shift.slug}`, data: { unitId: shift.id, kind: "shift" } });
+  }
+  docs.push({ path: `classes/${DEMO_CLASS.id}`, data: { name: DEMO_CLASS.name, nameSlug: DEMO_CLASS.slug, status: "active" } });
+  docs.push({ path: `uniquenessKeys/class_${DEMO_CLASS.slug}`, data: { unitId: DEMO_CLASS.id, kind: "class" } });
+  for (const p of DEMO_PRODUCTS.filter((product) => product.status === "active")) {
+    docs.push({ path: `defaultMenuRules/${p.id}`, data: { productId: p.id, shiftIds: [...p.shiftIds].sort(), version: 1, updatedBy: "seed" } });
   }
   for (const category of DEMO_CATEGORIES) {
     docs.push({ path: `categories/${category.id}`, data: { name: category.name, nameSlug: category.slug, status: "active" } });
@@ -172,16 +186,32 @@ function toValue(value: Plain): Record<string, unknown> {
   if (typeof value === "string") return { stringValue: value };
   if (typeof value === "boolean") return { booleanValue: value };
   if (typeof value === "number") return { integerValue: String(value) };
-  return { arrayValue: { values: value.map(toValue) } };
+  if (Array.isArray(value)) return { arrayValue: { values: value.map(toValue) } };
+  return { mapValue: { fields: Object.fromEntries(Object.entries(value).map(([k, v]) => [k, toValue(v)])) } };
 }
 
-/** Grava um documento no Firestore Emulator com o token "owner" (ignora Rules). Só emulador local. */
-export async function writeDemoDoc(target: EmulatorTarget, path: string, data: Record<string, Plain>): Promise<void> {
+/**
+ * Grava um documento no Firestore Emulator com o token "owner" (ignora Rules). Só emulador local. Com `mask`, altera
+ * apenas esses caminhos de campo (o restante do documento é preservado); sem ela, substitui o documento inteiro.
+ */
+export async function writeDemoDoc(target: EmulatorTarget, path: string, data: Record<string, Plain>, mask?: readonly string[]): Promise<void> {
   assertLocal(target);
   const fields = Object.fromEntries(Object.entries(data).map(([k, v]) => [k, toValue(v)]));
-  const url = `http://${target.firestoreHost}/v1/projects/${target.project}/databases/(default)/documents/${path}`;
+  const query = mask ? `?${mask.map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join("&")}` : "";
+  const url = `http://${target.firestoreHost}/v1/projects/${target.project}/databases/(default)/documents/${path}${query}`;
   const response = await fetch(url, { method: "PATCH", headers: { "content-type": "application/json", ...OWNER }, body: JSON.stringify({ fields }) });
   await expectOk(response, `documento ${path}`);
+}
+
+/** Lê um campo de texto de um documento do Firestore Emulator com o token "owner" (só emulador local). Ausente = null. */
+export async function readDemoString(target: EmulatorTarget, path: string, field: string): Promise<string | null> {
+  assertLocal(target);
+  const url = `http://${target.firestoreHost}/v1/projects/${target.project}/databases/(default)/documents/${path}`;
+  const response = await fetch(url, { headers: OWNER });
+  if (response.status === 404) return null;
+  await expectOk(response, `documento ${path}`);
+  const body = (await response.json()) as { fields?: Record<string, { stringValue?: string }> };
+  return body.fields?.[field]?.stringValue ?? null;
 }
 
 /** Perfil de acesso fictício em users/{uid} (fonte do papel; ver src/modules/access/profile.ts). */
@@ -232,4 +262,11 @@ export async function seedDemoCatalog(target: EmulatorTarget = DEFAULT_TARGET): 
     if (product.color) await uploadPhoto(target, demoPhotoPath(product.id), makePng(240, 180, product.color));
   }
   for (const { path, data } of demoCatalogDocs()) await writeDemoDoc(target, path, data);
+  // Horários dos turnos de exemplo: só os próprios campos (demais configurações e turnos ficam como estão).
+  await writeDemoDoc(
+    target,
+    "settings/school",
+    { shiftPolicies: Object.fromEntries(DEMO_SHIFTS.map((s) => [s.id, { ...s.cutoffs }])) },
+    DEMO_SHIFTS.map((s) => `shiftPolicies.${s.id}`),
+  );
 }

@@ -4,13 +4,19 @@
 //   autorizadas do próprio app (conta fixture de administração), só criando o que falta e corrigindo situação/foto
 //   ausente. Os testes não alteram esses produtos: o que precisa mudar algo cria o próprio produto temporário.
 import { request as playwrightRequest, type APIRequestContext } from "@playwright/test";
-import { DEFAULT_TARGET, DEMO_CATEGORIES, DEMO_PRODUCTS, DEMO_SHIFTS, makePng, nameSlug, seedDemoCatalog } from "../../scripts/lib/demo-seed.ts";
+import { DEFAULT_TARGET, DEMO_CATEGORIES, DEMO_CLASS, DEMO_PRODUCTS, DEMO_SHIFTS, makePng, nameSlug, readDemoString, seedDemoCatalog } from "../../scripts/lib/demo-seed.ts";
 import { admin, signIn } from "../../scripts/staging/admin.ts";
 import type { FixtureManifest } from "../../scripts/staging/fixtures.ts";
 import { PUBLISHED_STATE_FILE, type Target } from "../../scripts/staging/target.ts";
 import { isCloud } from "./cloud.ts";
 
-export type FixtureIds = { category: (name: string) => string; shift: (name: string) => string; product: (name: string) => string };
+export type FixtureIds = {
+  category: (name: string) => string;
+  shift: (name: string) => string;
+  product: (name: string) => string;
+  /** Turma de exemplo (alunos fictícios do portal). */
+  classId: () => string;
+};
 
 const categoryName = (id: string) => DEMO_CATEGORIES.find((c) => c.id === id)!.name;
 const shiftName = (id: string) => DEMO_SHIFTS.find((s) => s.id === id)!.name;
@@ -28,10 +34,10 @@ export async function fixtureIds(): Promise<FixtureIds> {
       if (!found) throw new Error(`fixture desconhecida: ${name}`);
       return found.id;
     };
-    return { category: by(DEMO_CATEGORIES), shift: by(DEMO_SHIFTS), product: by(DEMO_PRODUCTS) };
+    return { category: by(DEMO_CATEGORIES), shift: by(DEMO_SHIFTS), product: by(DEMO_PRODUCTS), classId: () => DEMO_CLASS.id };
   }
   const { db } = admin();
-  const read = async (kind: "category" | "shift" | "product", field: string, names: readonly string[]) => {
+  const read = async (kind: "category" | "shift" | "product" | "class", field: string, names: readonly string[]) => {
     const map = new Map<string, string>();
     for (const name of names) {
       const id = (await db.doc(`uniquenessKeys/${kind}_${nameSlug(name)}`).get()).get(field);
@@ -43,14 +49,19 @@ export async function fixtureIds(): Promise<FixtureIds> {
       return id;
     };
   };
+  const classes = await read("class", "unitId", [DEMO_CLASS.name]);
   return {
     category: await read("category", "categoryId", DEMO_CATEGORIES.map((c) => c.name)),
     shift: await read("shift", "unitId", DEMO_SHIFTS.map((s) => s.name)),
     product: await read("product", "productId", DEMO_PRODUCTS.map((p) => p.name)),
+    classId: () => classes(DEMO_CLASS.name),
   };
 }
 
-type Api = { post: (url: string, data: Record<string, unknown>) => Promise<Record<string, unknown>> };
+type Api = {
+  post: (url: string, data: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  get: (url: string) => Promise<Record<string, unknown>>;
+};
 
 function apiFor(context: APIRequestContext, idToken: string): Api {
   return {
@@ -60,12 +71,19 @@ function apiFor(context: APIRequestContext, idToken: string): Api {
       if (!response.ok()) throw new Error(`${url} ${String(data.action)} → ${response.status()} ${String(body.error ?? "")}`);
       return body;
     },
+    async get(url) {
+      const response = await context.get(url, { headers: { authorization: `Bearer ${idToken}` } });
+      const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!response.ok()) throw new Error(`GET ${url} → ${response.status()} ${String(body.error ?? "")}`);
+      return body;
+    },
   };
 }
 
 /**
  * Garante o catálogo de exemplo na homologação pelo fluxo autorizado (rotas do app, conta fixture `admin`):
- * turnos e categorias "(exemplo)", os cinco produtos, a situação esperada e as fotos que faltam. Idempotente: com tudo
+ * turnos e categorias "(exemplo)", os cinco produtos, a situação esperada e as fotos que faltam; desde a F07 também o
+ * cardápio padrão dos produtos ativos, a turma "(exemplo)" e os horários dos turnos de exemplo. Idempotente: com tudo
  * presente, só lê. Não altera preço/canais de produto existente e não remove foto (não existe comando para isso).
  */
 export async function ensureCloudCatalog(target: Target, manifest: FixtureManifest): Promise<string[]> {
@@ -141,11 +159,57 @@ export async function ensureCloudCatalog(target: Target, manifest: FixtureManife
         );
         actions.push(`situação ajustada (${product.status}): ${product.name}`);
       }
+      // F07: cardápio padrão do produto ativo de exemplo = todos os turnos em que é vendido.
+      if (product.status === "active") {
+        const wanted = product.shiftIds.map((s) => shiftIds.get(s)!).sort();
+        const rule = (await db.doc(`defaultMenuRules/${id}`).get()).data();
+        const have = Array.isArray(rule?.shiftIds) ? [...(rule.shiftIds as string[])].sort() : [];
+        if (have.join(",") !== wanted.join(",")) {
+          await api.post("/api/menu", { action: "setDefault", productId: id, shiftIds: wanted, expectedVersion: Number(rule?.version ?? 0) });
+          actions.push(`cardápio padrão: ${product.name}`);
+        }
+      }
+    }
+
+    // Turma de exemplo (alunos fictícios do portal).
+    const classId = await key("class", DEMO_CLASS.name, "unitId");
+    if (!classId) {
+      await api.post("/api/school", { action: "create", kind: "class", name: DEMO_CLASS.name });
+      actions.push(`turma criada: ${DEMO_CLASS.name}`);
+    } else if ((await db.doc(`classes/${classId}`).get()).get("status") !== "active") {
+      await api.post("/api/school", { action: "restore", kind: "class", id: classId });
+      actions.push(`turma restaurada: ${DEMO_CLASS.name}`);
+    }
+
+    // Horários dos turnos de exemplo (só os que faltam), pela rota de configurações com versão esperada.
+    const settings = (await api.get("/api/school/settings")) as {
+      schoolName: string;
+      weekdays: number[];
+      shiftPolicies: Record<string, { purchaseCutoff: string; cancelCutoff: string }>;
+      version: number;
+    };
+    const missing = DEMO_SHIFTS.filter((s) => !settings.shiftPolicies[shiftIds.get(s.id)!]);
+    if (missing.length > 0) {
+      await api.post("/api/school/settings", {
+        expectedVersion: settings.version,
+        schoolName: settings.schoolName || "Escola de homologação (fictícia)",
+        weekdays: settings.weekdays,
+        shiftPolicies: { ...settings.shiftPolicies, ...Object.fromEntries(missing.map((s) => [shiftIds.get(s.id)!, { ...s.cutoffs }])) },
+      });
+      actions.push(`horários de turno: ${missing.map((s) => s.name).join(", ")}`);
     }
   } finally {
     await context.dispose();
   }
   return actions;
+}
+
+/** ID de um produto pelo nome: chave de unicidade gravada pelo comando real (só leitura; emulador ou homologação). */
+export async function productIdByName(name: string): Promise<string> {
+  const path = `uniquenessKeys/product_${nameSlug(name)}`;
+  const id = isCloud() ? ((await admin().db.doc(path).get()).get("productId") as unknown) : await readDemoString(DEFAULT_TARGET, path, "productId");
+  if (typeof id !== "string") throw new Error(`produto não encontrado: ${name}`);
+  return id;
 }
 
 /** Produto temporário criado pela API (administração) para testes que mudam foto/preço/situação sem tocar nas fixtures. */

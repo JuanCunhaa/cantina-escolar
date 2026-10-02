@@ -125,19 +125,30 @@ test("consultas e índices reais: diretório por prefixo/matrícula, paginação
   const again = await request.post("/api/invitations/redeem", { data: { token, email: `outra-hml-${tag}@e2e.example.test`, displayName: "Outra Pessoa", password: "senha-fake-123" } });
   expect(again.status()).toBe(422); // convite de uso único: invitation_invalid
 
-  // Calendário: janela de compra do turno (hoje…hoje+7) e dia fechado.
-  const settings = await get("/api/school/settings");
-  const saved = await request.post("/api/school/settings", {
-    headers: bearer(admin.idToken),
-    data: { key: newKey("set"), expectedVersion: settings.version, schoolName: `Escola HML ${tag}`, weekdays: [1, 2, 3, 4, 5], shiftPolicies: { [shiftId]: { purchaseCutoff: "07:00", cancelCutoff: "08:00" } } },
-  });
+  // Calendário: janela de compra do turno (hoje…hoje+7) e dia fechado. A homologação é compartilhada: os horários dos
+  // DEMAIS turnos são mantidos (substituir o mapa deixava os turnos de exemplo sem horário e o portal sem cardápio) e,
+  // ao fim, a configuração volta a ser a encontrada (sem acumular um turno por execução; limite de 50 turnos).
+  type Settings = { version: number; schoolName: string; weekdays: number[]; shiftPolicies: Record<string, unknown> };
+  const settings = (await get("/api/school/settings")) as unknown as Settings;
+  const save = (data: Omit<Settings, "version">, expectedVersion: number) =>
+    request.post("/api/school/settings", { headers: bearer(admin.idToken), data: { key: newKey("set"), expectedVersion, ...data } });
+  const saved = await save(
+    { schoolName: `Escola HML ${tag}`, weekdays: [1, 2, 3, 4, 5], shiftPolicies: { ...settings.shiftPolicies, [shiftId]: { purchaseCutoff: "07:00", cancelCutoff: "08:00" } } },
+    settings.version,
+  );
   expect(saved.status()).toBe(200);
-  const window = await get(`/api/school/calendar?shiftId=${shiftId}`);
-  expect(window.timezone).toBe("America/Sao_Paulo");
-  expect(window.days.length).toBeGreaterThan(0);
-  expect(window.days.length).toBeLessThanOrEqual(8);
-  const asFamily = await request.get(`/api/school/calendar?shiftId=${shiftId}`, { headers: bearer(famA.idToken) });
-  expect(asFamily.status()).toBe(200);
+  try {
+    const window = await get(`/api/school/calendar?shiftId=${shiftId}`);
+    expect(window.timezone).toBe("America/Sao_Paulo");
+    expect(window.days.length).toBeGreaterThan(0);
+    expect(window.days.length).toBeLessThanOrEqual(8);
+    const asFamily = await request.get(`/api/school/calendar?shiftId=${shiftId}`, { headers: bearer(famA.idToken) });
+    expect(asFamily.status()).toBe(200);
+  } finally {
+    const { version } = (await saved.json()) as { version: number };
+    const restored = await save({ schoolName: settings.schoolName || `Escola HML ${tag}`, weekdays: settings.weekdays, shiftPolicies: settings.shiftPolicies }, version);
+    expect(restored.status()).toBe(200);
+  }
 });
 
 test("vínculo revogado: negado na hora nas Rules e no servidor; o outro responsável não é afetado (A02/A34)", async ({ request }) => {

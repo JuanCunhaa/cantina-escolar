@@ -139,6 +139,9 @@ input[type="password"],
 input[type="file"],
 input[type="text"],
 input[type="search"],
+input[type="date"],
+input[type="number"],
+input[type="time"],
 textarea,
 select {
   min-height: var(--touch-target);
@@ -214,7 +217,9 @@ select {
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table th, .data-table td { text-align: left; padding: var(--space-2); border-bottom: 1px solid var(--color-line); vertical-align: middle; }
 .data-table .photo { width: 6rem; }
-.table-scroll { overflow-x: auto; }
+/* `position: relative`: textos só para leitor de tela (posição absoluta) dentro da tabela ficam contidos na rolagem dela, em
+   vez de alargar a página quando a tabela é mais larga que a tela. */
+.table-scroll { overflow-x: auto; position: relative; }
 
 /* F04: formulários de cadastro em seções abertas (sem caixas por campo), barras de filtro e listas simples. */
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -251,4 +256,44 @@ button.danger:hover:not(:disabled) { background: #7f2617; }
   .catalog-table td { display: block; padding: 0; border: 0; }
   .catalog-table td:first-child { grid-row: span 4; }
   .catalog-table td:last-child { grid-column: 1 / -1; }
+}
+
+/* F07: cardápio. Faixa de datas (rádios nativos: setas do teclado mudam a data), estado de cada dia em texto. */
+.menu-student { margin: var(--space-2) 0 var(--space-3); }
+.day-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); border: 0; padding: 0; margin: 0 0 var(--space-3); }
+.day-strip > legend { grid-column: 1 / -1; margin-bottom: var(--space-2); }
+.day-option {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  min-height: var(--touch-target);
+  padding: var(--space-1) var(--space-1);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  cursor: pointer;
+  text-align: center;
+  transition: background-color var(--motion-fast) ease, border-color var(--motion-fast) ease;
+}
+.day-option input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.day-option:has(input:focus-visible) { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.day-option[data-selected="true"] { border-color: var(--color-accent); background: var(--color-accent-soft); box-shadow: inset 0 -3px 0 var(--color-accent); }
+.day-option .day-name { font-weight: 700; text-transform: capitalize; }
+.day-option .day-date { font-variant-numeric: tabular-nums; }
+.day-option .day-state { font-size: 0.8125rem; color: var(--color-muted); }
+.day-option[data-open="true"] .day-state { color: var(--color-accent-strong); }
+.menu-day > h2::first-letter { text-transform: uppercase; }
+.check { display: inline-flex; align-items: center; justify-content: center; min-width: var(--touch-target); min-height: var(--touch-target); cursor: pointer; }
+.limit-form, .day-actions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
+.limit-input { width: 8rem; }
+@media (min-width: 60rem) {
+  .day-strip { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+}
+/* Celular: cada produto da data vira um bloco (nome; situação e limite; ações), sem rolagem lateral. */
+@media (max-width: 40rem) {
+  .day-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .day-table tr { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--space-1) var(--space-3); padding: var(--space-2) 0; border-bottom: 1px solid var(--color-line); }
+  .day-table th, .day-table td { display: block; padding: 0; border: 0; }
+  .day-table tbody th, .day-table td:nth-child(4) { grid-column: 1 / -1; }
 }
