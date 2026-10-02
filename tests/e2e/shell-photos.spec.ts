@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { createTestUser } from "../helpers/auth-emulator";
 import { makePng, seedDemoCatalog, DEFAULT_TARGET } from "../../scripts/lib/demo-seed.ts";
+import { isCloud, seedCloudCatalog } from "../helpers/cloud.ts";
 
 async function login(page: Page, path: string, email: string) {
   await page.goto(path);
@@ -10,7 +11,8 @@ async function login(page: Page, path: string, email: string) {
 }
 
 test.beforeAll(async () => {
-  await seedDemoCatalog(DEFAULT_TARGET);
+  if (isCloud()) await seedCloudCatalog();
+  else await seedDemoCatalog(DEFAULT_TARGET);
 });
 
 test("portal: cardápio fictício com fotos, fallback, indisponibilidade e total em BRL (A36/A37)", async ({ page }) => {

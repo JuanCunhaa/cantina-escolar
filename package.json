@@ -22,7 +22,14 @@
     "seed": "node scripts/seed.ts",
     "dev:webpack": "next dev --webpack",
     "build:webpack": "next build --webpack",
-    "audit:prod": "npm audit --omit=dev --audit-level=high"
+    "audit:prod": "npm audit --omit=dev --audit-level=high",
+    "staging:preflight": "node scripts/staging/run.ts preflight",
+    "staging:deploy": "node scripts/staging/run.ts deploy",
+    "staging:fixtures": "node scripts/staging/run.ts fixtures",
+    "staging:dev": "node scripts/staging/run.ts dev",
+    "staging:verify": "node scripts/staging/run.ts verify",
+    "staging:cleanup": "node scripts/staging/run.ts cleanup",
+    "staging:selftest": "firebase emulators:exec --only auth,firestore --project demo-cantina \"node scripts/staging/run.ts verify --emulator\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1145.0",

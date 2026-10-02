@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { createTestUser, TEST_PASSWORD, type TestUser } from "../helpers/auth-emulator";
 import { seedDemoCatalog, DEFAULT_TARGET } from "../../scripts/lib/demo-seed.ts";
+import { isCloud, seedCloudCatalog } from "../helpers/cloud.ts";
 
 async function login(page: Page, path: string, email: string, password: string = TEST_PASSWORD) {
   await page.goto(path);
@@ -19,7 +20,8 @@ async function changeAccess(request: APIRequestContext, admin: TestUser, body: R
 }
 
 test.beforeAll(async () => {
-  await seedDemoCatalog(DEFAULT_TARGET);
+  if (isCloud()) await seedCloudCatalog();
+  else await seedDemoCatalog(DEFAULT_TARGET);
 });
 
 test("login e recuperação: mensagens genéricas, sem revelar se o email existe (A33)", async ({ page }) => {
@@ -39,7 +41,8 @@ test("login e recuperação: mensagens genéricas, sem revelar se o email existe
   await page.getByRole("button", { name: "Esqueci minha senha" }).click();
   await expect(page.getByRole("heading", { name: "Recuperar senha" })).toBeVisible();
   await expect(page.getByLabel("Senha", { exact: true })).toHaveCount(0);
-  for (const email of [user.email, "ninguem-existe@example.test"]) {
+  // Em homologação real a recuperação de conta existente enviaria e-mail de verdade (fixture sem caixa): só o desconhecido.
+  for (const email of isCloud() ? ["ninguem-existe@example.test"] : [user.email, "ninguem-existe@example.test"]) {
     await page.getByLabel("Email").fill(email);
     await page.getByRole("button", { name: "Enviar instruções" }).click();
     await expect(page.getByRole("status")).toContainText("Se este email estiver cadastrado");

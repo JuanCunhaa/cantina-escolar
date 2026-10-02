@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-const emulatorHost = z.string().regex(/^[\w.-]+:\d{2,5}$/);
+// Variável em branco = ausente (o launcher de homologação neutraliza o `.env` local enviando nomes vazios).
+const emulatorHost = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  z.string().regex(/^[\w.-]+:\d{2,5}$/).optional(),
+);
 
 const publicSchema = z.object({
   NEXT_PUBLIC_FIREBASE_API_KEY: z.string().min(1),
@@ -15,8 +19,8 @@ const serverSchema = z.object({
   FIREBASE_PROJECT_ID: z.string().min(1),
   FIREBASE_CLIENT_EMAIL: z.string().optional(),
   FIREBASE_PRIVATE_KEY: z.string().optional(),
-  FIREBASE_AUTH_EMULATOR_HOST: emulatorHost.optional(),
-  FIRESTORE_EMULATOR_HOST: emulatorHost.optional(),
+  FIREBASE_AUTH_EMULATOR_HOST: emulatorHost,
+  FIRESTORE_EMULATOR_HOST: emulatorHost,
 });
 
 export type PublicEnv = z.infer<typeof publicSchema>;
@@ -44,6 +48,14 @@ export function parseServerEnv(source: Source): ServerEnv {
     }
     if (env.FIREBASE_PROJECT_ID.startsWith("demo-")) {
       throw new Error(`APP_ENV=${env.APP_ENV} não pode usar projeto demo-*.`);
+    }
+    // Projeto de homologação precisa parecer homologação e produção não pode parecer (mesma regra do bucket R2).
+    const looksStaging = /(staging|homolog|hml|test)/.test(env.FIREBASE_PROJECT_ID);
+    if (env.APP_ENV === "staging" && !looksStaging) {
+      throw new Error("FIREBASE_PROJECT_ID de staging deve conter staging, homolog, hml ou test.");
+    }
+    if (env.APP_ENV === "production" && looksStaging) {
+      throw new Error("FIREBASE_PROJECT_ID de production não pode ser um projeto de staging/teste.");
     }
   }
   return env;

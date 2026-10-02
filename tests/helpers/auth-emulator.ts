@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { createCloudUser, isCloud, signInCloud, TEST_PASSWORD as CLOUD_PASSWORD } from "./cloud.ts";
 import { setDemoProfile, targetFromEnv, writeDemoDoc, type DemoProfile } from "../../scripts/lib/demo-seed.ts";
 
 export type TestUser = { uid: string; email: string; idToken: string };
@@ -9,7 +10,7 @@ function authHost(): string {
   return host;
 }
 
-export const TEST_PASSWORD = "senha-fake-123";
+export const TEST_PASSWORD = CLOUD_PASSWORD;
 
 /**
  * Cria conta fictícia no Auth Emulator (nunca produção) e devolve um ID token real do emulador.
@@ -17,6 +18,8 @@ export const TEST_PASSWORD = "senha-fake-123";
  * a conta fica sem perfil: autenticada, porém sem nenhum acesso.
  */
 export async function createTestUser(label: string, role?: DemoProfile["role"], profile: Partial<DemoProfile> = {}): Promise<TestUser> {
+  // Homologação real (STAGING_TARGET=staging): conta fictícia pelo Admin SDK e login real; nunca o emulador.
+  if (isCloud()) return createCloudUser(label, role, profile);
   const email = `${label}-${randomUUID().slice(0, 8)}@example.test`;
   const base = `http://${authHost()}/identitytoolkit.googleapis.com/v1`;
   const response = await fetch(`${base}/accounts:signUp?key=fake`, {
@@ -66,6 +69,7 @@ const authBase = () => `http://${authHost()}/identitytoolkit.googleapis.com/v1`;
 
 /** Novo login (novo ID token) de conta existente do Auth Emulator. */
 export async function signInTestUser(email: string, password: string = TEST_PASSWORD): Promise<TestUser> {
+  if (isCloud()) return { email, ...(await signInCloud(email, password)) };
   const response = await fetch(`${authBase()}/accounts:signInWithPassword?key=fake`, {
     method: "POST",
     headers: { "content-type": "application/json" },

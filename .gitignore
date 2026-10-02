@@ -19,3 +19,8 @@ backups/
 
 .agent-logs/
 next-env.d.ts
+
+# Homologação integrada: config, chave da conta de serviço e senhas das fixtures (nunca versionar)
+!.env.staging.example
+.secrets/
+.staging-fixtures*.json

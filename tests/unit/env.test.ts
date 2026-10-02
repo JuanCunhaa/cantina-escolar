@@ -26,8 +26,18 @@ describe("parseServerEnv (validação fechada)", () => {
     expect(() => parseServerEnv({ APP_ENV: "production", FIREBASE_PROJECT_ID: "escola" })).toThrow();
     expect(() => parseServerEnv({ APP_ENV: "staging", FIREBASE_PROJECT_ID: "demo-x", ...prodCreds })).toThrow();
   });
+  it("homologação exige projeto com cara de homologação; produção recusa esse nome", () => {
+    expect(parseServerEnv({ APP_ENV: "staging", FIREBASE_PROJECT_ID: "cantina-hml", ...prodCreds }).APP_ENV).toBe("staging");
+    expect(() => parseServerEnv({ APP_ENV: "staging", FIREBASE_PROJECT_ID: "cantina-claude", ...prodCreds })).toThrow(/staging/);
+    expect(() => parseServerEnv({ APP_ENV: "production", FIREBASE_PROJECT_ID: "cantina-staging", ...prodCreds })).toThrow(/production/);
+  });
   it("aceita produção com credencial e sem emulador", () => {
     expect(parseServerEnv({ APP_ENV: "production", FIREBASE_PROJECT_ID: "escola", ...prodCreds }).APP_ENV).toBe("production");
+  });
+  it("variáveis de emulador em branco valem como ausentes (staging com .env local neutralizado)", () => {
+    const env = { APP_ENV: "staging", FIREBASE_PROJECT_ID: "cantina-hml", ...prodCreds, FIREBASE_AUTH_EMULATOR_HOST: "", FIRESTORE_EMULATOR_HOST: "" };
+    expect(parseServerEnv(env).APP_ENV).toBe("staging");
+    expect(() => parseServerEnv({ ...env, APP_ENV: "emulator", FIREBASE_CLIENT_EMAIL: "", FIREBASE_PRIVATE_KEY: "" })).toThrow();
   });
   it("recusa APP_ENV desconhecido", () => {
     expect(() => parseServerEnv({ ...emulatorEnv, APP_ENV: "dev" })).toThrow();

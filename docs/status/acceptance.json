@@ -37,7 +37,8 @@
       "npm run test:integration 73/73",
       "npm run test:e2e 15/15",
       "npm run build:webpack exit 0",
-      "npm run audit:prod 0 vulnerabilidades"
+      "npm run audit:prod 0 vulnerabilidades",
+      "Homologação real 01/10/2026 (projeto cantina-escolar-hml, app local, docs/status/firebase-homologation.md): vínculo revogado nega política por rota e Rules; responsável altera só a política do próprio aluno"
     ],
     "notes": "Parcial (F04): configuração por AMBOS os responsáveis com auditoria de autor e negação sem vínculo provadas para as permissões de compra (site/balcão). Limites diários/semanais e bloqueios por produto (F09) e o efeito sobre checkout/PDV (F11/F15) seguem pendentes; manter not_run."
   },
@@ -108,7 +109,8 @@
       "npm run test:integration 83/83",
       "npm run test:e2e 17/17",
       "npm run build:webpack exit 0",
-      "npm run audit:prod 0 vulnerabilidades"
+      "npm run audit:prod 0 vulnerabilidades",
+      "Homologação real 01/10/2026 (projeto cantina-escolar-hml, app local, docs/status/firebase-homologation.md): calendar.spec.ts e janela de compra por rota no Firestore real (sem índice composto)"
     ],
     "notes": "Parcial (F05, 01/10/2026): regra/limites/revalidação no servidor provados; carrinho/checkout real e PDV (F11/F15) pendentes; manter not_run."
   },
@@ -288,9 +290,10 @@
       "npm run test:integration 73/73",
       "npm run test:e2e 15/15",
       "npm run build:webpack exit 0",
-      "npm run audit:prod 0 vulnerabilidades"
+      "npm run audit:prod 0 vulnerabilidades",
+      "Homologação real 01/10/2026 (projeto cantina-escolar-hml, app local, docs/status/firebase-homologation.md): staging:verify 28/28 — Rules publicadas: família A lê só o próprio aluno/política/vínculo/perfil e recebe 403 nos da família B e em listagens, sem login 403, 6 escritas de cliente negadas; 10 rotas administrativas 403 (família) e 401 (sem token); endpoint S3 e listagem do bucket anônimos negados"
     ],
-    "notes": "Parcial: provado para papéis, vínculos, políticas, cadastro de alunos, convites e prova de fundação. Carteira, pedidos, estoque, preço e relatórios reais ainda não existem (F06/F08+/F21); manter not_run."
+    "notes": "Parcial: provado para papéis, vínculos, políticas, cadastro de alunos, convites e prova de fundação. Carteira, pedidos, estoque, preço e relatórios reais ainda não existem (F06/F08+/F21); manter not_run. Homologação local×nuvem concluída em 01/10/2026; servidor publicado (F24) pendente — manter not_run."
   },
   "A34": {
     "status": "not_run",
@@ -304,17 +307,19 @@
       "npm run test:rules 26/26",
       "npm run test:integration 46/46",
       "npm run test:e2e 12/12",
-      "npm run build:webpack exit 0"
+      "npm run build:webpack exit 0",
+      "Homologação real 01/10/2026 (projeto cantina-escolar-hml, app local, docs/status/firebase-homologation.md): revogação ao vivo e desativação (e2e + token vigente 401/Rules fechadas), vínculo revogado nega na hora no mesmo token, listeners de perfil/vínculo/saldo de prova no Firestore real"
     ],
-    "notes": "Parcial: sessão/perfil/vínculos e saldo de prova. Saldo/pedidos/estoque reais e troca de aluno dependem de F08+/F12; dado de cache não confirmar compra segue só para a prova; manter not_run."
+    "notes": "Parcial: sessão/perfil/vínculos e saldo de prova. Saldo/pedidos/estoque reais e troca de aluno dependem de F08+/F12; dado de cache não confirmar compra segue só para a prova; manter not_run. Homologação local×nuvem concluída em 01/10/2026; servidor publicado (F24) pendente — manter not_run."
   },
   "A35": {
     "status": "not_run",
     "evidence": [
       "tests/integration/probe-command.test.ts: replay sem novo movimento/efeito, payload diferente rejeitado, 12 concorrentes conservam total, disputa pela mesma chave = 1 movimento/1 efeito, falha de efeito externo não repete",
-      "afterCommit só roda fora do callback e só se não for replay"
+      "afterCommit só roda fora do callback e só se não for replay",
+      "Homologação real 01/10/2026 (projeto cantina-escolar-hml, app local, docs/status/firebase-homologation.md): prova de fundação: idempotência (replay e 409) e 12 escritores no mesmo documento = 12×200, saldo conservado, 12 lançamentos (4,2 s, 1 execução)"
     ],
-    "notes": "Parcial: idempotência/retry comprovados no emulador com comando de prova. Documentos de uso diário/semanal e limites concorrentes reais dependem de F08/F09+; manter not_run."
+    "notes": "Parcial: idempotência/retry comprovados no emulador com comando de prova. Documentos de uso diário/semanal e limites concorrentes reais dependem de F08/F09+; manter not_run. Homologação local×nuvem concluída em 01/10/2026; servidor publicado (F24) pendente — manter not_run."
   },
   "A36": {
     "status": "not_run",
@@ -324,9 +329,10 @@
       "tests/unit/storage.test.ts (22): configuração por ambiente fechada, chaves, inspeção de imagem (PNG/JPEG/WebP), corpo limitado, armazenamento local e cliente S3 real contra servidor S3 duplo (If-None-Match: *, sem checksum CRC32, 412→ObjectExistsError, erros sem vazar segredo)",
       "tests/rules: Firestore nega ao cliente (inclusive equipe) qualquer escrita de metadados de foto; claim forjada sem efeito (Storage Rules removidas)",
       "tests/e2e/shell-photos.spec.ts: 3 fotos reais (blob com ID token) + 1 fallback; funcionário envia PNG válido; txt e >2 MB recusados no cliente; PNG falso recusado pelo servidor",
-      "tests/r2/r2-integration.test.ts (R2 REAL, bucket de homologação, 01/10/2026): 3/3 — PUT com If-None-Match recusa sobrescrita (412) e preserva os bytes, ETag = MD5, HEAD/GET/DELETE/LIST, objeto de 2 MB, endpoint S3 nega leitura anônima; limpeza só das chaves criadas"
+      "tests/r2/r2-integration.test.ts (R2 REAL, bucket de homologação, 01/10/2026): 3/3 — PUT com If-None-Match recusa sobrescrita (412) e preserva os bytes, ETag = MD5, HEAD/GET/DELETE/LIST, objeto de 2 MB, endpoint S3 nega leitura anônima; limpeza só das chaves criadas",
+      "Homologação real 01/10/2026 (projeto cantina-escolar-hml, app local, docs/status/firebase-homologation.md): upload/leitura/troca pelas rotas do app com o R2 real (bytes idênticos, nosniff, ETag/304, anterior removida), recusas 401/403, 10 entradas inválidas recusadas sem alterar o bucket"
     ],
-    "notes": "Parcial. Migração de Firebase Storage para Cloudflare R2 aprovada em 01/10/2026. Camada de armazenamento comprovada no R2 real de homologação; rotas/regras de negócio provadas com double local + emulador Auth/Firestore. Pendentes: app completo em homologação (F24), confirmação de ausência de acesso público (r2.dev/domínio) no painel e comportamento do SDK com checksum padrão. Decisão sobre fotos antigas de pedidos: F06/F11. Manter not_run."
+    "notes": "Parcial. Migração de Firebase Storage para Cloudflare R2 aprovada em 01/10/2026. Camada de armazenamento comprovada no R2 real de homologação; rotas/regras de negócio provadas com double local + emulador Auth/Firestore. Pendentes: app completo em homologação (F24), confirmação de ausência de acesso público (r2.dev/domínio) no painel e comportamento do SDK com checksum padrão. Decisão sobre fotos antigas de pedidos: F06/F11. Manter not_run. Homologação local×nuvem concluída em 01/10/2026; servidor publicado (F24) pendente — manter not_run."
   },
   "A37": {
     "status": "not_run",

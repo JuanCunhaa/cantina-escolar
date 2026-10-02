@@ -12,6 +12,12 @@ Data de referência: 01/10/2026. Este arquivo descreve código entregue, não ap
 ## Em andamento
 - Nenhuma. Próximas elegíveis: F06 (catálogo) e F08 (carteira); F07 e F09 exigem também F06/F08 (conferir docs/tasks/index.md). Nenhuma iniciada nesta sessão.
 
+## Homologação integrada F01–F05 (01/10/2026)
+- Destino: projeto Firebase exclusivo `cantina-escolar-hml` (criado nesta etapa, Spark, sem Storage/faturamento; Firestore sa-east1, regras e índices publicados, Auth e-mail/senha) + bucket `cantina-fotos-staging` (R2). `cantina-claude` (projeto do `.env`) não foi usado. App rodando local (porta 3300) contra os serviços reais; **servidor publicado (Vercel) NÃO validado**.
+- Resultado: `npm run staging:verify` 28/28 (e2e existente adaptado + isolation/photos-r2/transactions), 4,7 min; ensaio `staging:selftest` 27 + 1 pulado; typecheck 0; lint 0; unit 88/88; rules 24/24; integration 101/101; e2e emulador 17/17. Uma 1ª execução real falhou (10× 400) por variável de emulador em branco recusada pelo app; corrigido em `src/lib/env.ts` (branco = ausente) sem enfraquecer proteções.
+- Entregue: `scripts/staging/*` (alvo fechado por `.env.staging.local`, preflight, fixtures, runner), `playwright.staging.config.ts`, `tests/staging/*`, `tests/helpers/cloud.ts`, comandos `staging:*`; `env.ts` exige projeto com staging/homolog/hml/test em staging. Detalhes, evidência e limites: docs/status/firebase-homologation.md.
+- Pendências: servidor publicado/F24; e-mail de redefinição real (precisa de caixa do dono); desabilitar auto-cadastro público no Auth (Console); r2.dev/domínio público no painel; rotacionar credencial R2 (passou pelo chat); dados de teste persistem no HML. Skills invocadas via ferramenta Skill: nenhuma nesta etapa (consulta direta de código/docs).
+
 ## Migração de arquivos para Cloudflare R2 (01/10/2026)
 - Entregue: Firebase Storage substituído por Cloudflare R2 (bucket privado, upload pelo servidor) no módulo src/lib/storage; rotas POST/GET /api/catalog/photo e POST /api/admin/storage/sweep; Storage Rules/Emulator removidos; Auth e Firestore intactos. F06 não iniciada.
 - Validação (execução única após a última mudança): typecheck 0; lint 0; unit 86/86; rules 24/24; integration 101/101; e2e 17/17; build:webpack 0; audit:prod 0.
@@ -56,7 +62,7 @@ Data de referência: 01/10/2026. Este arquivo descreve código entregue, não ap
 ## Pendências
 - Dependências: overrides escopados (ver "Fechamento pós-F03" e docs/status/dependency-audit.md). `npm audit` completo ainda lista 3 avisos moderados só de desenvolvimento (GHSA-8988-4f7v-96qf, @opentelemetry/core via firebase-tools); a correção sugerida exige `--force` e não foi aplicada.
 - Primeiro administrador real: criar no Console (Auth + `users/{uid}` role admin); script de bootstrap fica para F24. Desabilitar cadastro público no Firebase Auth do projeto real (conta sem perfil já não acessa nada).
-- Homologação real pendente: homologação do app contra o R2 (F24; a integração do armazenamento já passou, ver r2-migration.md), e-mail de redefinição de senha (Firebase Auth), domínios autorizados.
+- Homologação: app local × Firebase/R2 reais concluída em 01/10/2026 (docs/status/firebase-homologation.md). Pendente: servidor publicado (F24), e-mail de redefinição de senha (Firebase Auth), domínios autorizados, desabilitar auto-cadastro público.
 - Sem tela de administração de usuários/funcionários (só API `POST /api/admin/users`); papel `student` só tem portal de consulta.
 - F04: convite não é enviado por e-mail (a escola copia o link; nenhuma integração de e-mail inventada); resgate público sem limitação de taxa própria (WAF/edge em F24); tela de revisão de pedidos futuros após troca de turma/turno depende de pedidos (F11+); edição de contato do responsável e de matrícula não existe (matrícula é imutável); busca por trecho/sobrenome é filtro no navegador sobre a lista carregada; importação testada até 300 linhas (limite 500); Gitleaks/Semgrep não executados.
 - F05: horários vivem em `settings/school` (turno novo fora de manhã/tarde precisa de horário configurado, senão fica indisponível); sem tela de revisão de pedidos afetados (F11); sem sincronização automática de feriados; Gitleaks/Semgrep não executados.
@@ -70,4 +76,4 @@ Data de referência: 01/10/2026. Este arquivo descreve código entregue, não ap
 - Dica de ambiente: `npm run test:e2e` não aceita filtro; para um spec use `npx firebase emulators:exec --only auth,firestore --project demo-cantina "npx playwright test <arquivo>"`. Seed local agora cria também secretaria@/admin@example.test (perfis em `users`).
 
 ## Próxima ação
-- Ler docs/tasks/index.md e executar a próxima tarefa elegível (por exemplo /cantina-task F06 ou F08) em sessão nova.
+- (Opcional antes de F06) fechar as pendências manuais de docs/status/firebase-homologation.md. - Ler docs/tasks/index.md e executar a próxima tarefa elegível (por exemplo /cantina-task F06 ou F08) em sessão nova.

@@ -43,6 +43,7 @@ Comandos reais (F01, `package.json`, npm; Node >=24.12, Java 21 para emuladores;
 - `npm run lint` (ESLint 9), `npm run typecheck` (tsc strict), `npm test` (unit, Vitest).
 - `npm run test:rules`, `npm run test:integration`, `npm run test:e2e` — sobem Auth/Firestore via `firebase emulators:exec` (arquivos: armazenamento local `STORAGE_LOCAL_DIR`, double do R2; sem Storage Emulator); e2e usa Playwright com `next dev --webpack` na porta 3100 e ambiente hermético (zera credencial de `.env` local).
 - Prova manual local: `npm run emulators` (UI em 4000) → outro terminal `npm run dev:emulator` (Next webpack hermético, porta 3000; ignora .env) → `npm run seed` (contas fictícias familia-a/b@example.test; recusa alvo não local). Não usar `npm run dev` com o .env atual (APP_ENV=production).
+- Homologação integrada (Firebase `cantina-escolar-hml` + R2 `cantina-fotos-staging`, config em `.env.staging.local`, nunca o `.env`): `npm run staging:preflight | staging:deploy | staging:fixtures | staging:dev | staging:verify | staging:cleanup`; `npm run staging:selftest` ensaia o harness em emuladores. Detalhes e limites: docs/status/firebase-homologation.md. Nunca apontar para `cantina-claude`/produção.
 - `npm run audit:prod` — `npm audit` só de produção.
 - `npm run test:r2` — integração OPCIONAL com bucket R2 de homologação (variáveis `R2_TEST_*` só no shell); sem elas os testes são pulados. Não contar como evidência de R2 real quando pulada.
 - Não usar logs com `:` no nome no Windows; `.env` local real nunca é lido pelos testes de emulador.
