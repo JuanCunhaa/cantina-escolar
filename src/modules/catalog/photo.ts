@@ -26,7 +26,7 @@ async function bestEffortDelete(store: ObjectStore, key: string, why: string): P
   try {
     await store.delete(key);
   } catch (error) {
-    console.error(`photo cleanup failed (${why})`, error instanceof Error ? error.name : "unknown");
+    console.error("photo cleanup failed (%s)", why, error instanceof Error ? error.name : "unknown");
   }
 }
 

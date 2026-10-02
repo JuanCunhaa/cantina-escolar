@@ -53,3 +53,10 @@ Efeito no lockfile: uma única cópia hoistada de `@grpc/grpc-js` 1.14.5 (as có
 
 - Dependência adicionada: `@aws-sdk/client-s3` 3.1145.0 (versão exata, lockfile atualizado; publicada em 01/10/2026). `npm run audit:prod`: 0 vulnerabilidades após a mudança. Os overrides existentes permanecem.
 - Dependências removidas do código: `firebase/storage` (cliente) e `firebase-admin/storage` (servidor); o pacote `@google-cloud/storage` segue apenas como transitivo do `firebase-admin`.
+
+## Override de compatibilidade `jwks-rsa>jose` (01/10/2026, publicação na Vercel)
+
+- Sintoma: no primeiro deploy (Vercel, Node 24.x, build Turbopack) toda rota com Admin SDK respondia 500: `Failed to load external module firebase-admin/auth: ERR_REQUIRE_ESM ... require() of ES Module jose/dist/webapi/index.js from jwks-rsa/src/utils.js`. Localmente (dev, Node 24.20) não aparecia. Reproduzido com `node --no-experimental-require-module -e "require('firebase-admin/auth')"`.
+- Causa: `firebase-admin@14.5.0` → `jwks-rsa@4.1.0` (última) faz `require('jose')` e aceita só `jose@^6`, que é somente ESM. Issue aberta upstream: firebase/firebase-admin-node#3181 (workaround indicado: override do jose de `jwks-rsa` para versão dual CJS/ESM).
+- Correção: `"jwks-rsa": { "jose": "5.10.0" }` em `overrides` (última 5.x, dual, não depreciada; jwks-rsa usa só `importJWK`, `exportSPKI`, `decodeJwt`, `decodeProtectedHeader`, presentes na 5.x). O `jose@6` de outras cadeias (firebase-tools) não muda. `audit:prod`: 0. Teste de regressão: `tests/unit/runtime-compat.test.ts` (falha sem o override).
+- Remover quando `jwks-rsa`/`firebase-admin` carregarem o jose por `import()` ou aceitarem versão dual.

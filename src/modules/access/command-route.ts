@@ -17,7 +17,7 @@ export function commandErrorResponse(error: unknown, label: string): Response {
   if (error instanceof ZodError) return Response.json({ error: "invalid_input" }, { status: 400 });
   if (error instanceof DomainError) return Response.json({ error: error.code }, { status: error.status });
   if (error instanceof IdempotencyConflictError) return Response.json({ error: "idempotency_conflict" }, { status: 409 });
-  console.error(`${label} failed`, error instanceof Error ? error.name : "unknown");
+  console.error("%s failed", label, error instanceof Error ? error.name : "unknown");
   return Response.json({ error: "internal" }, { status: 500 });
 }
 

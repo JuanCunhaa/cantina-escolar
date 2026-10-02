@@ -26,10 +26,10 @@ function errorResponse(error: unknown, what: string): Response {
   if (error instanceof PayloadTooLargeError) return Response.json({ error: "photo_too_large" }, { status: 413 });
   if (error instanceof PhotoRejectedError) return Response.json({ error: "photo_rejected" }, { status: 422 });
   if (error instanceof StorageUnavailableError) {
-    console.error(`${what}: storage unavailable`);
+    console.error("%s: storage unavailable", what);
     return Response.json({ error: "storage_unavailable" }, { status: 503 });
   }
-  console.error(`${what} failed`, error instanceof Error ? error.name : "unknown");
+  console.error("%s failed", what, error instanceof Error ? error.name : "unknown");
   return Response.json({ error: "internal" }, { status: 500 });
 }
 
