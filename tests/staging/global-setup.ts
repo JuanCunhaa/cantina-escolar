@@ -1,5 +1,6 @@
 import { request } from "@playwright/test";
 import { ensureFixtures } from "../../scripts/staging/fixtures.ts";
+import { ensureCloudCatalog } from "../helpers/catalog-fixtures.ts";
 import { printPreflight, runPreflight } from "../../scripts/staging/preflight.ts";
 import { bypassSecret, loadTarget, PUBLISHED_STATE_FILE, type Target } from "../../scripts/staging/target.ts";
 
@@ -23,10 +24,15 @@ async function preparePublished(target: Target): Promise<void> {
   console.log(`deployment publicado: proteção ativa (anônimo ${blocked.status()}), bypass por cookie do host`);
 }
 
-/** Confirma o destino, exige o preflight verde e garante as fixtures duráveis antes de qualquer teste. */
+/**
+ * Confirma o destino, exige o preflight verde e garante as fixtures duráveis antes de qualquer teste. O servidor (local ou
+ * publicado) já está de pé aqui: o catálogo de exemplo é garantido pelas rotas autorizadas do app, nunca por reset.
+ */
 export default async function globalSetup(): Promise<void> {
   const target = loadTarget();
   if (!printPreflight(target, await runPreflight(target))) throw new Error("Preflight falhou: veja as linhas FALHA acima.");
   if (target.published) await preparePublished(target);
-  await ensureFixtures(target);
+  const manifest = await ensureFixtures(target);
+  const actions = await ensureCloudCatalog(target, manifest);
+  console.log(actions.length ? `catálogo de exemplo (pela API): ${actions.join('; ')}` : "catálogo de exemplo: completo, nada criado");
 }

@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import { createTestUser, TEST_PASSWORD } from "../helpers/auth-emulator";
-import { DEFAULT_TARGET, seedDemoCatalog } from "../../scripts/lib/demo-seed.ts";
-import { isCloud, seedCloudCatalog } from "../helpers/cloud.ts";
+import { prepareCatalog } from "../helpers/catalog-fixtures.ts";
 
 async function login(page: Page, path: string, email: string) {
   await page.goto(path);
@@ -11,9 +10,10 @@ async function login(page: Page, path: string, email: string) {
   await page.getByRole("button", { name: "Entrar" }).click();
 }
 
+// Roda no emulador e na homologação: cria só os próprios dados (categoria/produto com sufixo aleatório) e os encerra pelo
+// fluxo autorizado; os produtos "(exemplo)" são apenas lidos.
 test.beforeAll(async () => {
-  if (isCloud()) await seedCloudCatalog();
-  else await seedDemoCatalog(DEFAULT_TARGET);
+  await prepareCatalog();
 });
 
 test("administração: categoria, produto, preço com histórico e desativação; família vê só o público (A16/A37)", async ({ browser }) => {
@@ -81,6 +81,12 @@ test("administração: categoria, produto, preço com histórico e desativação
   await row.getByRole("button", { name: `Gerenciar ${product}` }).click();
   await expect(page.getByTestId("price-history").getByRole("listitem")).toHaveCount(2);
   await expect(page.getByRole("button", { name: "Reativar produto" })).toBeVisible();
+
+  // Sem produto ativo, a categoria pode ser arquivada pela tela (nada é apagado).
+  const categories = page.getByTestId("categories");
+  await categories.getByRole("button", { name: `Arquivar Doces ${tag}` }).click();
+  await expect(categories.getByRole("status")).toContainText("Categoria arquivada.");
+  await expect(categories.getByRole("listitem").filter({ hasText: `Doces ${tag}` })).toContainText("Arquivada");
 });
 
 test("cantina: consulta e troca foto, sem cadastro/preço; celular sem rolagem horizontal (A36/A37)", async ({ browser }) => {
@@ -88,7 +94,7 @@ test("cantina: consulta e troca foto, sem cadastro/preço; celular sem rolagem h
   const context = await browser.newContext({ viewport: { width: 375, height: 740 } });
   const page = await context.newPage();
   await login(page, "/operacao/produtos", staff.email);
-  await expect(page.getByTestId("photo-row")).toHaveCount(4, { timeout: 20000 });
+  await expect(page.getByTestId("photo-row").filter({ hasText: "Suco de laranja (exemplo)" })).toBeVisible({ timeout: 20000 });
   await expect(page.getByRole("button", { name: "Novo produto" })).toHaveCount(0);
   await expect(page.getByTestId("categories")).toHaveCount(0);
   await expect(page.getByLabel("Enviar foto de Suco de laranja (exemplo)")).toBeAttached();
@@ -97,7 +103,7 @@ test("cantina: consulta e troca foto, sem cadastro/preço; celular sem rolagem h
 
   // Histórico de preço é consultável; formulário de preço não existe para a cantina.
   await page.getByRole("button", { name: "Histórico de preço de Suco de laranja (exemplo)" }).click();
-  await expect(page.getByTestId("price-history").getByRole("listitem")).toHaveCount(1);
+  await expect(page.getByTestId("price-history").getByRole("listitem").last()).toContainText("Cadastro inicial");
   await expect(page.locator("#new-price")).toHaveCount(0);
   await expect(page.getByLabel("Fornecedor padrão (interno)")).toHaveCount(0);
   await context.close();

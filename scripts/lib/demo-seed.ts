@@ -112,6 +112,11 @@ export function demoPhotoPath(productId: string): string {
 
 type Plain = string | number | boolean | null | Plain[];
 
+/** Mesma chave de unicidade dos comandos reais (src/modules/students/normalize.ts `unitSlug`), sem imports `@/`. */
+export function nameSlug(name: string): string {
+  return name.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
 /** Documentos do catálogo fictício (sem timestamps: o seed não depende do relógio). Fotos são tratadas à parte. */
 export function demoCatalogDocs(): { path: string; data: Record<string, Plain> }[] {
   const docs: { path: string; data: Record<string, Plain> }[] = [];
@@ -124,7 +129,7 @@ export function demoCatalogDocs(): { path: string; data: Record<string, Plain> }
     docs.push({ path: `uniquenessKeys/category_${category.slug}`, data: { categoryId: category.id } });
   }
   for (const p of DEMO_PRODUCTS) {
-    const slug = p.name.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const slug = nameSlug(p.name);
     docs.push({
       path: `products/${p.id}`,
       data: {

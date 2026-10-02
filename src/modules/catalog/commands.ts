@@ -170,17 +170,19 @@ async function runProductCommand(
   const before = snap?.exists ? (snap.data() as ProductDoc) : null;
   if (input.action === "create" ? before : !before) throw input.action === "create" ? conflict("already_exists") : notFound("product_not_found");
 
-  const reactivateCategory = input.action === "reactivate" ? before!.categoryId : null;
-  const categoryToCheck = categoryId ?? reactivateCategory;
+  // Reativar revalida as referências ATUAIS do produto (categoria e turnos podem ter sido arquivados enquanto inativo).
+  const reactivating = input.action === "reactivate";
+  const categoryToCheck = categoryId ?? (reactivating ? before!.categoryId : null);
+  const shiftsToCheck = reactivating ? (before!.shiftIds ?? []) : shiftIds;
   const [category, ...shifts] = categoryToCheck
-    ? await tx.getAll(db.doc(`${CATEGORIES}/${categoryToCheck}`), ...shiftIds.map((s) => db.doc(`shifts/${s}`)))
+    ? await tx.getAll(db.doc(`${CATEGORIES}/${categoryToCheck}`), ...shiftsToCheck.map((s) => db.doc(`shifts/${s}`)))
     : [];
   const oldKeyRef = before && slug && before.nameSlug !== slug ? uniqueRef(db, "product", before.nameSlug) : null;
   const oldKey = oldKeyRef ? await tx.get(oldKeyRef) : null;
   const privateSnap = input.action === "update" ? await tx.get(privateRef(db, id)) : null;
 
   if (newKey?.exists && newKey.get("productId") !== id) throw conflict("product_name_taken", "Já existe produto com este nome.");
-  if (categoryToCheck) assertReferences(category, input.action === "reactivate" ? [] : shifts);
+  if (categoryToCheck) assertReferences(category, shifts);
 
   const now = FieldValue.serverTimestamp();
   const audit = (action: string, extra: { before?: Record<string, unknown> | null; after?: Record<string, unknown>; reason?: string }) =>

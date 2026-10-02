@@ -3,10 +3,8 @@
 // SDK (nunca por rota pública), entram por signInWithPassword e são removidas no teardown.
 import { randomUUID } from "node:crypto";
 import { admin, signIn } from "../../scripts/staging/admin.ts";
-import { DEMO_PRODUCTS, demoCatalogDocs, demoPhotoPath, makePng, type DemoProfile } from "../../scripts/lib/demo-seed.ts";
+import type { DemoProfile } from "../../scripts/lib/demo-seed.ts";
 import { EPHEMERAL_DOMAIN, FIXTURE_DOMAIN } from "../../scripts/staging/target.ts";
-import { createObjectStore } from "../../src/lib/storage/factory.ts";
-import { ObjectExistsError } from "../../src/lib/storage/types.ts";
 
 export const isCloud = (): boolean => Boolean(process.env.STAGING_TARGET);
 
@@ -38,29 +36,6 @@ export async function createCloudUser(
 
 export async function signInCloud(email: string, password: string): Promise<{ uid: string; idToken: string }> {
   return signIn(admin().target, email, password);
-}
-
-/**
- * Catálogo fictício no modelo real (categorias, turnos, produtos, histórico, dados internos) com fotos no armazenamento
- * do alvo (R2 em staging). Re-executável: restaura o estado inicial dos documentos de exemplo.
- */
-export async function seedCloudCatalog(): Promise<void> {
-  const { target, db } = admin();
-  const store = createObjectStore(target.storage);
-  for (const product of DEMO_PRODUCTS) {
-    const photoPath = product.color ? demoPhotoPath(product.id) : null;
-    const previous = (await db.doc(`products/${product.id}`).get()).data()?.photoPath as string | null | undefined;
-    if (product.color && photoPath) {
-      try {
-        await store.putIfAbsent(photoPath, makePng(240, 180, product.color), { contentType: "image/png", metadata: { seed: "demo" } });
-      } catch (error) {
-        if (!(error instanceof ObjectExistsError)) throw error;
-      }
-    }
-    // Uma execução anterior pode ter trocado a foto (chave aleatória): apaga a anterior para não deixar órfã.
-    if (previous && previous !== photoPath) await store.delete(previous);
-  }
-  for (const { path, data } of demoCatalogDocs()) await db.doc(path).set(data);
 }
 
 /** Remove as contas efêmeras (qualquer @*.example.test que não seja fixture durável) e seus perfis. */

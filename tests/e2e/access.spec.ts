@@ -1,7 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { createTestUser, TEST_PASSWORD, type TestUser } from "../helpers/auth-emulator";
-import { seedDemoCatalog, DEFAULT_TARGET } from "../../scripts/lib/demo-seed.ts";
-import { isCloud, seedCloudCatalog } from "../helpers/cloud.ts";
+import { prepareCatalog } from "../helpers/catalog-fixtures.ts";
+import { isCloud } from "../helpers/cloud.ts";
 
 async function login(page: Page, path: string, email: string, password: string = TEST_PASSWORD) {
   await page.goto(path);
@@ -20,8 +20,7 @@ async function changeAccess(request: APIRequestContext, admin: TestUser, body: R
 }
 
 test.beforeAll(async () => {
-  if (isCloud()) await seedCloudCatalog();
-  else await seedDemoCatalog(DEFAULT_TARGET);
+  await prepareCatalog();
 });
 
 test("login e recuperação: mensagens genéricas, sem revelar se o email existe (A33)", async ({ page }) => {
@@ -85,7 +84,9 @@ test("revogação ao vivo: rebaixar muda a tela; desativar encerra a sessão (A3
   const staff = await createTestUser("e2e-func", "cantina");
   const page = await (await browser.newContext()).newPage();
   await login(page, "/operacao/produtos", staff.email);
-  await expect(page.getByTestId("photo-row")).toHaveCount(4);
+  // Catálogo compartilhado na homologação: confere um produto de exemplo conhecido, não a contagem total.
+  const suco = page.getByTestId("photo-row").filter({ hasText: "Suco de laranja (exemplo)" });
+  await expect(suco).toBeVisible({ timeout: 20000 });
 
   // Papel retirado: a tela reage sem recarregar (perfil ao vivo) e a lista de produtos some.
   await changeAccess(request, admin, { uid: staff.uid, role: "guardian" });
@@ -94,7 +95,7 @@ test("revogação ao vivo: rebaixar muda a tela; desativar encerra a sessão (A3
 
   // Papel devolvido: volta ao normal na mesma sessão, ainda sem novo login.
   await changeAccess(request, admin, { uid: staff.uid, role: "cantina" });
-  await expect(page.getByTestId("photo-row")).toHaveCount(4, { timeout: 15000 });
+  await expect(suco).toBeVisible({ timeout: 15000 });
 
   // Desativada: a sessão local é encerrada e o login informa o motivo.
   await changeAccess(request, admin, { uid: staff.uid, status: "disabled" });

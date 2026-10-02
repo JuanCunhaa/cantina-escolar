@@ -93,3 +93,15 @@ Mudança de arquitetura autorizada pelo dono do projeto: SOMENTE o armazenamento
 - Foto substituída: a anterior continua sendo apagada após o commit. Decisão: o snapshot do pedido (F11) guarda nome/preço/quantidade, não a foto, então pedidos antigos não dependem da chave antiga.
 - Portal (até a F07): mostra produtos ativos; produto só de balcão aparece sem controle de quantidade ("Só no balcão"); turno restrito ganha etiqueta pequena. A quantidade continua sendo prévia sem cobrança.
 - O sweep de fotos órfãs lê `products`: objetos antigos de `demoProducts` (homologação) viram órfãos e são recolhidos por `POST /api/admin/storage/sweep` com `apply`.
+
+## Coordenação de Rules × aplicação na homologação (02/10/2026)
+
+Contexto: os deployments de **preview** (branches/PRs) e da **main** (Production do projeto Vercel `cantina-escolar-hml`) usam o MESMO backend — Firebase `cantina-escolar-hml` e R2 `cantina-fotos-staging`. As Firestore Rules (e os índices) são um artefato único por projeto Firebase; o código do app é um por deployment. Na F06 as Rules novas (sem `demoProducts`) foram publicadas antes do merge e o cardápio da main publicada (código F05) ficou indisponível até o merge — falha de transição que não deve se repetir.
+
+Regra (expandir → migrar → contrair):
+1. **Expandir**: o PR que muda o acesso publica (`npm run staging:deploy`) Rules que liberam o que o código novo precisa SEM retirar o que a versão publicada da main ainda usa (ex.: manter a leitura de uma coleção antiga até o merge). Índice novo entra antes do código que o usa.
+2. **Migrar**: merge → deployment da main → validação pela URL publicada (`npm run staging:verify:published`, dirigida aos fluxos alterados). Dados novos são aditivos e o código tolera o formato antigo durante a transição; migração de dados só explícita, com prévia e no ambiente autorizado.
+3. **Contrair**: só depois que a main publicada roda o código novo, um PR pequeno remove a permissão/coleção/índice antigo e republica as Rules.
+- Nunca publicar Rules mais restritas do que a versão publicada da main exige. Se a restrição for urgente por segurança, publicar mesmo assim e registrar a indisponibilidade esperada no PROGRESS.md.
+- Registrar no PROGRESS.md cada `staging:deploy` (data, commit das Rules, motivo) e qual versão do app cada Rule atende.
+- Produção futura (outro projeto Firebase/Vercel, F24): mesma ordem — Rules expandidas → deploy do app → Rules contraídas.

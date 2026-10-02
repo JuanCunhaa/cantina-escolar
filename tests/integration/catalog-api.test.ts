@@ -236,6 +236,17 @@ describe("desativação preserva histórico; leitura canônica de venda", () => 
     expect(await sellable("prd_inexistente", "advance", morning)).toEqual({ ok: false, reason: "product_not_found" });
   });
 
+  it("reativar revalida os turnos atuais: turno arquivado enquanto o produto estava inativo bloqueia (422)", async () => {
+    const lonely = (await ok(school, admin, { action: "create", kind: "shift", name: `Noite ${tag}` })).id;
+    const { id } = await newProduct({ shiftIds: [lonely] });
+    await ok(products, admin, { action: "deactivate", id, reason: "Turno vai encerrar" });
+    await ok(school, admin, { action: "archive", kind: "shift", id: lonely });
+    expect(await error(await call(products, admin.idToken, { action: "reactivate", id }))).toEqual({ status: 422, error: "shift_unavailable" });
+    expect((await data(`products/${id}`))!.status).toBe("inactive");
+    await ok(school, admin, { action: "restore", kind: "shift", id: lonely });
+    expect(await ok(products, admin, { action: "reactivate", id })).toMatchObject({ changed: true });
+  });
+
   it("não existe comando de exclusão de produto", async () => {
     const { id } = await newProduct();
     expect((await call(products, admin.idToken, { action: "delete", id })).status).toBe(400);
