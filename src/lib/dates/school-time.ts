@@ -74,3 +74,14 @@ export function localInstant(date: LocalDate, time: string): Date {
   guess = wall - offsetAt(guess);
   return new Date(guess);
 }
+
+/** Segunda-feira (início da semana padrão, segunda a domingo) da semana que contém `date`. */
+export function weekStartOf(date: LocalDate): LocalDate {
+  const offset = (weekdayOf(date) + 6) % 7;
+  return addDays(date, -offset);
+}
+
+/** Domingo (último dia) da semana que começa em `weekStart`. */
+export function weekEndOf(weekStart: LocalDate): LocalDate {
+  return addDays(weekStart, 6);
+}

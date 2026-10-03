@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { User } from "firebase/auth";
 import { api, errorText, newKey } from "@/lib/api-client";
+import { useCatalog } from "@/modules/catalog/use-catalog";
+import { PolicyPanel } from "@/modules/policies/components/policy-panel";
 import { useUnits } from "@/modules/school/use-units";
 import { useFamilyStudents } from "../use-family-students";
 
@@ -15,6 +17,7 @@ type Message = { studentId: string; kind: "ok" | "error"; text: string };
 export function FamilyStudents({ user }: { user: User }) {
   const family = useFamilyStudents(user.uid);
   const units = useUnits();
+  const catalog = useCatalog(user.uid, { onlyActive: true });
   const [message, setMessage] = useState<Message | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [issued, setIssued] = useState<{ studentId: string; url: string } | null>(null);
@@ -84,6 +87,7 @@ export function FamilyStudents({ user }: { user: User }) {
               </p>
               <p className="muted">Retirar uma permissão não cancela pedidos já feitos nem mexe no saldo.</p>
             </fieldset>
+            <PolicyPanel user={user} student={s} categories={catalog.categories} products={catalog.products} />
             <p>
               {s.hasLogin ? (
                 <span className="tag">Aluno com login (somente consulta, salvo permissões acima)</span>

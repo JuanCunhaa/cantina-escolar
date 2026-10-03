@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import { getFirebaseClient } from "@/lib/firebase/client";
+import { parsePolicy } from "@/modules/policies/model";
 
 export type FamilyStudent = {
   id: string;
@@ -13,13 +14,18 @@ export type FamilyStudent = {
   status: string;
   allowSitePurchase: boolean;
   allowCounterPurchase: boolean;
+  dailyLimitCents: number | null;
+  weeklyLimitCents: number | null;
+  blockedProductIds: string[];
+  blockedCategoryIds: string[];
+  configVersion: number;
   hasLogin: boolean;
 };
 
 type Entry = { stop: () => void; student?: Partial<FamilyStudent>; policy?: Partial<FamilyStudent> };
 type Result = { status: "loading" | "ready" | "error"; students: FamilyStudent[] };
 
-const EMPTY: FamilyStudent = { id: "", name: "", enrollment: "", classId: "", shiftId: "", status: "active", allowSitePurchase: false, allowCounterPurchase: false, hasLogin: false };
+const EMPTY: FamilyStudent = { id: "", name: "", enrollment: "", classId: "", shiftId: "", status: "active", allowSitePurchase: false, allowCounterPurchase: false, dailyLimitCents: null, weeklyLimitCents: null, blockedProductIds: [], blockedCategoryIds: [], configVersion: 0, hasLogin: false };
 
 /**
  * Alunos vinculados ao responsável, ao vivo: vínculos ativos próprios (Rules exigem guardianUid == uid e status active)
@@ -76,7 +82,7 @@ export function useFamilyStudents(uid: string): Result {
           const stopPolicy = onSnapshot(
             doc(db, "studentPolicies", id),
             (s) => {
-              entry.policy = { allowSitePurchase: s.data()?.allowSitePurchase === true, allowCounterPurchase: s.data()?.allowCounterPurchase === true };
+              entry.policy = parsePolicy(s.data());
               publish();
             },
             fail,
