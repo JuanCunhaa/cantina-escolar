@@ -44,9 +44,22 @@ service cloud.firestore {
     }
 
     // Política do aluno (permissões de compra, limites, bloqueios): leitura de PDV/administração e da família do aluno.
+    // Exceções de compra (uso único): só responsável vinculado e administração leem; escrita só pelo servidor.
     match /studentPolicies/{studentId} {
       allow get: if hasRole(['cantina', 'admin']) || linkedGuardian(studentId) || studentSelf(studentId);
       allow list, write: if false;
+      match /exceptions/{exceptionId} {
+        allow get, list: if hasRole(['admin']) || linkedGuardian(studentId);
+        allow write: if false;
+      }
+    }
+
+    // F09: comprometimento de consumo por data/semana (valores em centavos): leitura da família, do próprio aluno e do
+    // PDV/administração (o PDV usa o servidor; a leitura direta é só para exibir o orçamento). Escrita só pelo servidor,
+    // na mesma transação da compra.
+    match /studentUsage/{studentId}/{kind}/{key} {
+      allow get, list: if (kind == 'days' || kind == 'weeks') && (hasRole(['cantina', 'admin']) || linkedGuardian(studentId) || studentSelf(studentId));
+      allow write: if false;
     }
 
     // F04: turmas e turnos são cadastro público interno (nomes), legíveis por qualquer conta com perfil ativo para
