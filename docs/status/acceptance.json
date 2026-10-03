@@ -18,7 +18,8 @@
       "npm run test:e2e 29/29 (suíte da interface; a propagação entre sessões roda à parte em npm run test:e2e:propagation)",
       "npm run build:webpack exit 0",
       "npm run audit:prod 0 vulnerabilidades",
-      "gitleaks git --redact: sem vazamentos; gitleaks dir em src/tests/scripts/docs/firebase: sem vazamentos (Semgrep só no CI: não executado localmente)"
+      "gitleaks git --redact: sem vazamentos; gitleaks dir em src/tests/scripts/docs/firebase: sem vazamentos (Semgrep só no CI: não executado localmente)",
+      "Aplicação publicada (Vercel HML + Firebase HML, 03/10/2026, smoke dirigido sem crédito, tests/staging/wallet-smoke.spec.ts 5/5): carteiras novas independentes (saldo 0/versão 0 por aluno), leitura só do responsável vinculado e da administração"
     ],
     "notes": "Parcial: carteiras individuais independentes e total consolidado provados em emulador (API, Admin e interface). \"Gasto de A não debita B\" por COMPRA depende do checkout/PDV (F11/F15); permanece not_run. Sem homologação real da carteira."
   },
@@ -64,9 +65,10 @@
       "npm run test:e2e 29/29 (suíte da interface; a propagação entre sessões roda à parte em npm run test:e2e:propagation)",
       "npm run build:webpack exit 0",
       "npm run audit:prod 0 vulnerabilidades",
-      "gitleaks git --redact: sem vazamentos; gitleaks dir em src/tests/scripts/docs/firebase: sem vazamentos (Semgrep só no CI: não executado localmente)"
+      "gitleaks git --redact: sem vazamentos; gitleaks dir em src/tests/scripts/docs/firebase: sem vazamentos (Semgrep só no CI: não executado localmente)",
+      "Aplicação publicada (Vercel HML + Firebase HML, 03/10/2026, smoke dirigido sem crédito, tests/staging/wallet-smoke.spec.ts 5/5): recusa por saldo insuficiente (409) sem escrita, vínculo às duas pontas (destino de outra família 403), papéis 403/401, arquivado não transfere (409 student_inactive); Rules publicadas negam leitura/escrita fora do vínculo"
     ],
-    "notes": "Enunciado provado no Emulator Suite (API, Rules, Admin e interface). Não homologado na nuvem (Firebase real/Vercel não executados nesta tarefa); permanece not_run até a revisão global (F23)."
+    "notes": "Enunciado provado no Emulator Suite (API, Rules, Admin e interface). Não homologado na nuvem (Firebase real/Vercel não executados nesta tarefa); permanece not_run até a revisão global (F23). Publicada: só caminhos sem saldo (recusas/isolamento/Rules); transferência COM saldo e conservação no Firestore real seguem pendentes (sem recarga/fixture na HML)."
   },
   "A04": {
     "status": "not_run",
@@ -207,7 +209,8 @@
       "npm run build:webpack exit 0",
       "npm run audit:prod 0 vulnerabilidades",
       "gitleaks git --redact: sem vazamentos; gitleaks dir em src/tests/scripts/docs/firebase: sem vazamentos (Semgrep só no CI: não executado localmente)",
-      "tests/integration/wallet-api.test.ts (fechamento): arquivar aluno com saldo ≠ 0 é recusado no servidor (409 student_has_balance, saldo lido na transação) e nada muda; disputa arquivar × receber transferência (6 rodadas, 3 execuções) e arquivar × transferir todo o saldo (6 rodadas): nunca resta aluno arquivado com saldo; reativação auditada de aluno arquivado com saldo devolve o fluxo normal sem ajuste, sem apagar histórico e sem mexer em vínculos; livro antigo permanece idêntico após novos movimentos"
+      "tests/integration/wallet-api.test.ts (fechamento): arquivar aluno com saldo ≠ 0 é recusado no servidor (409 student_has_balance, saldo lido na transação) e nada muda; disputa arquivar × receber transferência (6 rodadas, 3 execuções) e arquivar × transferir todo o saldo (6 rodadas): nunca resta aluno arquivado com saldo; reativação auditada de aluno arquivado com saldo devolve o fluxo normal sem ajuste, sem apagar histórico e sem mexer em vínculos; livro antigo permanece idêntico após novos movimentos",
+      "Aplicação publicada (Vercel HML + Firebase HML, 03/10/2026, smoke dirigido sem crédito, tests/staging/wallet-smoke.spec.ts 5/5): arquivar aluno com saldo zero permitido e reativação; bloqueio de arquivar com saldo ≠ 0 NÃO provado na nuvem (exige saldo)"
     ],
     "notes": "Parcial: provado para a TRANSFERÊNCIA (carteira/livro/projeção). Checkout com pedido e reserva (F11) ainda não existe; permanece not_run. Fechamento: arquivamento × transferência provado no emulador (ordem de chegada não controlada; não foi medido qual operação vence em cada rodada)."
   },
@@ -223,7 +226,8 @@
       "npm run test:e2e 29/29 (suíte da interface; a propagação entre sessões roda à parte em npm run test:e2e:propagation)",
       "npm run build:webpack exit 0",
       "npm run audit:prod 0 vulnerabilidades",
-      "gitleaks git --redact: sem vazamentos; gitleaks dir em src/tests/scripts/docs/firebase: sem vazamentos (Semgrep só no CI: não executado localmente)"
+      "gitleaks git --redact: sem vazamentos; gitleaks dir em src/tests/scripts/docs/firebase: sem vazamentos (Semgrep só no CI: não executado localmente)",
+      "Aplicação publicada (Vercel HML + Firebase HML, 03/10/2026, smoke dirigido sem crédito, tests/staging/wallet-smoke.spec.ts 5/5): recusa por saldo insuficiente no servidor publicado; disputa por saldo NÃO testada na nuvem"
     ],
     "notes": "Parcial: disputa por SALDO provada no emulador (≤ 8 simultâneas por carteira; limite documentado de 12). Cota e último estoque dependem de F10/F11; balcão e reservas de F15; permanece not_run. Concorrência não medida no Firestore real."
   },
@@ -378,7 +382,9 @@
       "npm run build:webpack exit 0",
       "npm run audit:prod 0 vulnerabilidades",
       "gitleaks git --redact: sem vazamentos; gitleaks dir em src/tests/scripts/docs/firebase: sem vazamentos (Semgrep só no CI: não executado localmente)",
-      "npm run test:e2e:propagation 1/1 local (emulador). CI (GitHub Actions, run 37092027313, head 892a253): o teste de propagação FALHOU na pré-condição (a sessão observadora seguia em \"connecting\" após o timeout padrão de 5 s; a propagação em si não chegou a ser exercitada). Local (emulador, Windows): passou em 3 execuções. Timeout não foi aumentado. Run seguinte da CI (37093327283): 1/1 passou. Total de amostras na CI: 1 falha, 1 aprovação."
+      "npm run test:e2e:propagation 1/1 local (emulador). CI (GitHub Actions, run 37092027313, head 892a253): o teste de propagação FALHOU na pré-condição (a sessão observadora seguia em \"connecting\" após o timeout padrão de 5 s; a propagação em si não chegou a ser exercitada). Local (emulador, Windows): passou em 3 execuções. Timeout não foi aumentado. Run seguinte da CI (37093327283): 1/1 passou. Total de amostras na CI: 1 falha, 1 aprovação.",
+      "Aplicação publicada (Vercel HML + Firebase HML, 03/10/2026, smoke dirigido sem crédito, tests/staging/wallet-smoke.spec.ts 5/5): tela: leitura em tempo real `live` com as Rules publicadas (1 execução, timeout padrão) e recusa exibida como recusa; propagação de alteração entre sessões NÃO testada na publicada",
+      "Propagação entre sessões na CI: 4 execuções, 1 falha (pré-condição) e 3 aprovações (runs 37093327283, 37095532196, 37096071690); passo não bloqueante"
     ],
     "notes": "Parcial: saldo da carteira por listener privado (escopo do vínculo) + leitura do servidor reconciliados por versão; dado de listener/cache não confirma operação. Pedidos/estoque (F11/F12/F10) e troca de aluno na interface seguem pendentes; atraso de listener da homologação NÃO reproduzido nem medido nesta tarefa (inconclusivo, PR #4). Propagação entre sessões pelo listener: NÃO comprovada de forma estável — passou 3× localmente e na CI 1 falha + 1 aprovação (ver evidência); sem homologação."
   },
