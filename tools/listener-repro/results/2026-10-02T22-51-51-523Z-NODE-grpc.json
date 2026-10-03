@@ -1,0 +1,247 @@
+{
+ "scenario": "NODE-grpc",
+ "transport": "gRPC (Web SDK em Node)",
+ "delayMs": 2000,
+ "runs": [
+  {
+   "run": 1,
+   "authMs": 624,
+   "subscribeToFirstSnapshotMs": 204,
+   "commitMs": 281,
+   "commitToSnapshotMs": 13,
+   "subscribeToDeliveryMs": 2509
+  },
+  {
+   "run": 2,
+   "authMs": 519,
+   "subscribeToFirstSnapshotMs": 172,
+   "commitMs": 28,
+   "commitToSnapshotMs": 18,
+   "subscribeToDeliveryMs": 2238
+  },
+  {
+   "run": 3,
+   "authMs": 540,
+   "subscribeToFirstSnapshotMs": 165,
+   "commitMs": 27,
+   "commitToSnapshotMs": 19,
+   "subscribeToDeliveryMs": 2219
+  },
+  {
+   "run": 4,
+   "authMs": 531,
+   "subscribeToFirstSnapshotMs": 179,
+   "commitMs": 35,
+   "commitToSnapshotMs": 11,
+   "subscribeToDeliveryMs": 2234
+  },
+  {
+   "run": 5,
+   "authMs": 553,
+   "subscribeToFirstSnapshotMs": 151,
+   "commitMs": 28,
+   "commitToSnapshotMs": 18,
+   "subscribeToDeliveryMs": 2225
+  },
+  {
+   "run": 6,
+   "authMs": 575,
+   "subscribeToFirstSnapshotMs": 200,
+   "commitMs": 33,
+   "commitToSnapshotMs": 12,
+   "subscribeToDeliveryMs": 2273
+  },
+  {
+   "run": 7,
+   "authMs": 548,
+   "subscribeToFirstSnapshotMs": 174,
+   "commitMs": 28,
+   "commitToSnapshotMs": 19,
+   "subscribeToDeliveryMs": 2256
+  },
+  {
+   "run": 8,
+   "authMs": 549,
+   "subscribeToFirstSnapshotMs": 155,
+   "commitMs": 25,
+   "commitToSnapshotMs": 22,
+   "subscribeToDeliveryMs": 2205
+  },
+  {
+   "run": 9,
+   "authMs": 541,
+   "subscribeToFirstSnapshotMs": 166,
+   "commitMs": 31,
+   "commitToSnapshotMs": 15,
+   "subscribeToDeliveryMs": 2244
+  },
+  {
+   "run": 10,
+   "authMs": 556,
+   "subscribeToFirstSnapshotMs": 200,
+   "commitMs": 30,
+   "commitToSnapshotMs": 16,
+   "subscribeToDeliveryMs": 2263
+  },
+  {
+   "run": 11,
+   "authMs": 533,
+   "subscribeToFirstSnapshotMs": 184,
+   "commitMs": 28,
+   "commitToSnapshotMs": 19,
+   "subscribeToDeliveryMs": 2256
+  },
+  {
+   "run": 12,
+   "authMs": 528,
+   "subscribeToFirstSnapshotMs": 173,
+   "commitMs": 19,
+   "commitToSnapshotMs": 12,
+   "subscribeToDeliveryMs": 2241
+  },
+  {
+   "run": 13,
+   "authMs": 517,
+   "subscribeToFirstSnapshotMs": 154,
+   "commitMs": 22,
+   "commitToSnapshotMs": 24,
+   "subscribeToDeliveryMs": 2210
+  },
+  {
+   "run": 14,
+   "authMs": 532,
+   "subscribeToFirstSnapshotMs": 156,
+   "commitMs": 23,
+   "commitToSnapshotMs": 7,
+   "subscribeToDeliveryMs": 2230
+  },
+  {
+   "run": 15,
+   "authMs": 531,
+   "subscribeToFirstSnapshotMs": 136,
+   "commitMs": 23,
+   "commitToSnapshotMs": 24,
+   "subscribeToDeliveryMs": 2188
+  },
+  {
+   "run": 16,
+   "authMs": 546,
+   "subscribeToFirstSnapshotMs": 151,
+   "commitMs": 22,
+   "commitToSnapshotMs": 24,
+   "subscribeToDeliveryMs": 2209
+  },
+  {
+   "run": 17,
+   "authMs": 542,
+   "subscribeToFirstSnapshotMs": 149,
+   "commitMs": 24,
+   "commitToSnapshotMs": 4,
+   "subscribeToDeliveryMs": 2209
+  },
+  {
+   "run": 18,
+   "authMs": 521,
+   "subscribeToFirstSnapshotMs": 150,
+   "commitMs": 23,
+   "commitToSnapshotMs": 7,
+   "subscribeToDeliveryMs": 2187
+  },
+  {
+   "run": 19,
+   "authMs": 524,
+   "subscribeToFirstSnapshotMs": 151,
+   "commitMs": 17,
+   "commitToSnapshotMs": 14,
+   "subscribeToDeliveryMs": 2197
+  },
+  {
+   "run": 20,
+   "authMs": 542,
+   "subscribeToFirstSnapshotMs": 174,
+   "commitMs": 25,
+   "commitToSnapshotMs": 22,
+   "subscribeToDeliveryMs": 2264
+  },
+  {
+   "run": 21,
+   "authMs": 521,
+   "subscribeToFirstSnapshotMs": 135,
+   "commitMs": 28,
+   "commitToSnapshotMs": 19,
+   "subscribeToDeliveryMs": 2206
+  },
+  {
+   "run": 22,
+   "authMs": 520,
+   "subscribeToFirstSnapshotMs": 148,
+   "commitMs": 25,
+   "commitToSnapshotMs": 21,
+   "subscribeToDeliveryMs": 2209
+  },
+  {
+   "run": 23,
+   "authMs": 511,
+   "subscribeToFirstSnapshotMs": 137,
+   "commitMs": 25,
+   "commitToSnapshotMs": 11,
+   "subscribeToDeliveryMs": 2206
+  },
+  {
+   "run": 24,
+   "authMs": 521,
+   "subscribeToFirstSnapshotMs": 163,
+   "commitMs": 31,
+   "commitToSnapshotMs": 15,
+   "subscribeToDeliveryMs": 2236
+  },
+  {
+   "run": 25,
+   "authMs": 515,
+   "subscribeToFirstSnapshotMs": 127,
+   "commitMs": 21,
+   "commitToSnapshotMs": 14,
+   "subscribeToDeliveryMs": 2218
+  },
+  {
+   "run": 26,
+   "authMs": 517,
+   "subscribeToFirstSnapshotMs": 127,
+   "commitMs": 23,
+   "commitToSnapshotMs": 24,
+   "subscribeToDeliveryMs": 2209
+  },
+  {
+   "run": 27,
+   "authMs": 502,
+   "subscribeToFirstSnapshotMs": 181,
+   "commitMs": 33,
+   "commitToSnapshotMs": 14,
+   "subscribeToDeliveryMs": 2251
+  },
+  {
+   "run": 28,
+   "authMs": 550,
+   "subscribeToFirstSnapshotMs": 134,
+   "commitMs": 25,
+   "commitToSnapshotMs": 5,
+   "subscribeToDeliveryMs": 2180
+  },
+  {
+   "run": 29,
+   "authMs": 501,
+   "subscribeToFirstSnapshotMs": 140,
+   "commitMs": 21,
+   "commitToSnapshotMs": 6,
+   "subscribeToDeliveryMs": 2207
+  },
+  {
+   "run": 30,
+   "authMs": 537,
+   "subscribeToFirstSnapshotMs": 159,
+   "commitMs": 23,
+   "commitToSnapshotMs": 38,
+   "subscribeToDeliveryMs": 2249
+  }
+ ]
+}

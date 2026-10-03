@@ -1,0 +1,84 @@
+{
+ "scenario": "fumaca-firefox",
+ "browser": "firefox 155.0",
+ "transport": "default",
+ "listeners": [
+  "calendar",
+  "probe",
+  "page"
+ ],
+ "measure": "calendar",
+ "delayMs": 2000,
+ "churn": false,
+ "firestoreBeforeAuth": false,
+ "writeMode": "admin",
+ "staggerMs": 0,
+ "burstAfterMs": 0,
+ "runs": [
+  {
+   "run": 1,
+   "authMs": 1657,
+   "subscribeToFirstSnapshotMs": 214,
+   "writeAfterFirstSnapshotMs": 2020,
+   "commitMs": 284,
+   "commitToSnapshotMs": 9,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2522,
+   "deliveringBackchannel": null,
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 131,
+     "status": 200,
+     "aid": null,
+     "bytes": 71
+    },
+    {
+     "kind": "FWD",
+     "start": 2680,
+     "end": 2691,
+     "status": 200,
+     "aid": "72",
+     "bytes": 31
+    },
+    {
+     "kind": "FWD",
+     "start": 2709,
+     "end": 2721,
+     "status": 200,
+     "aid": "76",
+     "bytes": 31
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 136,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2679,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "FWD",
+     "at": 2709,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    }
+   ],
+   "backchannelChunks": [],
+   "errors": []
+  }
+ ]
+}

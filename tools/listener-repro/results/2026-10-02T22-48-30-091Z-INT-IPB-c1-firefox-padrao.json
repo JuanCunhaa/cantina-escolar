@@ -1,0 +1,186 @@
+{
+ "scenario": "INT-IPB-c1-firefox-padrao",
+ "browser": "firefox 155.0",
+ "transport": "default",
+ "listeners": [
+  "calendar",
+  "probe",
+  "page"
+ ],
+ "measure": "calendar",
+ "delayMs": 2000,
+ "churn": false,
+ "firestoreBeforeAuth": false,
+ "writeMode": "admin",
+ "staggerMs": 0,
+ "burstAfterMs": 0,
+ "pin": "none",
+ "runs": [
+  {
+   "run": 1,
+   "authMs": 1521,
+   "subscribeToFirstSnapshotMs": 140,
+   "writeAfterFirstSnapshotMs": 2083,
+   "commitMs": 250,
+   "commitToSnapshotMs": 5,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2474,
+   "deliveringBackchannel": null,
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 88,
+     "status": 200,
+     "aid": null,
+     "bytes": 71
+    },
+    {
+     "kind": "FWD",
+     "start": 2636,
+     "end": 2645,
+     "status": 200,
+     "aid": "56",
+     "bytes": 31
+    },
+    {
+     "kind": "FWD",
+     "start": 2661,
+     "end": 2674,
+     "status": 200,
+     "aid": "60",
+     "bytes": 31
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 93,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2635,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "FWD",
+     "at": 2661,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:839::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:839::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:839::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:839::200a]"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 2,
+   "authMs": 1148,
+   "subscribeToFirstSnapshotMs": 162,
+   "writeAfterFirstSnapshotMs": 2070,
+   "commitMs": 37,
+   "commitToSnapshotMs": 6,
+   "snapshotToRenderMs": 1,
+   "channelOpenToDeliveryMs": 2271,
+   "deliveringBackchannel": null,
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 114,
+     "status": 200,
+     "aid": null,
+     "bytes": 71
+    },
+    {
+     "kind": "FWD",
+     "start": 2433,
+     "end": 2447,
+     "status": 200,
+     "aid": "56",
+     "bytes": 31
+    },
+    {
+     "kind": "FWD",
+     "start": 2461,
+     "end": 2469,
+     "status": 200,
+     "aid": "60",
+     "bytes": 31
+    }
+   ],
+   "requestStarts": [
+    {
+     "kind": "FWD",
+     "at": 0,
+     "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+     "method": "POST"
+    },
+    {
+     "kind": "BACK",
+     "at": 118,
+     "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+     "method": "GET"
+    },
+    {
+     "kind": "FWD",
+     "at": 2432,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    },
+    {
+     "kind": "FWD",
+     "at": 2460,
+     "params": "AID,RID,SID,VER,database,gsessionid",
+     "method": "POST"
+    }
+   ],
+   "backchannelChunks": [],
+   "channelServers": [
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:839::200a]"
+    },
+    {
+     "kind": "BACK",
+     "ip": "[2800:3f0:4001:839::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:839::200a]"
+    },
+    {
+     "kind": "FWD",
+     "ip": "[2800:3f0:4001:839::200a]"
+    }
+   ],
+   "errors": []
+  }
+ ]
+}

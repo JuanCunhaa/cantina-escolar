@@ -1,0 +1,37 @@
+{
+ "scenario": "APP-foto",
+ "runs": [
+  {
+   "run": 1,
+   "listReadyToUploadMs": 2013,
+   "uploadToConfirmedMs": 1389,
+   "confirmedToPhotoGetStartMs": -279,
+   "photoGetMs": 715,
+   "confirmedToImageMs": 889
+  },
+  {
+   "run": 2,
+   "listReadyToUploadMs": 2017,
+   "uploadToConfirmedMs": 1455,
+   "confirmedToPhotoGetStartMs": 20521,
+   "photoGetMs": 882,
+   "confirmedToImageMs": 21542
+  },
+  {
+   "run": 3,
+   "listReadyToUploadMs": 2008,
+   "uploadToConfirmedMs": 1434,
+   "confirmedToPhotoGetStartMs": -372,
+   "photoGetMs": 799,
+   "confirmedToImageMs": 858
+  },
+  {
+   "run": 4,
+   "listReadyToUploadMs": 2013,
+   "uploadToConfirmedMs": 1356,
+   "confirmedToPhotoGetStartMs": -262,
+   "photoGetMs": 874,
+   "confirmedToImageMs": 865
+  }
+ ]
+}

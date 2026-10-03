@@ -1,0 +1,245 @@
+{
+ "scenario": "W-tx-chromium",
+ "browser": "chromium 153.0.8010.12",
+ "transport": "default",
+ "listeners": [
+  "calendar",
+  "probe",
+  "page"
+ ],
+ "measure": "calendar",
+ "delayMs": 2000,
+ "churn": false,
+ "firestoreBeforeAuth": false,
+ "writeMode": "tx",
+ "runs": [
+  {
+   "run": 1,
+   "authMs": 1082,
+   "subscribeToFirstSnapshotMs": 153,
+   "writeAfterFirstSnapshotMs": 2083,
+   "commitMs": 335,
+   "commitToSnapshotMs": 24,
+   "snapshotToRenderMs": 1,
+   "channelOpenToDeliveryMs": 2585,
+   "deliveringBackchannel": null,
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 80,
+     "status": 200,
+     "aid": null,
+     "bytes": 452
+    },
+    {
+     "kind": "FWD",
+     "start": 2745,
+     "end": 2760,
+     "status": 200,
+     "aid": "65",
+     "bytes": 52
+    },
+    {
+     "kind": "FWD",
+     "start": 2821,
+     "end": 2829,
+     "status": 200,
+     "aid": "69",
+     "bytes": 50
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 2,
+   "authMs": 2931,
+   "subscribeToFirstSnapshotMs": 167,
+   "writeAfterFirstSnapshotMs": 2056,
+   "commitMs": 99,
+   "commitToSnapshotMs": 13,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2319,
+   "deliveringBackchannel": null,
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 89,
+     "status": 200,
+     "aid": null,
+     "bytes": 451
+    },
+    {
+     "kind": "FWD",
+     "start": 2475,
+     "end": 2488,
+     "status": 200,
+     "aid": "57",
+     "bytes": 52
+    },
+    {
+     "kind": "FWD",
+     "start": 2509,
+     "end": 2530,
+     "status": 200,
+     "aid": "61",
+     "bytes": 50
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 3,
+   "authMs": 1142,
+   "subscribeToFirstSnapshotMs": 141,
+   "writeAfterFirstSnapshotMs": 2099,
+   "commitMs": 80,
+   "commitToSnapshotMs": 31,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2342,
+   "deliveringBackchannel": null,
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 73,
+     "status": 200,
+     "aid": null,
+     "bytes": 452
+    },
+    {
+     "kind": "FWD",
+     "start": 2483,
+     "end": 2492,
+     "status": 200,
+     "aid": "65",
+     "bytes": 52
+    },
+    {
+     "kind": "FWD",
+     "start": 2526,
+     "end": 2538,
+     "status": 200,
+     "aid": "69",
+     "bytes": 50
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 4,
+   "authMs": 1077,
+   "subscribeToFirstSnapshotMs": 143,
+   "writeAfterFirstSnapshotMs": 2074,
+   "commitMs": 85,
+   "commitToSnapshotMs": 27,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2319,
+   "deliveringBackchannel": null,
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 74,
+     "status": 200,
+     "aid": null,
+     "bytes": 452
+    },
+    {
+     "kind": "FWD",
+     "start": 2429,
+     "end": 2437,
+     "status": 200,
+     "aid": "59",
+     "bytes": 50
+    },
+    {
+     "kind": "FWD",
+     "start": 2461,
+     "end": 2476,
+     "status": 200,
+     "aid": "63",
+     "bytes": 50
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 5,
+   "authMs": 1038,
+   "subscribeToFirstSnapshotMs": 161,
+   "writeAfterFirstSnapshotMs": 2067,
+   "commitMs": 71,
+   "commitToSnapshotMs": 24,
+   "snapshotToRenderMs": 0,
+   "channelOpenToDeliveryMs": 2313,
+   "deliveringBackchannel": null,
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 80,
+     "status": 200,
+     "aid": null,
+     "bytes": 452
+    },
+    {
+     "kind": "FWD",
+     "start": 2454,
+     "end": 2462,
+     "status": 200,
+     "aid": "65",
+     "bytes": 52
+    },
+    {
+     "kind": "FWD",
+     "start": 2517,
+     "end": 2529,
+     "status": 200,
+     "aid": "69",
+     "bytes": 50
+    }
+   ],
+   "errors": []
+  },
+  {
+   "run": 6,
+   "authMs": 1101,
+   "subscribeToFirstSnapshotMs": 158,
+   "writeAfterFirstSnapshotMs": 2072,
+   "commitMs": 72,
+   "commitToSnapshotMs": 7,
+   "snapshotToRenderMs": 1,
+   "channelOpenToDeliveryMs": 2299,
+   "deliveringBackchannel": null,
+   "listenRequests": [
+    {
+     "kind": "FWD",
+     "start": 0,
+     "end": 89,
+     "status": 200,
+     "aid": null,
+     "bytes": 452
+    },
+    {
+     "kind": "FWD",
+     "start": 2470,
+     "end": 2490,
+     "status": 200,
+     "aid": "56",
+     "bytes": 50
+    },
+    {
+     "kind": "FWD",
+     "start": 2518,
+     "end": 2555,
+     "status": 200,
+     "aid": "60",
+     "bytes": 50
+    }
+   ],
+   "errors": []
+  }
+ ]
+}
