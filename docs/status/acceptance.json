@@ -47,7 +47,8 @@
       "npm run test:e2e 15/15",
       "npm run build:webpack exit 0",
       "npm run audit:prod 0 vulnerabilidades",
-      "Homologação real 01/10/2026 (projeto cantina-escolar-hml, app local, docs/status/firebase-homologation.md): vínculo revogado nega política por rota e Rules; responsável altera só a política do próprio aluno"
+      "Homologação real 01/10/2026 (projeto cantina-escolar-hml, app local, docs/status/firebase-homologation.md): vínculo revogado nega política por rota e Rules; responsável altera só a política do próprio aluno",
+      "Homologação publicada 03/10/2026 (tests/staging/policies-smoke.spec.ts, 5/5, sem dinheiro/compra): responsável e administração alteram a política com versão esperada; sem vínculo negado (API e Rules)"
     ],
     "notes": "Parcial (F04): configuração por AMBOS os responsáveis com auditoria de autor e negação sem vínculo provadas para as permissões de compra (site/balcão). Limites diários/semanais e bloqueios por produto (F09) e o efeito sobre checkout/PDV (F11/F15) seguem pendentes; manter not_run."
   },
@@ -119,7 +120,8 @@
       "npm run test:rules 40/40",
       "npm run test:integration 163/163",
       "npm run test:e2e 30/30",
-      "npm run build:webpack exit 0"
+      "npm run build:webpack exit 0",
+      "Homologação publicada 03/10/2026 (tests/staging/policies-smoke.spec.ts, 5/5, sem dinheiro/compra): política/bloqueios/exceção de uso único por rota, papéis e outra família negados, Rules publicadas de política/exceções, tela"
     ],
     "notes": "Parcial: política e exceção provadas no guard compartilhado e na interface de configuração; confirmação 'mostrando o efeito' é devolvida pela API (needsConfirmation + efeito por dia/semana) mas a tela de confirmação do checkout/PDV é de F11/F15. Manter not_run."
   },
@@ -135,7 +137,8 @@
       "npm run test:rules 40/40",
       "npm run test:integration 163/163",
       "npm run test:e2e 30/30",
-      "npm run build:webpack exit 0"
+      "npm run build:webpack exit 0",
+      "Homologação publicada 03/10/2026 (tests/staging/policies-smoke.spec.ts, 5/5, sem dinheiro/compra): limites diário/semanal gravados e exibidos na tela com comprometimento zerado (teto com compromisso real não foi exercitado na nuvem)"
     ],
     "notes": "Parcial: 'agendar com saldo suficiente' depende do checkout (F11) e da carteira; aqui só a regra de limite por data de consumo, no guard e nos documentos de uso. Manter not_run."
   },
@@ -440,7 +443,8 @@
       "npm run test:rules 40/40",
       "npm run test:integration 163/163",
       "npm run test:e2e 30/30",
-      "npm run build:webpack exit 0"
+      "npm run build:webpack exit 0",
+      "Homologação publicada 03/10/2026 (tests/staging/policies-smoke.spec.ts, 5/5, sem dinheiro/compra): Rules negam escrita de uso/exceção/política pelo cliente; concorrência de limites só no emulador"
     ],
     "notes": "Parcial: documentos de uso diário/semanal impedem contornar limites concorrentes (emulador, comando de teste com a sequência do guard); 'callback em retry não chama pagamento/e-mail' não se aplica a este guard (sem efeito externo) e o do pedido real é de F11/F15; Firestore real não medido. Mantém as evidências da carteira. Manter not_run."
   },

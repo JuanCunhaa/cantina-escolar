@@ -11,7 +11,8 @@ export default defineConfig({
   testDir: "tests",
   testMatch: ["e2e/*.spec.ts", "staging/*.spec.ts"],
   // Carteira (F08): fixtures de saldo só existem no emulador; a verificação em homologação ainda não foi escrita.
-  testIgnore: ["e2e/wallet*.spec.ts"],
+  // Políticas (F09): e2e usa fixtures de uso por data (emulador); o equivalente publicado é staging/policies-smoke.spec.ts.
+  testIgnore: ["e2e/wallet*.spec.ts", "e2e/policies*.spec.ts"],
   timeout: 120000,
   fullyParallel: false,
   workers: 1,
