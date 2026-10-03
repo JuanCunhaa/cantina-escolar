@@ -1,0 +1,150 @@
+{
+ "scenario": "CI-escrita-35s",
+ "measure": "probe",
+ "transport": "default",
+ "listeners": [
+  "probe"
+ ],
+ "runner": {
+  "os": "linux",
+  "arch": "x64",
+  "imageOs": "ubuntu24",
+  "node": "v24.21.0",
+  "githubRunId": "37098798557",
+  "githubJob": "rodada"
+ },
+ "browser": "chromium 153.0.8010.12",
+ "firebaseSdk": "12.19.0",
+ "playwright": "1.63.0",
+ "at": "2026-10-03T05:23:03.962Z",
+ "run": {
+  "round": 3,
+  "writeAfterSubscribeTargetMs": 35000,
+  "writeAfterSubscribeMs": 35004,
+  "authMs": 374,
+  "subscribeToFirstSnapshotMs": 2249,
+  "firstSnapshotFromCache": [
+   {
+    "afterSubscribeMs": 2249,
+    "fromCache": false,
+    "n": null
+   },
+   {
+    "afterSubscribeMs": 35279,
+    "fromCache": false,
+    "n": 982287
+   }
+  ],
+  "writeAfterFirstSnapshotMs": 32755,
+  "commitMs": 248,
+  "commitConfirmedAfterSubscribeMs": 35252,
+  "commitToSnapshotMs": 27,
+  "newValueSnapshot": {
+   "afterSubscribeMs": 35279,
+   "fromCache": false
+  },
+  "snapshotToRenderMs": 1,
+  "subscribeToDeliveryMs": 35279,
+  "channelOpenToDeliveryMs": 35266,
+  "slow": false,
+  "delivered": true,
+  "requestStarts": [
+   {
+    "kind": "FWD",
+    "at": 0,
+    "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+    "method": "POST"
+   },
+   {
+    "kind": "BACK",
+    "at": 1108,
+    "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+    "method": "GET"
+   }
+  ],
+  "listenRequests": [
+   {
+    "kind": "FWD",
+    "start": 0,
+    "end": 1102,
+    "status": 200,
+    "aid": null,
+    "bytes": 450
+   }
+  ],
+  "failedRequests": [],
+  "backchannelChunks": [
+   {
+    "afterCommitMs": -33006,
+    "afterSubscribeMs": 2246,
+    "bytes": 670
+   },
+   {
+    "afterCommitMs": -2982,
+    "afterSubscribeMs": 32270,
+    "bytes": 17
+   },
+   {
+    "afterCommitMs": 26,
+    "afterSubscribeMs": 35278,
+    "bytes": 538
+   },
+   {
+    "afterCommitMs": 914,
+    "afterSubscribeMs": 36166,
+    "bytes": 381
+   }
+  ],
+  "channelServers": [
+   {
+    "kind": "FWD",
+    "ip": "142.250.73.106"
+   },
+   {
+    "kind": "BACK",
+    "ip": "142.250.73.106"
+   }
+  ],
+  "errors": [],
+  "console": [],
+  "pageErrors": [],
+  "marks": [
+   {
+    "afterSubscribeMs": -375,
+    "ev": "auth:start"
+   },
+   {
+    "afterSubscribeMs": -1,
+    "ev": "auth:ready"
+   },
+   {
+    "afterSubscribeMs": 0,
+    "ev": "subscribe:probe"
+   },
+   {
+    "afterSubscribeMs": 2249,
+    "ev": "snapshot:probe",
+    "data": {
+     "n": null,
+     "fromCache": false
+    }
+   },
+   {
+    "afterSubscribeMs": 2250,
+    "ev": "render:probe"
+   },
+   {
+    "afterSubscribeMs": 35279,
+    "ev": "snapshot:probe",
+    "data": {
+     "n": 982287,
+     "fromCache": false
+    }
+   },
+   {
+    "afterSubscribeMs": 35280,
+    "ev": "render:probe"
+   }
+  ]
+ }
+}

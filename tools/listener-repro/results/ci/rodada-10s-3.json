@@ -1,0 +1,145 @@
+{
+ "scenario": "CI-escrita-10s",
+ "measure": "probe",
+ "transport": "default",
+ "listeners": [
+  "probe"
+ ],
+ "runner": {
+  "os": "linux",
+  "arch": "x64",
+  "imageOs": "ubuntu24",
+  "node": "v24.21.0",
+  "githubRunId": "37098798557",
+  "githubJob": "rodada"
+ },
+ "browser": "chromium 153.0.8010.12",
+ "firebaseSdk": "12.19.0",
+ "playwright": "1.63.0",
+ "at": "2026-10-03T05:20:27.338Z",
+ "run": {
+  "round": 3,
+  "writeAfterSubscribeTargetMs": 10000,
+  "writeAfterSubscribeMs": 10002,
+  "authMs": 362,
+  "subscribeToFirstSnapshotMs": 1488,
+  "firstSnapshotFromCache": [
+   {
+    "afterSubscribeMs": 1488,
+    "fromCache": false,
+    "n": null
+   },
+   {
+    "afterSubscribeMs": 10799,
+    "fromCache": false,
+    "n": 825752
+   }
+  ],
+  "writeAfterFirstSnapshotMs": 8514,
+  "commitMs": 789,
+  "commitConfirmedAfterSubscribeMs": 10791,
+  "commitToSnapshotMs": 8,
+  "newValueSnapshot": {
+   "afterSubscribeMs": 10799,
+   "fromCache": false
+  },
+  "snapshotToRenderMs": 1,
+  "subscribeToDeliveryMs": 10799,
+  "channelOpenToDeliveryMs": 10786,
+  "slow": false,
+  "delivered": true,
+  "requestStarts": [
+   {
+    "kind": "FWD",
+    "at": 0,
+    "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+    "method": "POST"
+   },
+   {
+    "kind": "BACK",
+    "at": 718,
+    "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+    "method": "GET"
+   }
+  ],
+  "listenRequests": [
+   {
+    "kind": "FWD",
+    "start": 0,
+    "end": 713,
+    "status": 200,
+    "aid": null,
+    "bytes": 452
+   }
+  ],
+  "failedRequests": [],
+  "backchannelChunks": [
+   {
+    "afterCommitMs": -9308,
+    "afterSubscribeMs": 1483,
+    "bytes": 1042
+   },
+   {
+    "afterCommitMs": 7,
+    "afterSubscribeMs": 10798,
+    "bytes": 538
+   },
+   {
+    "afterCommitMs": 275,
+    "afterSubscribeMs": 11066,
+    "bytes": 382
+   }
+  ],
+  "channelServers": [
+   {
+    "kind": "FWD",
+    "ip": "172.253.62.95"
+   },
+   {
+    "kind": "BACK",
+    "ip": "172.253.62.95"
+   }
+  ],
+  "errors": [],
+  "console": [],
+  "pageErrors": [],
+  "marks": [
+   {
+    "afterSubscribeMs": -363,
+    "ev": "auth:start"
+   },
+   {
+    "afterSubscribeMs": -1,
+    "ev": "auth:ready"
+   },
+   {
+    "afterSubscribeMs": 0,
+    "ev": "subscribe:probe"
+   },
+   {
+    "afterSubscribeMs": 1488,
+    "ev": "snapshot:probe",
+    "data": {
+     "n": null,
+     "fromCache": false
+    }
+   },
+   {
+    "afterSubscribeMs": 1488,
+    "ev": "render:probe"
+   },
+   {
+    "afterSubscribeMs": 10799,
+    "ev": "snapshot:probe",
+    "data": {
+     "n": 825752,
+     "fromCache": false
+    }
+   },
+   {
+    "afterSubscribeMs": 10800,
+    "ev": "render:probe"
+   }
+  ]
+ }
+}

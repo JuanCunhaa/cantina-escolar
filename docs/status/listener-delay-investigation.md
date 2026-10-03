@@ -107,3 +107,7 @@ Assinatura comum a todos os eventos: 1º snapshot imediato; primeira alteração
 - Skills invocadas via ferramenta Skill: cantina-debug, cantina-firebase, cantina-testing, cantina-verify.
 - Checks da branch (só ferramentas e documentação; nada em src/, Rules ou testes do app): typecheck 0, lint 0 (ESLint passa a ignorar `**/dist/**`, saída do empacotamento da reprodução). Varredura de segredos nos arquivos alterados: nenhum token, chave, e-mail de conta ou uid.
 - Firefox do Playwright (v1543) instalado nesta máquina para a comparação entre motores (sem mudança no package.json).
+
+## Adendo (03/10/2026): experimento no CI
+
+O passo 0 dos próximos passos (variar o instante da escrita) e a opção (b) de "outra rede" foram executados num runner do GitHub Actions (9 rodadas, escritas 2/10/35 s após a inscrição): **não reproduzido nesta amostra**, sem concluir nada sobre a causa. Ver `listener-ci-experiment.md`.
