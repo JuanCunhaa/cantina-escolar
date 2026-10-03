@@ -36,6 +36,7 @@ export async function createTestUser(label: string, role?: DemoProfile["role"], 
 /** Cadastro de aluno, vínculo e política fictícios (formato documentado em docs/firebase/schema.md). */
 export async function seedStudentAccess(input: {
   studentId: string;
+  name?: string;
   guardianUids?: string[];
   revokedGuardianUids?: string[];
   studentUid?: string;
@@ -45,7 +46,7 @@ export async function seedStudentAccess(input: {
 }): Promise<void> {
   const target = targetFromEnv();
   await writeDemoDoc(target, `students/${input.studentId}`, {
-    name: "Aluno Exemplo",
+    name: input.name ?? "Aluno Exemplo",
     status: input.studentStatus ?? "active",
     userUid: input.studentUid ?? null,
   });

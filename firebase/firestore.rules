@@ -119,7 +119,19 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Todo o resto (carteira, pedidos, custos, lucro, relatórios, auditoria, idempotência) permanece fechado ao
+    // F08: carteira individual (saldo projetado + versão) e livro imutável: leitura só do responsável com vínculo ativo
+    // ao aluno (cada família vê apenas as próprias carteiras; equipe e aluno usam o servidor). Escrita só pelo servidor,
+    // em transação com auditoria. Sem list em wallets; o extrato é consultado por orderBy(seq) com limite.
+    match /wallets/{studentId} {
+      allow get: if linkedGuardian(studentId);
+      allow list, write: if false;
+      match /entries/{entryId} {
+        allow get, list: if linkedGuardian(studentId);
+        allow write: if false;
+      }
+    }
+
+    // Todo o resto (transferências, pedidos, custos, lucro, relatórios, auditoria, idempotência) permanece fechado ao
     // cliente: acesso só por servidor autorizado. Custos/lucro ficarão em coleções de administração (nunca abertas à secretaria).
     match /{document=**} { allow read, write: if false; }
   }

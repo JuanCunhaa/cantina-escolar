@@ -40,7 +40,14 @@ export type CommandContext = {
 export async function runIdempotentCommand<T extends object>(
   db: Firestore,
   actor: Actor,
-  opts: { scope: string; key: string; payload: unknown; allow: (profile: AccessProfile) => boolean },
+  opts: {
+    scope: string;
+    key: string;
+    payload: unknown;
+    allow: (profile: AccessProfile) => boolean;
+    /** Reautoriza a repetição com o estado ATUAL (vínculo/política) antes de devolver a resposta guardada; só leituras. */
+    revalidateReplay?: (ctx: { tx: Transaction; actor: Actor }) => Promise<void>;
+  },
   work: (ctx: CommandContext) => Promise<T>,
 ): Promise<T & { replayed: boolean }> {
   const hash = hashPayload({ a: opts.scope, p: opts.payload });
@@ -50,12 +57,13 @@ export async function runIdempotentCommand<T extends object>(
     const [idem, actorSnap] = await tx.getAll(idemRef, db.doc(`users/${actor.uid}`));
     const profile = parseProfile(actorSnap?.data());
     if (!profile || profile.status !== "active" || !opts.allow(profile)) throw new ForbiddenError("Ator sem permissão atual.");
+    const current: Actor = { uid: actor.uid, role: profile.role, permissions: profile.permissions };
     if (idem?.exists) {
       const stored = idem.data() as Stored<T>;
       if (stored.payloadHash !== hash) throw new IdempotencyConflictError("Chave reutilizada com payload diferente.");
+      await opts.revalidateReplay?.({ tx, actor: current });
       return { ...stored.response, replayed: true };
     }
-    const current: Actor = { uid: actor.uid, role: profile.role, permissions: profile.permissions };
     const response = await work({ tx, actor: current, profile, auditId });
     tx.create(idemRef, { payloadHash: hash, response, createdAt: FieldValue.serverTimestamp() });
     return { ...response, replayed: false };

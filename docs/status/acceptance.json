@@ -3,16 +3,24 @@
     "status": "not_run",
     "evidence": [
       "tests/integration/students-api.test.ts (F04, parcial): dois filhos do mesmo responsável são alunos/políticas independentes — alterar a política de A não muda B",
-      "npm run typecheck exit 0",
-      "npm run lint exit 0",
       "npm test 46/46",
       "npm run test:rules 30/30",
       "npm run test:integration 73/73",
       "npm run test:e2e 15/15",
+      "tests/integration/wallet-api.test.ts (F08): transferir A→B altera só as duas carteiras; a de um terceiro irmão (saldo e versão) e a de outra família não mudam",
+      "tests/e2e/wallet.spec.ts: saldos individuais e total consolidado na interface",
+      "tests/unit/wallet.test.ts: modelo da carteira",
+      "npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 140/140",
+      "npm run test:rules 35/35",
+      "npm run test:integration 141/141",
+      "npm run test:e2e 30/30 (inclui a propagação entre sessões, registrada à parte)",
       "npm run build:webpack exit 0",
-      "npm run audit:prod 0 vulnerabilidades"
+      "npm run audit:prod 0 vulnerabilidades",
+      "gitleaks git --redact: sem vazamentos; gitleaks dir em src/tests/scripts/docs/firebase: sem vazamentos (Semgrep só no CI: não executado localmente)"
     ],
-    "notes": "Parcial (F04, 01/10/2026): só a independência de cadastro/política entre irmãos. Saldos independentes e 'gasto de A não debita B' dependem da carteira (F08); manter not_run."
+    "notes": "Parcial: carteiras individuais independentes e total consolidado provados em emulador (API, Admin e interface). \"Gasto de A não debita B\" por COMPRA depende do checkout/PDV (F11/F15); permanece not_run. Sem homologação real da carteira."
   },
   "A02": {
     "status": "not_run",
@@ -44,8 +52,21 @@
   },
   "A03": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/integration/wallet-api.test.ts: conserva o total; duas pernas com o mesmo transferId + projeção + auditoria na mesma transação; replay devolve o resultado original sem novo movimento; chave com payload diferente = 409; vínculo às DUAS pontas (outra família, revogado, equipe, aluno, anônimo negados sem escrever); repetição após perder o vínculo é negada; saldo insuficiente/inativo/valor inválido sem efeito",
+      "tests/rules/wallet.rules.test.ts: família A×B, revogado, aluno, equipe, anônimo; nenhuma escrita pelo cliente",
+      "tests/e2e/wallet.spec.ts: transferência pela interface, clique duplo, recusa por saldo insuficiente, resposta perdida e resultado incerto sem cobrança dupla; API/Admin confirmam saldos e reconciliação",
+      "npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 140/140",
+      "npm run test:rules 35/35",
+      "npm run test:integration 141/141",
+      "npm run test:e2e 30/30 (inclui a propagação entre sessões, registrada à parte)",
+      "npm run build:webpack exit 0",
+      "npm run audit:prod 0 vulnerabilidades",
+      "gitleaks git --redact: sem vazamentos; gitleaks dir em src/tests/scripts/docs/firebase: sem vazamentos (Semgrep só no CI: não executado localmente)"
+    ],
+    "notes": "Enunciado provado no Emulator Suite (API, Rules, Admin e interface). Não homologado na nuvem (Firebase real/Vercel não executados nesta tarefa); permanece not_run até a revisão global (F23)."
   },
   "A04": {
     "status": "not_run",
@@ -174,13 +195,36 @@
   },
   "A17": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/integration/wallet-api.test.ts: falha forçada na 2ª perna no commit desfaz tudo (sem perna parcial, projeção, transferência, idempotência ou auditoria); 6 envios simultâneos da mesma operação = 1 movimento",
+      "tests/e2e/wallet.spec.ts: clique duplo = 1 transferência; resposta perdida após o commit é repetida com a mesma chave sem cobrar duas vezes",
+      "npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 140/140",
+      "npm run test:rules 35/35",
+      "npm run test:integration 141/141",
+      "npm run test:e2e 30/30 (inclui a propagação entre sessões, registrada à parte)",
+      "npm run build:webpack exit 0",
+      "npm run audit:prod 0 vulnerabilidades",
+      "gitleaks git --redact: sem vazamentos; gitleaks dir em src/tests/scripts/docs/firebase: sem vazamentos (Semgrep só no CI: não executado localmente)"
+    ],
+    "notes": "Parcial: provado para a TRANSFERÊNCIA (carteira/livro/projeção). Checkout com pedido e reserva (F11) ainda não existe; permanece not_run."
   },
   "A18": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/integration/wallet-api.test.ts: saldo 1000 e 8 transferências simultâneas de 300 = exatamente 3 aprovadas e 5 com saldo insuficiente, saldo nunca negativo; A→B e B→A simultâneos conservam o total e reconciliam o livro nas duas carteiras",
+      "npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 140/140",
+      "npm run test:rules 35/35",
+      "npm run test:integration 141/141",
+      "npm run test:e2e 30/30 (inclui a propagação entre sessões, registrada à parte)",
+      "npm run build:webpack exit 0",
+      "npm run audit:prod 0 vulnerabilidades",
+      "gitleaks git --redact: sem vazamentos; gitleaks dir em src/tests/scripts/docs/firebase: sem vazamentos (Semgrep só no CI: não executado localmente)"
+    ],
+    "notes": "Parcial: disputa por SALDO provada no emulador (≤ 8 simultâneas por carteira; limite documentado de 12). Cota e último estoque dependem de F10/F11; balcão e reservas de F15; permanece not_run. Concorrência não medida no Firestore real."
   },
   "A19": {
     "status": "not_run",
@@ -316,25 +360,45 @@
       "tests/e2e/foundation.spec.ts: listener de saldo de prova atualiza após commit, outra conta não muda, logout desliga e limpa",
       "tests/e2e/access.spec.ts: perfil ao vivo — rebaixar muda a tela e retira a lista de produtos sem recarregar, devolver papel restaura, desativar encerra a sessão com aviso; listener do perfil desligado no logout",
       "tests/rules: listener de perfil próprio e consultas de vínculos limitadas ao próprio uid; sem coleções amplas",
-      "npm run typecheck exit 0",
-      "npm run lint exit 0",
       "npm test 34/34",
       "npm run test:rules 26/26",
       "npm run test:integration 46/46",
       "npm run test:e2e 12/12",
+      "Homologação real 01/10/2026 (projeto cantina-escolar-hml, app local, docs/status/firebase-homologation.md): revogação ao vivo e desativação (e2e + token vigente 401/Rules fechadas), vínculo revogado nega na hora no mesmo token, listeners de perfil/vínculo/saldo de prova no Firestore real",
+      "tests/e2e/wallet.spec.ts: com a leitura em tempo real indisponível (alvos da carteira bloqueados no canal do Firestore) o resultado confirmado aparece da resposta e a tela marca \"atualizando\", sem parecer falha; isolamento entre famílias e logout sem dado residual",
+      "tests/unit/wallet.test.ts: snapshot/resposta antigos nunca regridem o saldo (versão do servidor); cache não conta como listener",
+      "src/modules/wallet/use-wallets.ts: listeners por aluno vinculado, encerrados ao trocar conta/alunos e ao desmontar",
+      "npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 140/140",
+      "npm run test:rules 35/35",
+      "npm run test:integration 141/141",
+      "npm run test:e2e 30/30 (inclui a propagação entre sessões, registrada à parte)",
       "npm run build:webpack exit 0",
-      "Homologação real 01/10/2026 (projeto cantina-escolar-hml, app local, docs/status/firebase-homologation.md): revogação ao vivo e desativação (e2e + token vigente 401/Rules fechadas), vínculo revogado nega na hora no mesmo token, listeners de perfil/vínculo/saldo de prova no Firestore real"
+      "npm run audit:prod 0 vulnerabilidades",
+      "gitleaks git --redact: sem vazamentos; gitleaks dir em src/tests/scripts/docs/firebase: sem vazamentos (Semgrep só no CI: não executado localmente)"
     ],
-    "notes": "Parcial: sessão/perfil/vínculos e saldo de prova. Saldo/pedidos/estoque reais e troca de aluno dependem de F08+/F12; dado de cache não confirmar compra segue só para a prova; manter not_run. Homologação local×nuvem concluída em 01/10/2026; servidor publicado (F24) pendente — manter not_run."
+    "notes": "Parcial: saldo da carteira por listener privado (escopo do vínculo) + leitura do servidor reconciliados por versão; dado de listener/cache não confirma operação. Pedidos/estoque (F11/F12/F10) e troca de aluno na interface seguem pendentes; atraso de listener da homologação NÃO reproduzido nem medido nesta tarefa (inconclusivo, PR #4)."
   },
   "A35": {
     "status": "not_run",
     "evidence": [
       "tests/integration/probe-command.test.ts: replay sem novo movimento/efeito, payload diferente rejeitado, 12 concorrentes conservam total, disputa pela mesma chave = 1 movimento/1 efeito, falha de efeito externo não repete",
       "afterCommit só roda fora do callback e só se não for replay",
-      "Homologação real 01/10/2026 (projeto cantina-escolar-hml, app local, docs/status/firebase-homologation.md): prova de fundação: idempotência (replay e 409) e 12 escritores no mesmo documento = 12×200, saldo conservado, 12 lançamentos (4,2 s, 1 execução)"
+      "Homologação real 01/10/2026 (projeto cantina-escolar-hml, app local, docs/status/firebase-homologation.md): prova de fundação: idempotência (replay e 409) e 12 escritores no mesmo documento = 12×200, saldo conservado, 12 lançamentos (4,2 s, 1 execução)",
+      "tests/integration/wallet-api.test.ts (carteira real): 6 requisições simultâneas da mesma chave = 1 movimento, 1 transferência, 1 auditoria; disputa com retentativas da transação não duplica movimentos; 8 concorrentes e A↔B conservam o total",
+      "tests/integration/probe-command.test.ts (F01, comando de prova): efeito externo só depois do commit e fora do callback",
+      "npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 140/140",
+      "npm run test:rules 35/35",
+      "npm run test:integration 141/141",
+      "npm run test:e2e 30/30 (inclui a propagação entre sessões, registrada à parte)",
+      "npm run build:webpack exit 0",
+      "npm run audit:prod 0 vulnerabilidades",
+      "gitleaks git --redact: sem vazamentos; gitleaks dir em src/tests/scripts/docs/firebase: sem vazamentos (Semgrep só no CI: não executado localmente)"
     ],
-    "notes": "Parcial: idempotência/retry comprovados no emulador com comando de prova. Documentos de uso diário/semanal e limites concorrentes reais dependem de F08/F09+; manter not_run. Homologação local×nuvem concluída em 01/10/2026; servidor publicado (F24) pendente — manter not_run."
+    "notes": "Parcial: idempotência/retry da carteira real provados no emulador. A transferência não tem efeito externo (pagamento/e-mail). Documentos de uso diário/semanal e limites concorrentes (F09/F11) pendentes."
   },
   "A36": {
     "status": "not_run",

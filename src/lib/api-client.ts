@@ -3,11 +3,18 @@ import type { User } from "firebase/auth";
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
 
 /** Chamada autenticada à API do servidor (ID token atual). Nunca lança: devolve o código de erro estável. */
-export async function api<T = Record<string, unknown>>(user: User | null, method: "GET" | "POST", url: string, body?: unknown): Promise<ApiResult<T>> {
+export async function api<T = Record<string, unknown>>(
+  user: User | null,
+  method: "GET" | "POST",
+  url: string,
+  body?: unknown,
+  options: { timeoutMs?: number } = {},
+): Promise<ApiResult<T>> {
   try {
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (user) headers.authorization = `Bearer ${await user.getIdToken()}`;
-    const response = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    const signal = options.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined;
+    const response = await fetch(url, { method, headers, signal, body: body === undefined ? undefined : JSON.stringify(body) });
     const data = (await response.json().catch(() => ({}))) as T & { error?: string };
     return response.ok ? { ok: true, data } : { ok: false, status: response.status, error: data.error ?? "internal" };
   } catch {
@@ -73,6 +80,8 @@ const MESSAGES: Record<string, string> = {
   shift_not_configured: "Os horários do turno deste aluno ainda não foram configurados pela escola.",
   student_required: "Selecione o aluno.",
   beyond_window: "Compras só de hoje até 7 dias à frente.",
+  insufficient_balance: "Saldo insuficiente na carteira de origem.",
+  balance_limit: "A carteira de destino atingiria o limite de saldo.",
   internal: "Não foi possível concluir agora. Tente novamente.",
 };
 
