@@ -144,6 +144,28 @@ service cloud.firestore {
       }
     }
 
+    // F10: estoque. QUANTIDADES (saldo físico, reservas por data, lotes/validade, reservas ativas e cota/comprometimento
+    // por data/turno) são legíveis pela cantina e pela administração e NUNCA contêm custo. CUSTOS (stockCosts: valor do
+    // estoque e livro de movimentos com custo) e ENTRADAS (stockReceipts: fornecedor, documento, custo) ficam em coleções
+    // separadas e FECHADAS ao cliente (regra final): a administração os lê pela API autorizada (costs.read). Rules
+    // autorizam documento inteiro, por isso a separação física. Escrita só pelo servidor, em transação (Admin SDK).
+    // Regras novas apenas acrescentam leitura (expandir), compatíveis com a main publicada.
+    match /stockBalances/{productId} {
+      allow get, list: if hasRole(['cantina', 'admin']);
+      allow write: if false;
+      match /lots/{lotId} {
+        allow get, list: if hasRole(['cantina', 'admin']);
+        allow write: if false;
+      }
+      match /reservations/{reservationId} {
+        allow get, list: if hasRole(['cantina', 'admin']);
+        allow write: if false;
+      }
+    }
+    match /dailyCapacity/{capacityId} {
+      allow get, list: if hasRole(['cantina', 'admin']);
+      allow write: if false;
+    }
     // Todo o resto (transferências, pedidos, custos, lucro, relatórios, auditoria, idempotência) permanece fechado ao
     // cliente: acesso só por servidor autorizado. Custos/lucro ficarão em coleções de administração (nunca abertas à secretaria).
     match /{document=**} { allow read, write: if false; }

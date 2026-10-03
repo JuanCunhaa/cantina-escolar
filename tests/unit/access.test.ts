@@ -20,7 +20,7 @@ describe("matriz de papéis (A30)", () => {
   });
 
   it("cantina opera pedidos/PDV/fotos, mas não vê custos, lucro nem recarrega", () => {
-    expect(allowed("cantina")).toEqual(["students.search", "orders.operate", "pos.operate", "catalog.photos.manage"]);
+    expect(allowed("cantina")).toEqual(["students.search", "orders.operate", "pos.operate", "catalog.photos.manage", "inventory.read", "inventory.loss"]);
   });
 
   it("responsável, aluno e conta sem papel não têm capacidade administrativa", () => {

@@ -15,7 +15,7 @@ export function commandErrorResponse(error: unknown, label: string): Response {
   const denied = accessErrorResponse(error);
   if (denied) return denied;
   if (error instanceof ZodError) return Response.json({ error: "invalid_input" }, { status: 400 });
-  if (error instanceof DomainError) return Response.json({ error: error.code }, { status: error.status });
+  if (error instanceof DomainError) return Response.json(error.details ? { error: error.code, details: error.details } : { error: error.code }, { status: error.status });
   if (error instanceof IdempotencyConflictError) return Response.json({ error: "idempotency_conflict" }, { status: 409 });
   console.error("%s failed", label, error instanceof Error ? error.name : "unknown");
   return Response.json({ error: "internal" }, { status: 500 });

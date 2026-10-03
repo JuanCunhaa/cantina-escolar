@@ -1,6 +1,6 @@
 import type { User } from "firebase/auth";
 
-export type ApiResult<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
+export type ApiResult<T> = { ok: true; data: T } | { ok: false; status: number; error: string; details?: Record<string, unknown> };
 
 /** Chamada autenticada à API do servidor (ID token atual). Nunca lança: devolve o código de erro estável. */
 export async function api<T = Record<string, unknown>>(
@@ -15,8 +15,8 @@ export async function api<T = Record<string, unknown>>(
     if (user) headers.authorization = `Bearer ${await user.getIdToken()}`;
     const signal = options.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined;
     const response = await fetch(url, { method, headers, signal, body: body === undefined ? undefined : JSON.stringify(body) });
-    const data = (await response.json().catch(() => ({}))) as T & { error?: string };
-    return response.ok ? { ok: true, data } : { ok: false, status: response.status, error: data.error ?? "internal" };
+    const data = (await response.json().catch(() => ({}))) as T & { error?: string; details?: Record<string, unknown> };
+    return response.ok ? { ok: true, data } : { ok: false, status: response.status, error: data.error ?? "internal", details: data.details };
   } catch {
     return { ok: false, status: 0, error: "network" };
   }
@@ -91,6 +91,9 @@ const MESSAGES: Record<string, string> = {
   beyond_window: "Compras só de hoje até 7 dias à frente.",
   insufficient_balance: "Saldo insuficiente na carteira de origem.",
   balance_limit: "A carteira de destino atingiria o limite de saldo.",
+  mode_in_use: "O produto tem estoque ou reservas ativas: zere o estoque e trate as reservas antes de mudar o modo (físico/planejado).",
+  insufficient_stock: "Estoque insuficiente (unidades reservadas, vencidas ou inexistentes não podem ser baixadas).",
+  capacity_exceeded: "A cota desta data e turno está esgotada.",
   internal: "Não foi possível concluir agora. Tente novamente.",
 };
 

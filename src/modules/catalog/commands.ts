@@ -226,6 +226,13 @@ async function runProductCommand(
     }
     case "update": {
       if (before!.version !== input.expectedVersion) throw conflict("stale_product", "O produto mudou desde que foi aberto.");
+      if (before!.availabilityMode !== input.availabilityMode) {
+        // F10: físico ↔ planejado muda a regra de reserva/entrega; com unidades em estoque ou reservas ativas o saldo ficaria incoerente.
+        const stock = await tx.get(db.doc(`stockBalances/${id}`));
+        if (stock.exists && (Number(stock.get("onHand")) > 0 || Number(stock.get("reservedTotal")) > 0)) {
+          throw conflict("mode_in_use", "O produto tem estoque ou reservas ativas: zere o estoque e trate as reservas antes de mudar o modo.");
+        }
+      }
       const next = publicSummary({ ...input, status: before!.status });
       const changedPublic = JSON.stringify(publicSummary(before!)) !== JSON.stringify(next);
       const changedPrivate =

@@ -299,3 +299,16 @@ fieldset { min-width: 0; }
   .day-table th, .day-table td { display: block; padding: 0; border: 0; }
   .day-table tbody th, .day-table td:nth-child(4) { grid-column: 1 / -1; }
 }
+
+/* F10: estoque. Tabelas abertas; no celular cada produto/lote/movimento vira um bloco com rótulos (sem rolagem lateral). */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.stock-table td, .stock-table th { font-variant-numeric: tabular-nums; }
+.stock-table tr[data-selected="true"] { background: var(--color-accent-soft); }
+@media (max-width: 40rem) {
+  .stock-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .stock-table tr { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1) var(--space-3); padding: var(--space-2) 0; border-bottom: 1px solid var(--color-line); }
+  .stock-table th, .stock-table td { display: block; padding: 0; border: 0; }
+  .stock-table tbody th { grid-column: 1 / -1; }
+  .stock-table td[data-label]::before { content: attr(data-label) ": "; color: var(--color-muted); font-size: 0.8125rem; }
+  .stock-table td:last-child { grid-column: 1 / -1; }
+}
