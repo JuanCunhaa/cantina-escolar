@@ -24,6 +24,11 @@ import {
 } from "./model";
 
 const EXPIRING_DAYS = 3;
+// Listas do detalhe: lê um pouco mais que o exibido, ordena em memória (sem índice composto) e informa se cortou.
+const RESERVATIONS_READ = 300;
+const RESERVATIONS_SHOWN = 100;
+const RECEIPTS_READ = 500;
+const RECEIPTS_SHOWN = 100;
 const iso = (value: unknown) => (value && typeof (value as Timestamp).toDate === "function" ? (value as Timestamp).toDate().toISOString() : null);
 
 export type OverviewItem = {
@@ -159,6 +164,8 @@ export type ProductStockView = {
   movementSeq: number;
   lots: LotView[];
   reservations: ReservationView[];
+  /** Há mais reservas ativas do que as exibidas (as mais próximas vêm primeiro). */
+  reservationsTruncated: boolean;
   capacities: (Capacity & { available: number })[];
   movements: MovementView[];
   valueMicros?: Micros;
@@ -178,10 +185,10 @@ export async function readProductStock(db: Firestore, actor: Actor, productId: s
   const balance = parseBalance(productId, mode, balanceSnap?.data());
   const [lots, reservations, capacities, movements, receipts] = await Promise.all([
     db.collection(`stockBalances/${productId}/lots`).orderBy("openKey").limit(60).get(),
-    db.collection(`stockBalances/${productId}/reservations`).where("status", "==", "active").limit(100).get(),
+    db.collection(`stockBalances/${productId}/reservations`).where("status", "==", "active").limit(RESERVATIONS_READ).get(),
     db.collection("dailyCapacity").where("productId", "==", productId).get(),
     db.collection(`stockCosts/${productId}/movements`).orderBy("seq", "desc").limit(50).get(),
-    withCosts ? db.collection("stockReceipts").where("productId", "==", productId).limit(100).get() : Promise.resolve(null),
+    withCosts ? db.collection("stockReceipts").where("productId", "==", productId).limit(RECEIPTS_READ).get() : Promise.resolve(null),
   ]);
   const view: ProductStockView = {
     today,
@@ -197,9 +204,11 @@ export async function readProductStock(db: Firestore, actor: Actor, productId: s
       const lot = parseLot(d.id, d.data());
       return { id: lot.id, lotCode: lot.lotCode, availableOn: lot.availableOn, expiresOn: lot.expiresOn, validThrough: lot.validThrough, quantity: lot.quantity, remaining: lot.remaining, expired: lot.validThrough < today };
     }),
+    reservationsTruncated: reservations.size > RESERVATIONS_SHOWN,
     reservations: reservations.docs
       .map((d) => parseReservation(d.id, d.data()))
       .sort((a, b) => a.consumptionDate.localeCompare(b.consumptionDate) || a.id.localeCompare(b.id))
+      .slice(0, RESERVATIONS_SHOWN)
       .map((r) => ({ id: r.id, orderRef: r.orderRef, consumptionDate: r.consumptionDate, shiftId: r.shiftId, quantity: r.quantity, remaining: remainingOf(r), deliveredQty: r.deliveredQty })),
     capacities: capacities.docs
       .map((d) => parseCapacity(productId, String(d.get("date")), String(d.get("shiftId")), d.data()))
@@ -238,6 +247,7 @@ export async function readProductStock(db: Firestore, actor: Actor, productId: s
     view.receipts = (receipts?.docs ?? [])
       .map((d) => ({ doc: d, at: (d.get("createdAt") as Timestamp | undefined)?.toMillis() ?? 0 }))
       .sort((a, b) => b.at - a.at)
+      .slice(0, RECEIPTS_SHOWN)
       .map(({ doc }) => ({
         id: doc.id,
         kind: String(doc.get("kind")),

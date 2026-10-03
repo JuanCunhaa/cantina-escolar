@@ -323,11 +323,14 @@ export class StockSession {
       if (remaining < quantity) throw conflict("reservation_closed", "A reserva não cobre esta quantidade (já entregue, liberada ou menor).", { remaining });
     }
 
-    await this.loadLots(p, eligDate, () => allocateFefo(this.lotValues(p), quantity, eligibleOn(eligDate)).unmet === 0);
+    const reservedOthers = reservation ? 0 : p.balance.reservedByDate[eligDate] ?? 0;
+    // Venda de balcão de produto planejado precisa de quantidade + reservas da data em lotes elegíveis: ler lotes até cobrir ISSO
+    // (parar ao cobrir só a quantidade geraria entry_required falso quando há mais de uma página de lotes).
+    const needed = p.mode === "planned" ? quantity + reservedOthers : quantity;
+    await this.loadLots(p, eligDate, () => allocateFefo(this.lotValues(p), needed, eligibleOn(eligDate)).unmet === 0);
     const lots = this.lotValues(p);
     const covered = allocateFefo(lots, Number.MAX_SAFE_INTEGER, eligibleOn(eligDate));
     const eligible = Number.MAX_SAFE_INTEGER - covered.unmet;
-    const reservedOthers = reservation ? 0 : p.balance.reservedByDate[eligDate] ?? 0;
 
     if (p.mode === "planned") {
       if (eligible - reservedOthers < quantity) {
@@ -577,7 +580,7 @@ export class StockSession {
 
   /** Reservas ativas mais distantes primeiro (as de maior data cobrem o déficit antes), até somar o déficit; tratadas pela administração. */
   private async affectedReservations(p: ProductState, shortfall: number): Promise<AffectedReservation[]> {
-    const snap = await this.tx.get(this.refs(p.productId).reservations.where("status", "==", "active").limit(200));
+    const snap = await this.tx.get(this.refs(p.productId).reservations.where("status", "==", "active").limit(500));
     const active = snap.docs.map((d) => parseReservation(d.id, d.data())).filter((r) => remainingOf(r) > 0).sort((a, b) => b.consumptionDate.localeCompare(a.consumptionDate) || a.id.localeCompare(b.id));
     const out: AffectedReservation[] = [];
     let covered = 0;

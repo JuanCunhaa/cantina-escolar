@@ -295,6 +295,19 @@ describe("A19 — reserva não é saída; saída física acontece uma vez", () =
     await expectReconciled(p);
   });
 
+  it("balcão de planejado com mais de uma página de lotes e reservas na data não falha à toa (regressão da revisão)", async () => {
+    const p = await product("planned");
+    for (let i = 0; i < 12; i++) expect((await receive(admin, p, 1, "1,00", { availableOn: TODAY }, "production")).status).toBe(200); // 12 lotes de 1 unidade (> 1 página de 10)
+    expect((await setCapacity(p, TODAY, 5)).status).toBe(200);
+    await reserve(p, 1, "pag_res", TODAY);
+    const exit = await sell(p, 10); // 12 físicas − 1 reservada = 11 livres
+    expect(exit.allocations).toHaveLength(10);
+    expect(await attempt(() => sell(p, 2))).toMatchObject({ ok: false, code: "entry_required" }); // sobra 1 livre + 1 reservada
+    expect((await sell(p, 1)).quantity).toBe(1);
+    expect((await sell(p, 1, { reservationId: "pag_res" })).quantity).toBe(1); // a reservada continua entregável
+    await expectReconciled(p);
+  }, 90000);
+
   it("sobra de planejado não vira estoque do dia seguinte sozinha: precisa de ação explícita (ampliar validade) ou perda", async () => {
     const p = await product("planned");
     await receive(admin, p, 4, "2,00", { availableOn: TODAY }, "production");

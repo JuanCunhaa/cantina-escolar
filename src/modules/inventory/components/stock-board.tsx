@@ -193,6 +193,8 @@ function StockDetail({ user, productId, canManage, onChanged }: { user: User; pr
       {view.reservations.length === 0 ? (
         <p className="muted">Nenhuma reserva ativa.</p>
       ) : (
+        <>
+          {view.reservationsTruncated && <p className="muted">Há mais reservas ativas do que as exibidas (mostrando as de datas mais próximas).</p>}
         <ul data-testid="reservations-list">
           {view.reservations.map((r) => (
             <li key={r.id}>
@@ -200,6 +202,7 @@ function StockDetail({ user, productId, canManage, onChanged }: { user: User; pr
             </li>
           ))}
         </ul>
+        </>
       )}
 
       {view.mode === "planned" && (
