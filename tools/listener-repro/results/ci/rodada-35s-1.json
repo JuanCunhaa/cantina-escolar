@@ -1,0 +1,279 @@
+{
+ "scenario": "CI-escrita-35s",
+ "measure": "probe",
+ "transport": "default",
+ "listeners": [
+  "probe"
+ ],
+ "runner": {
+  "os": "linux",
+  "arch": "x64",
+  "imageOs": "ubuntu24",
+  "node": "v24.21.0",
+  "githubRunId": "37098798557",
+  "githubJob": "rodada"
+ },
+ "browser": "chromium 153.0.8010.12",
+ "firebaseSdk": "12.19.0",
+ "playwright": "1.63.0",
+ "at": "2026-10-03T05:13:04.998Z",
+ "run": {
+  "round": 1,
+  "writeAfterSubscribeTargetMs": 35000,
+  "writeAfterSubscribeMs": 35002,
+  "authMs": 402,
+  "subscribeToFirstSnapshotMs": 2013,
+  "firstSnapshotFromCache": [
+   {
+    "afterSubscribeMs": 2013,
+    "fromCache": false,
+    "n": null
+   },
+   {
+    "afterSubscribeMs": 35420,
+    "fromCache": false,
+    "n": 383409
+   }
+  ],
+  "writeAfterFirstSnapshotMs": 32989,
+  "commitMs": 234,
+  "commitConfirmedAfterSubscribeMs": 35236,
+  "commitToSnapshotMs": 184,
+  "newValueSnapshot": {
+   "afterSubscribeMs": 35420,
+   "fromCache": false
+  },
+  "snapshotToRenderMs": 0,
+  "subscribeToDeliveryMs": 35420,
+  "channelOpenToDeliveryMs": 35405,
+  "slow": false,
+  "delivered": true,
+  "requestStarts": [
+   {
+    "kind": "FWD",
+    "at": 0,
+    "params": "CVER,RID,VER,X-HTTP-Session-Id,database",
+    "method": "POST"
+   },
+   {
+    "kind": "BACK",
+    "at": 211,
+    "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+    "method": "GET"
+   },
+   {
+    "kind": "BACK",
+    "at": 1042,
+    "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+    "method": "GET"
+   },
+   {
+    "kind": "BACK",
+    "at": 2002,
+    "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+    "method": "GET"
+   },
+   {
+    "kind": "BACK",
+    "at": 32090,
+    "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+    "method": "GET"
+   },
+   {
+    "kind": "BACK",
+    "at": 35229,
+    "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+    "method": "GET"
+   },
+   {
+    "kind": "BACK",
+    "at": 35403,
+    "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+    "method": "GET"
+   },
+   {
+    "kind": "BACK",
+    "at": 36027,
+    "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+    "method": "GET"
+   },
+   {
+    "kind": "BACK",
+    "at": 36202,
+    "params": "AID,CI,RID,SID,TYPE,VER,database,gsessionid",
+    "method": "GET"
+   }
+  ],
+  "listenRequests": [
+   {
+    "kind": "FWD",
+    "start": 0,
+    "end": 205,
+    "status": 200,
+    "aid": null,
+    "bytes": 451
+   },
+   {
+    "kind": "BACK",
+    "start": 35229,
+    "end": 35398,
+    "status": 200,
+    "aid": "11",
+    "bytes": 161
+   }
+  ],
+  "failedRequests": [
+   {
+    "kind": "BACK",
+    "at": 1057
+   },
+   {
+    "kind": "BACK",
+    "at": 2017
+   },
+   {
+    "kind": "BACK",
+    "at": 32105
+   },
+   {
+    "kind": "BACK",
+    "at": 35243
+   },
+   {
+    "kind": "BACK",
+    "at": 36042
+   },
+   {
+    "kind": "BACK",
+    "at": 36216
+   }
+  ],
+  "backchannelChunks": [
+   {
+    "afterCommitMs": -33232,
+    "afterSubscribeMs": 2004,
+    "bytes": 1055
+   },
+   {
+    "afterCommitMs": -33052,
+    "afterSubscribeMs": 2184,
+    "bytes": 17
+   },
+   {
+    "afterCommitMs": -3205,
+    "afterSubscribeMs": 32031,
+    "bytes": 17
+   },
+   {
+    "afterCommitMs": -2963,
+    "afterSubscribeMs": 32273,
+    "bytes": 18
+   },
+   {
+    "afterCommitMs": 4,
+    "afterSubscribeMs": 35240,
+    "bytes": 414
+   },
+   {
+    "afterCommitMs": 177,
+    "afterSubscribeMs": 35413,
+    "bytes": 126
+   },
+   {
+    "afterCommitMs": 349,
+    "afterSubscribeMs": 35585,
+    "bytes": 18
+   },
+   {
+    "afterCommitMs": 802,
+    "afterSubscribeMs": 36038,
+    "bytes": 257
+   },
+   {
+    "afterCommitMs": 976,
+    "afterSubscribeMs": 36212,
+    "bytes": 126
+   },
+   {
+    "afterCommitMs": 1150,
+    "afterSubscribeMs": 36386,
+    "bytes": 18
+   }
+  ],
+  "channelServers": [
+   {
+    "kind": "FWD",
+    "ip": "142.251.219.138"
+   },
+   {
+    "kind": "BACK",
+    "ip": "142.251.219.138"
+   },
+   {
+    "kind": "BACK",
+    "ip": "142.251.219.138"
+   },
+   {
+    "kind": "BACK",
+    "ip": "142.251.219.138"
+   },
+   {
+    "kind": "BACK",
+    "ip": "142.251.219.138"
+   },
+   {
+    "kind": "BACK",
+    "ip": "142.251.219.138"
+   },
+   {
+    "kind": "BACK",
+    "ip": "142.251.219.138"
+   },
+   {
+    "kind": "BACK",
+    "ip": "142.251.219.138"
+   }
+  ],
+  "errors": [],
+  "console": [],
+  "pageErrors": [],
+  "marks": [
+   {
+    "afterSubscribeMs": -402,
+    "ev": "auth:start"
+   },
+   {
+    "afterSubscribeMs": 0,
+    "ev": "auth:ready"
+   },
+   {
+    "afterSubscribeMs": 0,
+    "ev": "subscribe:probe"
+   },
+   {
+    "afterSubscribeMs": 2013,
+    "ev": "snapshot:probe",
+    "data": {
+     "n": null,
+     "fromCache": false
+    }
+   },
+   {
+    "afterSubscribeMs": 2015,
+    "ev": "render:probe"
+   },
+   {
+    "afterSubscribeMs": 35420,
+    "ev": "snapshot:probe",
+    "data": {
+     "n": 383409,
+     "fromCache": false
+    }
+   },
+   {
+    "afterSubscribeMs": 35420,
+    "ev": "render:probe"
+   }
+  ]
+ }
+}
