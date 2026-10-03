@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page, type PlaywrightWorkerArgs } from "@playwright/test";
 import { createTestUser, TEST_PASSWORD } from "../helpers/auth-emulator";
 import { createTempProduct, prepareCatalog, retireTempProduct } from "../helpers/catalog-fixtures.ts";
 import { warmRoutes } from "../helpers/dev-server.ts";
@@ -10,6 +10,14 @@ async function login(page: Page, path: string, email: string) {
   await page.getByLabel("Senha").fill(TEST_PASSWORD);
   await page.getByRole("button", { name: "Entrar" }).click();
 }
+
+/**
+ * Chamadas de API feitas DEPOIS de interações longas na tela usam conexão nova e sem keep-alive: o servidor de desenvolvimento
+ * (Node) fecha sockets ociosos após ~5 s e o contexto de requisições do Playwright pode reaproveitar um já fechado
+ * (ECONNRESET intermitente no CI). Não muda nenhuma asserção.
+ */
+const freshApi = (playwright: PlaywrightWorkerArgs["playwright"]): Promise<APIRequestContext> =>
+  playwright.request.newContext({ baseURL: test.info().project.use.baseURL, extraHTTPHeaders: { connection: "close" } });
 
 const row = (page: Page, id: string) => page.getByTestId("stock-table").locator(`tr[data-product="${id}"]`);
 async function openProduct(page: Page, id: string) {
@@ -26,7 +34,7 @@ test.beforeAll(async ({ request }) => {
   });
 });
 
-test("administração: duas compras viram duas entradas, custo médio R$ 1,05 e custo visível só a ela (A20)", async ({ browser, request }) => {
+test("administração: duas compras viram duas entradas, custo médio R$ 1,05 e custo visível só a ela (A20)", async ({ browser, request, playwright }) => {
   test.setTimeout(150_000);
   const tag = randomUUID().slice(0, 6);
   const admin = await createTestUser("e2e-estoque-adm", "admin");
@@ -73,7 +81,8 @@ test("administração: duas compras viram duas entradas, custo médio R$ 1,05 e 
     if (process.env.F10_SHOTS) await page.screenshot({ path: `${process.env.F10_SHOTS}/estoque-admin.png`, fullPage: true });
 
     // Reconciliação da administração fecha: saldo = livro = lotes.
-    const reconcile = await request.get(`/api/inventory/reconcile?productId=${productId}`, { headers: { authorization: `Bearer ${admin.idToken}` } });
+    const api = await freshApi(playwright);
+    const reconcile = await api.get(`/api/inventory/reconcile?productId=${productId}`, { headers: { authorization: `Bearer ${admin.idToken}` } });
     expect(await reconcile.json()).toMatchObject({ ok: true });
 
     // Cantina: vê as quantidades e registra perda, mas nenhum custo nem formulário de entrada/ajuste.
@@ -101,14 +110,17 @@ test("administração: duas compras viram duas entradas, custo médio R$ 1,05 e 
 
     // Família não acessa a API de estoque.
     for (const url of ["/api/inventory", `/api/inventory/product?productId=${productId}`]) {
-      expect((await request.get(url, { headers: { authorization: `Bearer ${family.idToken}` } })).status()).toBe(403);
+      expect((await api.get(url, { headers: { authorization: `Bearer ${family.idToken}` } })).status()).toBe(403);
     }
+    await api.dispose();
   } finally {
-    await retireTempProduct(request, admin.idToken, productId);
+    const cleanup = await freshApi(playwright);
+    await retireTempProduct(cleanup, admin.idToken, productId);
+    await cleanup.dispose();
   }
 });
 
-test("produto planejado: sem cota não reserva, a cota aparece por data/turno e a entrada exige a data de disponibilidade", async ({ browser, request }) => {
+test("produto planejado: sem cota não reserva, a cota aparece por data/turno e a entrada exige a data de disponibilidade", async ({ browser, request, playwright }) => {
   test.setTimeout(120_000);
   const tag = randomUUID().slice(0, 6);
   const admin = await createTestUser("e2e-estoque-adm2", "admin");
@@ -137,6 +149,8 @@ test("produto planejado: sem cota não reserva, a cota aparece por data/turno e 
     await expect(page.getByTestId("detail-onhand")).toHaveText("12");
     await expect(page.getByTestId("detail-average")).toHaveText("R$ 2,50");
   } finally {
-    await retireTempProduct(request, admin.idToken, productId);
+    const cleanup = await freshApi(playwright);
+    await retireTempProduct(cleanup, admin.idToken, productId);
+    await cleanup.dispose();
   }
 });
