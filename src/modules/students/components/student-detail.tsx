@@ -149,7 +149,7 @@ export function StudentDetail({ user, studentId }: { user: User; studentId: stri
         >
           {student.status === "active" ? "Arquivar aluno" : "Reativar aluno"}
         </button>{" "}
-        <span className="muted">Arquivar mantém vínculos, histórico e matrícula; bloqueia novas compras.</span>
+        <span className="muted">Arquivar mantém vínculos, histórico e matrícula; bloqueia novas compras e só é possível com a carteira zerada.</span>
       </p>
 
       <h2>Responsáveis vinculados</h2>

@@ -270,3 +270,51 @@ export async function seedDemoCatalog(target: EmulatorTarget = DEFAULT_TARGET): 
     DEMO_SHIFTS.map((s) => `shiftPolicies.${s.id}`),
   );
 }
+
+type Decoded = string | number | boolean | null | Decoded[] | { [key: string]: Decoded };
+
+function fromValue(value: Record<string, unknown>): Decoded {
+  if ("stringValue" in value) return String(value.stringValue);
+  if ("integerValue" in value) return Number(value.integerValue);
+  if ("doubleValue" in value) return Number(value.doubleValue);
+  if ("booleanValue" in value) return Boolean(value.booleanValue);
+  if ("timestampValue" in value) return String(value.timestampValue);
+  if ("arrayValue" in value) return ((value.arrayValue as { values?: Record<string, unknown>[] }).values ?? []).map(fromValue);
+  if ("mapValue" in value) return Object.fromEntries(Object.entries((value.mapValue as { fields?: Record<string, Record<string, unknown>> }).fields ?? {}).map(([k, v]) => [k, fromValue(v)]));
+  return null;
+}
+
+/** Lê um documento do Firestore Emulator com o token "owner" (só emulador local). Ausente = null. */
+export async function readDemoDoc(target: EmulatorTarget, path: string): Promise<Record<string, Decoded> | null> {
+  assertLocal(target);
+  const response = await fetch(`http://${target.firestoreHost}/v1/projects/${target.project}/databases/(default)/documents/${path}`, { headers: OWNER });
+  if (response.status === 404) return null;
+  await expectOk(response, `documento ${path}`);
+  const body = (await response.json()) as { fields?: Record<string, Record<string, unknown>> };
+  return Object.fromEntries(Object.entries(body.fields ?? {}).map(([k, v]) => [k, fromValue(v)])) as Record<string, Decoded>;
+}
+
+/**
+ * FIXTURE de teste (financiamento real vem das recargas F17–F19): credita a carteira de um aluno com UM movimento do livro
+ * no formato real (seq contíguo, saldo após, tipo `adjustment`, motivo "fixture de teste") e atualiza a projeção. Só
+ * emulador local; não é transacional — usar antes de disparar comandos concorrentes, nunca durante.
+ */
+export async function fundDemoWallet(target: EmulatorTarget, studentId: string, cents: number): Promise<{ balanceCents: number; version: number }> {
+  const wallet = await readDemoDoc(target, `wallets/${studentId}`);
+  const version = Number(wallet?.version ?? 0) + 1;
+  const balanceCents = Number(wallet?.balanceCents ?? 0) + cents;
+  if (!Number.isSafeInteger(cents) || cents <= 0 || balanceCents < 0) throw new Error("fixture de carteira inválida.");
+  const entryId = `fixture_${studentId}_${version}`;
+  await writeDemoDoc(target, `wallets/${studentId}/entries/${entryId}`, {
+    type: "adjustment",
+    seq: version,
+    amountCents: cents,
+    balanceAfterCents: balanceCents,
+    reason: "fixture de teste",
+    actorUid: "fixture",
+    referenceType: "fixture",
+    referenceId: entryId,
+  });
+  await writeDemoDoc(target, `wallets/${studentId}`, { studentId, currency: "BRL", balanceCents, version });
+  return { balanceCents, version };
+}

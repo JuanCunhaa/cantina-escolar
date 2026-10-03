@@ -9,6 +9,8 @@ if (process.env.TEST_WORKER_INDEX === undefined) rmSync(storageDir, { recursive:
 
 export default defineConfig({
   testDir: "tests/e2e",
+  // A propagação entre sessões (listener) roda à parte: playwright.propagation.config.ts.
+  testIgnore: "**/*.propagation.spec.ts",
   timeout: 60000,
   fullyParallel: false,
   workers: 1,

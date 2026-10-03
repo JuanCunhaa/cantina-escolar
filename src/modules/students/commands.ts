@@ -5,6 +5,7 @@ import { deterministicId, runIdempotentCommand } from "@/lib/firebase/command";
 import type { Actor } from "@/modules/access/actor";
 import { authorize } from "@/modules/access/authorize";
 import { auditInTransaction } from "@/modules/audit/log";
+import { parseWalletState } from "@/modules/wallet/model";
 import { isSafeLabel, normalizeEnrollment, normalizeName } from "./normalize";
 
 export const STUDENT_STATUSES = ["active", "inactive"] as const;
@@ -107,7 +108,13 @@ export async function createStudentInTx(
 
 export type StudentChanges = { name?: string; classId?: string; shiftId?: string; status?: (typeof STUDENT_STATUSES)[number] };
 
-/** Altera o cadastro: turma/turno só para unidades ativas; histórico (matrícula, vínculos, pedidos) permanece. */
+/**
+ * Altera o cadastro: turma/turno só para unidades ativas; histórico (matrícula, vínculos, pedidos) permanece.
+ * Arquivar (ativo → inativo) é recusado (409 `student_has_balance`) enquanto a carteira tem saldo diferente de zero: o
+ * saldo é lido NESTA transação, junto do aluno, e a transferência lê o aluno e as carteiras na dela — as duas disputam o
+ * documento do aluno, então o saldo nunca fica preso em cadastro arquivado por corrida. Para aluno já arquivado com saldo:
+ * reativar (esta mesma ação, auditada), usar o fluxo normal e só então arquivar.
+ */
 export async function updateStudentInTx(
   db: Firestore,
   tx: Transaction,
@@ -120,10 +127,15 @@ export async function updateStudentInTx(
   const refs = [db.doc(`students/${id}`)];
   if (changes.classId) refs.push(db.doc(`classes/${changes.classId}`));
   if (changes.shiftId) refs.push(db.doc(`shifts/${changes.shiftId}`));
+  const archiving = changes.status === "inactive";
+  if (archiving) refs.push(db.doc(`wallets/${id}`));
   const snaps = await tx.getAll(...refs);
   const snap = snaps[0]!;
   if (!snap.exists) throw notFound("student_not_found");
   const before = snap.data() as StudentDoc;
+  if (archiving && before.status === "active" && parseWalletState(snaps[snaps.length - 1]?.data()).balanceCents !== 0) {
+    throw conflict("student_has_balance", "O aluno tem saldo na carteira.");
+  }
   let at = 1;
   if (changes.classId) assertActiveUnit(snaps[at++], "class_unavailable", "Turma inexistente ou arquivada.");
   if (changes.shiftId) assertActiveUnit(snaps[at++], "shift_unavailable", "Turno inexistente ou arquivado.");
