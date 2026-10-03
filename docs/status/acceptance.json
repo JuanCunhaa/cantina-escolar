@@ -377,9 +377,9 @@
       "npm run build:webpack exit 0",
       "npm run audit:prod 0 vulnerabilidades",
       "gitleaks git --redact: sem vazamentos; gitleaks dir em src/tests/scripts/docs/firebase: sem vazamentos (Semgrep só no CI: não executado localmente)",
-      "npm run test:e2e:propagation 1/1 local (emulador). CI (GitHub Actions, run 37092027313, head 892a253): o teste de propagação FALHOU na pré-condição (a sessão observadora seguia em \"connecting\" após o timeout padrão de 5 s; a propagação em si não chegou a ser exercitada). Local (emulador, Windows): passou em 3 execuções. Timeout não foi aumentado."
+      "npm run test:e2e:propagation 1/1 local (emulador). CI (GitHub Actions, run 37092027313, head 892a253): o teste de propagação FALHOU na pré-condição (a sessão observadora seguia em \"connecting\" após o timeout padrão de 5 s; a propagação em si não chegou a ser exercitada). Local (emulador, Windows): passou em 3 execuções. Timeout não foi aumentado. Run seguinte da CI (37093327283): 1/1 passou. Total de amostras na CI: 1 falha, 1 aprovação."
     ],
-    "notes": "Parcial: saldo da carteira por listener privado (escopo do vínculo) + leitura do servidor reconciliados por versão; dado de listener/cache não confirma operação. Pedidos/estoque (F11/F12/F10) e troca de aluno na interface seguem pendentes; atraso de listener da homologação NÃO reproduzido nem medido nesta tarefa (inconclusivo, PR #4). Propagação entre sessões pelo listener: NÃO comprovada de forma estável — passou localmente e falhou uma vez na CI (ver evidência); sem homologação."
+    "notes": "Parcial: saldo da carteira por listener privado (escopo do vínculo) + leitura do servidor reconciliados por versão; dado de listener/cache não confirma operação. Pedidos/estoque (F11/F12/F10) e troca de aluno na interface seguem pendentes; atraso de listener da homologação NÃO reproduzido nem medido nesta tarefa (inconclusivo, PR #4). Propagação entre sessões pelo listener: NÃO comprovada de forma estável — passou 3× localmente e na CI 1 falha + 1 aprovação (ver evidência); sem homologação."
   },
   "A35": {
     "status": "not_run",
