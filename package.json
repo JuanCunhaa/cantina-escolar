@@ -18,6 +18,7 @@
     "test:rules": "firebase emulators:exec --only auth,firestore --project demo-cantina \"vitest run --config vitest.rules.config.ts\"",
     "test:r2": "vitest run --config vitest.r2.config.ts",
     "test:e2e": "firebase emulators:exec --only auth,firestore --project demo-cantina \"playwright test\"",
+    "test:e2e:propagation": "firebase emulators:exec --only auth,firestore --project demo-cantina \"playwright test --config playwright.propagation.config.ts\"",
     "emulators": "firebase emulators:start --project demo-cantina",
     "seed": "node scripts/seed.ts",
     "dev:webpack": "next dev --webpack",

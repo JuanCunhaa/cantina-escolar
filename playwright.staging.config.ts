@@ -10,6 +10,8 @@ const target = loadTarget();
 export default defineConfig({
   testDir: "tests",
   testMatch: ["e2e/*.spec.ts", "staging/*.spec.ts"],
+  // Carteira (F08): fixtures de saldo só existem no emulador; a verificação em homologação ainda não foi escrita.
+  testIgnore: ["e2e/wallet*.spec.ts"],
   timeout: 120000,
   fullyParallel: false,
   workers: 1,

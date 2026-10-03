@@ -1,59 +1,8 @@
-import { expect, test, type APIRequestContext, type Browser, type Locator, type Page } from "@playwright/test";
-import { fundDemoWallet } from "../../scripts/lib/demo-seed.ts";
-import { createTestUser, seedStudentAccess, targetFromEnv, TEST_PASSWORD, type TestUser } from "../helpers/auth-emulator";
+import { expect, test } from "@playwright/test";
+import { createTestUser } from "../helpers/auth-emulator";
 import { warmRoutes } from "../helpers/dev-server.ts";
+import { balance, card, family, fillTransfer, login, n, openWallet, reconciled, serverWallet, status, tag } from "../helpers/wallet-fixtures";
 
-const tag = Math.random().toString(36).slice(2, 7);
-let n = 0;
-
-async function login(page: Page, path: string, email: string) {
-  await page.goto(path);
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Senha").fill(TEST_PASSWORD);
-  await page.getByRole("button", { name: "Entrar" }).click();
-}
-
-type Family = { ana: { id: string; name: string }; bia: { id: string; name: string } };
-
-/** Dois alunos ativos vinculados aos responsáveis informados, com saldo inicial por FIXTURE (recarga real é F17–F19). */
-async function family(guardians: TestUser[], anaCents: number, biaCents: number): Promise<Family> {
-  const make = async (label: string, cents: number) => {
-    const id = `stu_${tag}_${label}_${++n}`;
-    const name = `${label} ${tag}${n}`;
-    await seedStudentAccess({ studentId: id, name, guardianUids: guardians.map((g) => g.uid) });
-    if (cents > 0) await fundDemoWallet(targetFromEnv(), id, cents);
-    return { id, name };
-  };
-  return { ana: await make("Ana", anaCents), bia: await make("Bia", biaCents) };
-}
-
-const card = (page: Page, id: string): Locator => page.locator(`[data-testid="wallet-student"][data-student="${id}"]`);
-const balance = (page: Page, id: string) => card(page, id).getByTestId("wallet-balance");
-const status = (page: Page) => page.getByTestId("transfer-status");
-
-async function openWallet(page: Page, user: TestUser, f: Family) {
-  await login(page, "/portal/carteira", user.email);
-  await expect(card(page, f.ana.id)).toBeVisible({ timeout: 20000 });
-  await expect(card(page, f.bia.id)).toBeVisible();
-}
-
-async function fillTransfer(page: Page, f: Family, amount: string) {
-  await page.locator("#transfer-from").selectOption({ label: f.ana.name });
-  await page.locator("#transfer-to").selectOption({ label: f.bia.name });
-  await page.locator("#transfer-amount").fill(amount);
-}
-
-/** Verificação adicional pelo servidor (API autenticada) e pelo Admin/emulador, independente do que a tela mostra. */
-async function serverWallet(request: APIRequestContext, token: string, id: string) {
-  const response = await request.get(`/api/wallets?studentId=${id}`, { headers: { authorization: `Bearer ${token}` } });
-  expect(response.status()).toBe(200);
-  return (await response.json()) as { balanceCents: number; version: number; entries: { type: string; amountCents: number }[] };
-}
-async function reconciled(request: APIRequestContext, admin: TestUser, id: string) {
-  const response = await request.get(`/api/wallets/reconcile?studentId=${id}`, { headers: { authorization: `Bearer ${admin.idToken}` } });
-  expect(response.status()).toBe(200);
-  expect(await response.json()).toMatchObject({ ok: true, problems: [] });
-}
 test.describe.configure({ mode: "serial" });
 
 test.beforeAll(async ({ request }) => {
@@ -212,38 +161,5 @@ test.describe("carteira — comportamento da interface", () => {
     const attempt = await request.post("/api/wallets/transfer", { headers, data: { key: `k${tag}${n}abcdefgh`, fromStudentId: f.ana.id, toStudentId: f.bia.id, amountCents: 100 } });
     expect(attempt.status()).toBe(403);
     expect(await serverWallet(request, owner.idToken, f.ana.id)).toMatchObject({ balanceCents: 5000, version: 1 });
-  });
-});
-
-/**
- * PROPAGAÇÃO ENTRE SESSÕES (listener) — registrada À PARTE do comportamento da interface acima. Aqui só se observa se a
- * alteração feita numa sessão chega à outra pelo listener, com o timeout padrão do Playwright (sem folga). No emulador
- * não há o atraso de 24–30 s visto na homologação (docs/status/listener-delay-investigation.md); este teste não
- * representa a homologação.
- */
-test.describe("carteira — propagação entre sessões pelo listener", () => {
-  async function session(browser: Browser, user: TestUser, f: Family) {
-    const page = await (await browser.newContext()).newPage();
-    await openWallet(page, user, f);
-    return page;
-  }
-
-  test("a transferência feita por um responsável chega ao outro responsável sem recarregar", async ({ browser }) => {
-    const g1 = await createTestUser("e2e-w-s1", "guardian");
-    const g2 = await createTestUser("e2e-w-s2", "guardian");
-    const f = await family([g1, g2], 5000, 2000);
-    const p1 = await session(browser, g1, f);
-    const p2 = await session(browser, g2, f);
-    await expect(balance(p2, f.ana.id)).toContainText("R$ 50,00");
-    await expect(card(p2, f.ana.id).getByTestId("wallet-reading")).toHaveAttribute("data-sync", "live");
-
-    await fillTransfer(p1, f, "12,50");
-    await p1.getByRole("button", { name: "Transferir" }).click();
-    await expect(status(p1)).toHaveAttribute("data-phase", "confirmed");
-    await expect(balance(p1, f.ana.id)).toContainText("R$ 37,50"); // imediato, pela resposta
-
-    await expect(balance(p2, f.ana.id)).toContainText("R$ 37,50"); // propagação pelo listener, timeout padrão
-    await expect(balance(p2, f.bia.id)).toContainText("R$ 32,50");
-    await expect(card(p1, f.ana.id).getByTestId("wallet-reading")).toHaveAttribute("data-sync", "live");
   });
 });
