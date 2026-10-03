@@ -1,6 +1,6 @@
 # Experimento dirigido no CI: atraso de listener (homologação)
 
-Branch `diagnostico/listener-ci-hml`, 03/10/2026. Complementa `listener-delay-investigation.md` (PR #4, **causa não identificada**). Este experimento é **separado dos gates financeiros e do CI exigido**: não bloqueia nem substitui nenhum check, e o PR que o carrega não deve ser mesclado sem decisão do dono.
+Branch `diagnostico/listener-ci-hml`, 03/10/2026. Complementa `listener-delay-investigation.md` (PR #4, **causa não identificada**). Este experimento é **separado dos gates financeiros e do CI exigido**: não bloqueia nem substitui nenhum check, e o PR #7 que o carrega foi mesclado com autorização do dono apenas como documentação, ferramentas e resultados (nenhum código da aplicação).
 
 ## Pergunta e desenho
 
@@ -15,7 +15,7 @@ O atraso local aparece como uma entrega ~24–30 s após a **abertura do canal**
 - Destino único: `cantina-escolar-hml` (o executor aborta se o projeto, a conta de serviço ou o e-mail forem outros, ou se variável de emulador estiver definida).
 - Conta fictícia **própria do diagnóstico** (`listener-diag@hml.example.test`), **sem perfil em `users/`** (não acessa nada do app) e **sem alteração de Rules**: ela só lê o próprio `foundationProbes/{uid}` (regra existente, `isOwner`); a escrita é do Admin SDK nesse mesmo documento (campo `n`), apagado a cada rodada. Nenhuma carteira, crédito, pagamento ou Rules foram tocados; não houve uso do Vercel nem de bypass.
 - Credenciais só por secrets do **ambiente restrito** `diagnostico-listener` (publicável apenas pela branch do diagnóstico), `permissions: contents: read`; a conta de serviço entra como base64 numa variável de ambiente do passo e nunca é impressa; o executor não loga erro bruto. Os artefatos (JSON) têm só tempos, nomes de parâmetros e IPs públicos do Google (varredura de segredos: nada encontrado).
-- **Limpeza feita ao fim** (`node tools/listener-repro/ci-setup.ts cleanup`): os 4 secrets, a conta fictícia, o documento de sonda e o ambiente foram apagados. Como uma cópia da chave de serviço da homologação ficou ~20 min em secrets do GitHub, **recomenda-se a rotação dessa chave** (ação do dono; não feita).
+- **Limpeza feita ao fim** (`node tools/listener-repro/ci-setup.ts cleanup`): os 4 secrets, a conta fictícia, o documento de sonda e o ambiente foram apagados. Ver a recomendação de rotação, separada, mais abaixo.
 
 ## Resultados (9 rodadas, todas preservadas em `tools/listener-repro/results/ci/`)
 
@@ -63,6 +63,16 @@ Resumo: **9/9 entregues, 0 lentas (> 5 s)**, nenhuma sem entrega na janela de 60
 **Não reproduzido nesta amostra** (0/9 rodadas lentas, com escritas aos 2, 10 e 35 s da inscrição, contra a homologação a partir de um runner do GitHub com o mesmo Chromium e o mesmo SDK da comparação local). Isso **não** resolve o problema e **não** o descarta: a amostra é pequena demais para distinguir taxa zero de taxa de ~3–5%. A diferença de ambiente (runner × estação local) também **não prova**, sozinha, que a rede local seja a causa — vários fatores diferem ao mesmo tempo, e a própria ausência de evento é esperada com boa probabilidade mesmo se o problema existisse no CI. O diagnóstico do PR #4 permanece **INCONCLUSIVO**; nenhuma mudança no app, nas Rules, nos timeouts ou no transporte foi feita ou sugerida por este resultado.
 
 Se o dono quiser avançar (decisões abertas): (a) uma série longa e intercalada no CI e na estação local no mesmo período (centenas de rodadas, não 9) para comparar taxas com poder estatístico; (b) variar a latência até o backend sem mudar o resto; (c) enviar o relato ao suporte (`listener-delay-support-draft.md`) incluindo este resultado como "não reproduzido a partir do CI". Qualquer nova execução exige nova autorização (limite desta etapa: 9 rodadas) e recriar o ambiente com `node tools/listener-repro/ci-setup.ts setup`.
+
+## Natureza do workflow e do resultado (leia antes de reutilizar)
+
+- `listener-diagnostic.yml` é um **experimento pontual**, não um gate recorrente nem monitoramento: ele só dispara por push na branch `diagnostico/listener-ci-hml` quando o próprio workflow ou `ci-run.ts` mudam, não faz parte do `ci` (que continua sendo o único conjunto de checks exigidos) e não roda na main nem em PRs. Depois da limpeza ele **não funciona** até o ambiente e os secrets serem recriados (`ci-setup.ts setup`); rodá-lo de novo exige nova autorização e novo limite de rodadas.
+- Nenhum resultado dele é **garantia de ausência do atraso**: "não reproduzido nesta amostra" descreve 9 rodadas de um runner, uma hora, um navegador; não vale para outros horários, redes, navegadores nem para o app. Um resultado verde ou rápido do workflow nunca deve ser lido como "o atraso não existe mais".
+- Os artefatos (JSON em `tools/listener-repro/results/ci/` e os artefatos do Actions, retenção de 30 dias) foram conferidos: contêm apenas tempos, contadores, nomes de parâmetros, versões de ambiente, o id do run e IPs de front-ends do Google; **sem credenciais, tokens, e-mails, uids nem dados pessoais** (varredura de padrões e Gitleaks no histórico da branch: nada). O IP do runner não é registrado.
+
+## Recomendação de rotação da chave de serviço (preventiva, separada)
+
+Para o experimento, uma cópia da chave da conta de serviço da homologação (`cantina-escolar-hml`) foi gravada por ~20 min (05:04–~05:24 UTC de 03/10/2026) em secrets de um ambiente do GitHub restrito à branch do diagnóstico, e depois apagada junto com a conta fictícia, o documento de sonda e o ambiente. **Não há evidência de vazamento**: o GitHub mascara secrets nos logs, o executor nunca imprime credenciais nem erro bruto, os artefatos foram varridos e o ambiente só era acessível por essa branch. A recomendação é **preventiva** — rotacionar a chave por boa prática, já que uma cópia existiu num cofre de terceiros — e é uma **ação do dono, não feita por mim** (a chave só se gera no Console; depois, atualizar `.secrets/`, `.env.staging.local` e as variáveis da Vercel de homologação).
 
 ## Reproduzir
 
