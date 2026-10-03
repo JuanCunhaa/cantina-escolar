@@ -36,6 +36,8 @@ function entryFromDoc(id: string, d: Record<string, unknown>): LedgerEntryView {
 export function useWallets(user: User, studentIds: readonly string[]) {
   const [slots, setSlots] = useState<Record<string, Slot>>({});
   const userRef = useRef(user);
+  /** Geração da assinatura atual: respostas de leitura de uma geração anterior (conta/alunos trocados) são descartadas. */
+  const epoch = useRef(0);
   useEffect(() => {
     userRef.current = user;
   }, [user]);
@@ -52,7 +54,9 @@ export function useWallets(user: User, studentIds: readonly string[]) {
   /** Leitura autoritativa pelo servidor (carga inicial e conferência de resultado incerto). */
   const refresh = useCallback(
     async (id: string): Promise<boolean> => {
+      const started = epoch.current;
       const result = await api<ServerReading>(userRef.current, "GET", `/api/wallets?studentId=${encodeURIComponent(id)}`, undefined, { timeoutMs: 15000 });
+      if (started !== epoch.current) return false;
       if (!result.ok) {
         update(id, (slot) => ({ ...slot, readError: true }));
         return false;
@@ -80,6 +84,7 @@ export function useWallets(user: User, studentIds: readonly string[]) {
   );
 
   useEffect(() => {
+    epoch.current += 1;
     const ids = idsKey ? idsKey.split(",") : [];
     const { db } = getFirebaseClient();
     const stops: (() => void)[] = [];
@@ -105,6 +110,7 @@ export function useWallets(user: User, studentIds: readonly string[]) {
       );
     }
     return () => {
+      epoch.current += 1;
       for (const stop of stops) stop();
       setSlots({});
     };

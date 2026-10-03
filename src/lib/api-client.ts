@@ -41,6 +41,7 @@ const MESSAGES: Record<string, string> = {
   shift_unavailable: "Turno inexistente ou arquivado.",
   student_not_found: "Aluno não encontrado.",
   student_inactive: "O aluno está inativo.",
+  student_has_balance: "Este aluno tem saldo na carteira. Transfira ou resolva o saldo antes de arquivar o cadastro.",
   guardian_not_found: "Nenhuma conta encontrada com este e-mail.",
   not_a_guardian: "Esta conta não é de um responsável ativo.",
   link_not_found: "Vínculo não encontrado.",

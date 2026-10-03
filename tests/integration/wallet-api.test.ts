@@ -9,6 +9,7 @@ type Json = Record<string, unknown>;
 let transfer: Handler;
 let walletRead: Handler;
 let reconcile: Handler;
+let studentsRoute: Handler;
 let adminDb: typeof import("@/lib/firebase/admin").adminDb;
 let deterministicId: typeof import("@/lib/firebase/command").deterministicId;
 
@@ -30,6 +31,7 @@ beforeAll(async () => {
   transfer = (await import("@/app/api/wallets/transfer/route")).POST as Handler;
   walletRead = (await import("@/app/api/wallets/route")).GET as Handler;
   reconcile = (await import("@/app/api/wallets/reconcile/route")).GET as Handler;
+  studentsRoute = (await import("@/app/api/students/route")).POST as Handler;
   ({ adminDb } = await import("@/lib/firebase/admin"));
   ({ deterministicId } = await import("@/lib/firebase/command"));
   admin = await createTestUser("wadm", "admin");
@@ -288,5 +290,119 @@ describe("leitura autoritativa e reconciliação", () => {
     const broken = await reconcileOf(a!);
     expect(broken.ok).toBe(false);
     expect(broken.problems.join(" ")).toContain("soma do livro");
+  });
+});
+
+/** Aluno com cadastro completo (campos que o comando de cadastro exige), vinculado ao responsável, saldo por fixture. */
+async function realStudent(cents: number, who: TestUser[] = [guardian]): Promise<string> {
+  const id = sid("real");
+  await seedStudentAccess({ studentId: id, name: `Real ${counter}`, guardianUids: who.map((u) => u.uid) });
+  await writeDemoDoc(target(), `students/${id}`, { enrollment: `E-${id}`, classId: "cls_fixture", shiftId: "shf_fixture", nameNormalized: `real ${counter}`, version: 1 }, ["enrollment", "classId", "shiftId", "nameNormalized", "version"]);
+  if (cents > 0) await fundDemoWallet(target(), id, cents);
+  return id;
+}
+const setStatus = (studentId: string, status: "active" | "inactive", key: string = randomUUID()) =>
+  studentsRoute(req("POST", "/api/students", admin.idToken, { key, action: "update", studentId, status, reason: status === "inactive" ? "Saída da escola" : "Reativado para resolver o saldo" }));
+const statusOf = async (id: string) => (await adminDb().doc(`students/${id}`).get()).get("status") as string;
+
+describe("fechamento F08 — arquivar aluno com saldo (servidor, dentro da transação)", () => {
+  it("arquivar é recusado com saldo diferente de zero e permitido com saldo zero ou sem carteira; nada é alterado na recusa", async () => {
+    const withBalance = await realStudent(500);
+    const refused = await setStatus(withBalance, "inactive");
+    expect([refused.status, await refused.json()]).toEqual([409, { error: "student_has_balance" }]);
+    expect(await statusOf(withBalance)).toBe("active");
+    expect((await adminDb().doc(`students/${withBalance}`).get()).get("version")).toBe(1);
+    expect(await balanceOf(withBalance)).toBe(500);
+
+    const noWallet = await realStudent(0); // carteira inexistente = saldo 0
+    expect((await setStatus(noWallet, "inactive")).status).toBe(200);
+    expect(await statusOf(noWallet)).toBe("inactive");
+
+    // Depois de transferir todo o saldo, arquivar é permitido; o saldo recebido bloqueia o destino.
+    const dest = await realStudent(0);
+    expect((await send(guardian, withBalance, dest, 500)).status).toBe(200);
+    expect((await setStatus(dest, "inactive")).status).toBe(409);
+    expect((await setStatus(withBalance, "inactive")).status).toBe(200);
+    expect(await statusOf(withBalance)).toBe("inactive");
+  });
+
+  it("aluno já arquivado com saldo: reativação administrativa auditada devolve o fluxo normal, sem ajuste, sem apagar histórico e sem mexer em vínculos", async () => {
+    const stuck = await realStudent(800);
+    const dest = await realStudent(0);
+    await adminDb().doc(`students/${stuck}`).update({ status: "inactive" }); // estado legado: arquivado com saldo
+    const blocked = await send(guardian, stuck, dest, 100);
+    expect(blocked.status).toBe(409); // fluxo normal exige alunos ativos nas duas pontas
+    const beforeEntries = (await adminDb().collection(`wallets/${stuck}/entries`).get()).docs.map((d) => [d.id, d.data()] as const);
+    const linkBefore = (await adminDb().doc(`guardianStudentLinks/${guardian.uid}_${stuck}`).get()).data();
+
+    const key = randomUUID();
+    expect((await setStatus(stuck, "active", key)).status).toBe(200);
+    const audit = (await adminDb().doc(`auditLog/${admin.uid}__student.update__${key}`).get()).data()!;
+    expect(audit).toMatchObject({ action: "student.update", actorUid: admin.uid, before: { status: "inactive" }, after: { status: "active" } });
+    expect((await send(guardian, stuck, dest, 800)).status).toBe(200);
+    expect(await balanceOf(stuck)).toBe(0);
+    expect((await setStatus(stuck, "inactive")).status).toBe(200);
+
+    // Histórico preservado (entradas originais idênticas), vínculo intacto, nenhum movimento de ajuste novo.
+    const afterEntries = new Map((await adminDb().collection(`wallets/${stuck}/entries`).get()).docs.map((d) => [d.id, d.data()]));
+    for (const [id, data] of beforeEntries) expect(afterEntries.get(id)).toEqual(data);
+    expect([...afterEntries.values()].filter((e) => e.type === "adjustment")).toHaveLength(1); // só a fixture inicial
+    expect((await adminDb().doc(`guardianStudentLinks/${guardian.uid}_${stuck}`).get()).data()).toEqual(linkBefore);
+    expect(await reconcileOf(stuck)).toMatchObject({ ok: true });
+  });
+
+  it("disputa arquivar × receber transferência (6 rodadas): nunca fica aluno arquivado com saldo; exatamente um dos dois vence", async () => {
+    const source = await realStudent(100_000);
+    let archiveFirst = 0;
+    let transferFirst = 0;
+    for (let round = 0; round < 6; round++) {
+      const dest = await realStudent(0);
+      const [archive, move] = await Promise.all([setStatus(dest, "inactive"), send(guardian, source, dest, 500)]);
+      const status = await statusOf(dest);
+      const balance = await balanceOf(dest);
+      expect(status === "inactive" && balance !== 0).toBe(false); // invariante
+      if (archive.status === 200) {
+        expect([move.status, await move.json()]).toEqual([409, { error: "student_inactive" }]);
+        expect([status, balance]).toEqual(["inactive", 0]);
+        archiveFirst++;
+      } else {
+        expect([archive.status, await archive.json()]).toEqual([409, { error: "student_has_balance" }]);
+        expect(move.status).toBe(200);
+        expect([status, balance]).toEqual(["active", 500]);
+        transferFirst++;
+      }
+    }
+    expect(archiveFirst + transferFirst).toBe(6);
+    console.info(`disputa arquivar × receber: arquivamento venceu ${archiveFirst}, transferência venceu ${transferFirst}`);
+    expect(await reconcileOf(source)).toMatchObject({ ok: true });
+  });
+
+  it("disputa arquivar × transferir TODO o saldo para fora (6 rodadas): nunca arquiva com saldo; arquivar só vence se a transferência já zerou", async () => {
+    const dest = await realStudent(0);
+    for (let round = 0; round < 6; round++) {
+      const from = await realStudent(300);
+      const [archive, move] = await Promise.all([setStatus(from, "inactive"), send(guardian, from, dest, 300)]);
+      const balance = await balanceOf(from);
+      expect((await statusOf(from)) === "inactive" && balance !== 0).toBe(false);
+      expect(move.status).toBe(200); // a saída nunca perde: o arquivamento com saldo é que é recusado
+      if (archive.status === 200) expect(balance).toBe(0);
+      else expect(await archive.json()).toEqual({ error: "student_has_balance" });
+    }
+    expect(await reconcileOf(dest)).toMatchObject({ ok: true });
+  });
+});
+
+describe("fechamento F08 — livro imutável", () => {
+  it("movimentos antigos permanecem idênticos depois de novos movimentos, e a projeção continua igual à soma do livro", async () => {
+    const [a, b] = await family([5000, 0]);
+    expect((await send(guardian, a!, b!, 1000)).status).toBe(200);
+    const snapshot = async () => new Map((await adminDb().collection(`wallets/${a!}/entries`).get()).docs.map((d) => [d.id, d.data()]));
+    const before = await snapshot();
+    expect((await send(guardian, a!, b!, 700)).status).toBe(200);
+    expect((await send(guardian, b!, a!, 200)).status).toBe(200);
+    const after = await snapshot();
+    expect(after.size).toBe(before.size + 2);
+    for (const [id, data] of before) expect(after.get(id)).toEqual(data);
+    expect(await reconcileOf(a!)).toMatchObject({ ok: true, entryCount: 4, version: 4 });
   });
 });
