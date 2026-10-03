@@ -265,24 +265,66 @@
       "npm run build:webpack exit 0",
       "npm run audit:prod 0 vulnerabilidades",
       "gitleaks git --redact: sem vazamentos; gitleaks dir em src/tests/scripts/docs/firebase: sem vazamentos (Semgrep só no CI: não executado localmente)",
-      "Aplicação publicada (Vercel HML + Firebase HML, 03/10/2026, smoke dirigido sem crédito, tests/staging/wallet-smoke.spec.ts 5/5): recusa por saldo insuficiente no servidor publicado; disputa por saldo NÃO testada na nuvem"
+      "Aplicação publicada (Vercel HML + Firebase HML, 03/10/2026, smoke dirigido sem crédito, tests/staging/wallet-smoke.spec.ts 5/5): recusa por saldo insuficiente no servidor publicado; disputa por saldo NÃO testada na nuvem",
+      "tests/integration/inventory-api.test.ts (F10, emulador, contratos de estoque chamados como o checkout/PDV os chamarão): último item — 8 baixas simultâneas de 1 unidade, só 1 passa e físico/valor terminam em zero; 8 reservas simultâneas sobre 5 unidades = exatamente 5, físico inalterado; cota planejada 4 com 8 reservas simultâneas = exatamente 4; balcão × reserva — 5 em estoque, 3 reservadas, 6 vendas simultâneas = no máximo 2 e a reserva segue entregável; entrega × cancelamento da mesma reserva = só um vence e as unidades se conservam; falha forçada após o commit na mesma transação não deixa reserva, saldo, cota nem movimento",
+      "F10 (03/10/2026, branch feat/f10-estoque-cotas-custo-medio): npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 172/172 (inclui tests/unit/inventory-cost.test.ts e inventory-model.test.ts)",
+      "npm run test:rules 43/43 (inclui tests/rules/inventory.rules.test.ts)",
+      "npm run test:integration 188/188 (inclui tests/integration/inventory-api.test.ts, 25 testes no Firestore Emulator)",
+      "npm run test:e2e 32/32 (inclui tests/e2e/inventory.spec.ts)",
+      "npm run build:webpack exit 0; npm run audit:prod 0 vulnerabilidades",
+      "gitleaks git --redact: sem vazamentos; gitleaks dir por pasta (src, tests, scripts, docs, firebase): sem vazamentos (Semgrep só no CI)"
     ],
-    "notes": "Parcial: disputa por SALDO provada no emulador (≤ 8 simultâneas por carteira; limite documentado de 12). Cota e último estoque dependem de F10/F11; balcão e reservas de F15; permanece not_run. Concorrência não medida no Firestore real."
+    "notes": "Parcial: saldo (F08), cota e último item de estoque, e balcão não vendendo reserva de outro pedido (F10) provados no emulador pelos contratos (reserve/release/exit). 'Duas compras simultâneas' de um checkout real e o PDV real dependem de F11/F15; concorrência não medida no Firestore real (≤ 8 escritores por documento testados; limite documentado de 12). Permanece not_run."
   },
   "A19": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/integration/inventory-api.test.ts (F10, emulador): reservar e liberar não mudam físico, valor nem livro (sem movimento); cancelar reserva não cria entrada; a entrega baixa uma única vez e reentregar a mesma reserva é recusada; produto planejado — reserva consome só a cota, entrega sem entrada recusada com entry_required e a quantidade a registrar, entrega parcial, cota/entregue sem duplo desconto; sobra de planejado não vira estoque do dia seguinte sem ação explícita (ampliar validade)",
+      "tests/e2e/inventory.spec.ts: planejado sem cota não aceita reservas; entrada de produto acabado vira físico",
+      "F10 (03/10/2026, branch feat/f10-estoque-cotas-custo-medio): npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 172/172 (inclui tests/unit/inventory-cost.test.ts e inventory-model.test.ts)",
+      "npm run test:rules 43/43 (inclui tests/rules/inventory.rules.test.ts)",
+      "npm run test:integration 188/188 (inclui tests/integration/inventory-api.test.ts, 25 testes no Firestore Emulator)",
+      "npm run test:e2e 32/32 (inclui tests/e2e/inventory.spec.ts)",
+      "npm run build:webpack exit 0; npm run audit:prod 0 vulnerabilidades",
+      "gitleaks git --redact: sem vazamentos; gitleaks dir por pasta (src, tests, scripts, docs, firebase): sem vazamentos (Semgrep só no CI)"
+    ],
+    "notes": "Parcial: regra provada nos contratos de estoque (emulador). Entrega e cancelamento reais de pedidos dependem de F11/F13/F14; na homologação só entradas/perdas/cotas/Rules (tests/staging/inventory-smoke.spec.ts). Permanece not_run."
   },
   "A20": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/unit/inventory-cost.test.ts: 100 a R$ 1,00 + 100 a R$ 1,10 = valor R$ 210,00, média R$ 1,05; saída de 10 = CMV R$ 10,50 (1 050 centavos); receita R$ 20 − CMV = lucro bruto R$ 9,50 (950 centavos)",
+      "tests/integration/inventory-api.test.ts (F10, emulador): duas entradas separadas (não edita o custo anterior), média 105 000 000 micro-centavos, saída de 10 com revenueCents 2000 grava CMV 1 050 000 000 e grossProfitCents 950 (visão da administração); custo/lucro ausentes para a cantina",
+      "F10 (03/10/2026, branch feat/f10-estoque-cotas-custo-medio): npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 172/172 (inclui tests/unit/inventory-cost.test.ts e inventory-model.test.ts)",
+      "npm run test:rules 43/43 (inclui tests/rules/inventory.rules.test.ts)",
+      "npm run test:integration 188/188 (inclui tests/integration/inventory-api.test.ts, 25 testes no Firestore Emulator)",
+      "npm run test:e2e 32/32 (inclui tests/e2e/inventory.spec.ts)",
+      "npm run build:webpack exit 0; npm run audit:prod 0 vulnerabilidades",
+      "gitleaks git --redact: sem vazamentos; gitleaks dir por pasta (src, tests, scripts, docs, firebase): sem vazamentos (Semgrep só no CI)"
+    ],
+    "notes": "Parcial: números do enunciado provados na camada de estoque (contrato de saída com receita informada). A venda real de 10 unidades a R$ 2 (checkout/PDV) e o relatório de lucro dependem de F11/F15/F21. Permanece not_run."
   },
   "A21": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/unit/inventory-cost.test.ts: média só sobre o que resta (compra, saída de 60, nova compra: 140 un., média 1,0714…, saída de 70 = R$ 75,00 exatos); resíduo preservado (3 unidades, custos 100 006 667 + 100 006 667 + 100 006 666 = total das entradas; valor termina em 0); propriedade com 200 sequências aleatórias de entradas e saídas: Σ saídas + valor restante = Σ entradas; BigInt para valores acima de 2^53",
+      "tests/integration/inventory-api.test.ts (F10, emulador): saída entre compras (500 020 000 × 2 ÷ 5 = 200 008 000); nova compra e mudança do preço de venda depois NÃO alteram o movimento histórico; esvaziar o estoque termina com valor 0 e reconciliação ok",
+      "F10 (03/10/2026, branch feat/f10-estoque-cotas-custo-medio): npm run typecheck exit 0",
+      "npm run lint exit 0",
+      "npm test 172/172 (inclui tests/unit/inventory-cost.test.ts e inventory-model.test.ts)",
+      "npm run test:rules 43/43 (inclui tests/rules/inventory.rules.test.ts)",
+      "npm run test:integration 188/188 (inclui tests/integration/inventory-api.test.ts, 25 testes no Firestore Emulator)",
+      "npm run test:e2e 32/32 (inclui tests/e2e/inventory.spec.ts)",
+      "npm run build:webpack exit 0; npm run audit:prod 0 vulnerabilidades",
+      "gitleaks git --redact: sem vazamentos; gitleaks dir por pasta (src, tests, scripts, docs, firebase): sem vazamentos (Semgrep só no CI)"
+    ],
+    "notes": "Enunciado coberto no nível de estoque (custo médio com saídas entre compras, resíduo e histórico imutável); a revisão global dos 38 critérios é da F23 e o status segue not_run por convenção do projeto."
   },
   "A22": {
     "status": "not_run",
