@@ -249,6 +249,8 @@ input[type="radio"] { width: 1.25rem; height: 1.25rem; vertical-align: middle; }
 button.danger { background: var(--color-danger); border-color: var(--color-danger); }
 button.danger:hover:not(:disabled) { background: #7f2617; }
 .form-grid > fieldset { align-self: start; }
+/* F09: fieldset tem min-width implícito (min-content) e alargava a página em celular estreito. */
+fieldset { min-width: 0; }
 /* Celular: cada produto vira um bloco (foto à esquerda, dados à direita, ações embaixo), sem rolagem lateral. */
 @media (max-width: 40rem) {
   .catalog-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }

@@ -151,60 +151,64 @@ export function PolicyPanel({ user, student, categories, products }: { user: Use
           {sessionNote}
         </p>
       )}
-      <table className="data-table" data-testid="usage-days">
-        <caption className="muted" style={{ textAlign: "left" }}>
-          Próximos dias (hoje até {dayMonth(dates[dates.length - 1]!)})
-        </caption>
-        <thead>
-          <tr>
-            <th scope="col">Data</th>
-            <th scope="col">Comprometido</th>
-            <th scope="col">Limite diário</th>
-            <th scope="col">Ainda cabe</th>
-          </tr>
-        </thead>
-        <tbody>
-          {dates.map((d) => {
-            const used = usage.days[d] ?? 0;
-            return (
-              <tr key={d} data-date={d}>
-                <th scope="row">{dayLabel(d)}</th>
-                <td>{formatBRL(used)}</td>
-                <td>{limit(student.dailyLimitCents)}</td>
-                <td>{remaining(used, student.dailyLimitCents)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <table className="data-table" data-testid="usage-weeks">
-        <caption className="muted" style={{ textAlign: "left" }}>
-          Semanas (segunda a domingo)
-        </caption>
-        <thead>
-          <tr>
-            <th scope="col">Semana</th>
-            <th scope="col">Comprometido</th>
-            <th scope="col">Limite semanal</th>
-            <th scope="col">Ainda cabe</th>
-          </tr>
-        </thead>
-        <tbody>
-          {weeks.map((w) => {
-            const used = usage.weeks[w] ?? 0;
-            return (
-              <tr key={w} data-week={w}>
-                <th scope="row">
-                  {dayMonth(w)} a {dayMonth(weekEndOf(w))}
-                </th>
-                <td>{formatBRL(used)}</td>
-                <td>{limit(student.weeklyLimitCents)}</td>
-                <td>{remaining(used, student.weeklyLimitCents)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div className="table-scroll">
+        <table className="data-table" data-testid="usage-days">
+          <caption className="muted" style={{ textAlign: "left" }}>
+            Próximos dias (hoje até {dayMonth(dates[dates.length - 1]!)})
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Data</th>
+              <th scope="col">Comprometido</th>
+              <th scope="col">Limite diário</th>
+              <th scope="col">Ainda cabe</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dates.map((d) => {
+              const used = usage.days[d] ?? 0;
+              return (
+                <tr key={d} data-date={d}>
+                  <th scope="row">{dayLabel(d)}</th>
+                  <td>{formatBRL(used)}</td>
+                  <td>{limit(student.dailyLimitCents)}</td>
+                  <td>{remaining(used, student.dailyLimitCents)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="table-scroll">
+        <table className="data-table" data-testid="usage-weeks">
+          <caption className="muted" style={{ textAlign: "left" }}>
+            Semanas (segunda a domingo)
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Semana</th>
+              <th scope="col">Comprometido</th>
+              <th scope="col">Limite semanal</th>
+              <th scope="col">Ainda cabe</th>
+            </tr>
+          </thead>
+          <tbody>
+            {weeks.map((w) => {
+              const used = usage.weeks[w] ?? 0;
+              return (
+                <tr key={w} data-week={w}>
+                  <th scope="row">
+                    {dayMonth(w)} a {dayMonth(weekEndOf(w))}
+                  </th>
+                  <td>{formatBRL(used)}</td>
+                  <td>{limit(student.weeklyLimitCents)}</td>
+                  <td>{remaining(used, student.weeklyLimitCents)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
       <h3>Bloqueios</h3>
       <p className="muted">

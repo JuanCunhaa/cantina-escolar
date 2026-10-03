@@ -60,6 +60,13 @@ test.describe("limites, bloqueios e comprometimento no portal do responsável (A
     const usage = await readDemoDoc(targetFromEnv(), `studentUsage/${studentId}/days/${tomorrow}`);
     expect(usage?.committedCents).toBe(800);
 
+    // Celular estreito: o painel não pode gerar rolagem horizontal da página (tabelas rolam dentro do próprio bloco).
+    for (const width of [320, 375]) {
+      await page.setViewportSize({ width, height: 800 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `sem rolagem horizontal em ${width}px`).toBe(true);
+    }
+    await page.setViewportSize({ width: 1280, height: 800 });
+
     // Valor inválido não vai ao servidor; limite diário maior que o semanal é recusado pelo servidor.
     await panel.getByLabel("Limite diário (R$)").fill("abc");
     await panel.getByRole("button", { name: "Salvar limites" }).click();
