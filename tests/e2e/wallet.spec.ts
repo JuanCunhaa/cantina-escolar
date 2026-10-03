@@ -6,7 +6,7 @@ import { balance, card, family, fillTransfer, login, n, openWallet, reconciled, 
 test.describe.configure({ mode: "serial" });
 
 test.beforeAll(async ({ request }) => {
-  await warmRoutes(request, { post: ["/api/wallets/transfer"], get: ["/portal/carteira", "/api/wallets", "/api/wallets/reconcile"] });
+  await warmRoutes(request, { post: ["/api/wallets/transfer"], get: ["/portal/carteira", "/portal/alunos", "/api/wallets", "/api/wallets/reconcile"] });
 });
 
 test.describe("carteira — comportamento da interface", () => {
@@ -120,13 +120,18 @@ test.describe("carteira — comportamento da interface", () => {
     const f = await family([guardian], 5000, 2000);
     const context = await browser.newContext();
     const page = await context.newPage();
-    // Bloqueia só o registro dos alvos da carteira no canal do Firestore (o perfil de sessão segue funcionando).
+    // Carrega primeiro a área da família (sessão e vínculos já ao vivo); o bloqueio entra depois, de modo que o ÚNICO registro
+    // novo no canal do Firestore seja o dos alvos da carteira (o SDK agrupa alvos criados juntos no mesmo envio).
+    await login(page, "/portal/alunos", guardian.email);
+    await expect(page.getByTestId("family-student")).toHaveCount(2, { timeout: 20000 });
     await context.route("**/google.firestore.v1.Firestore/Listen/**", async (route) => {
       const body = decodeURIComponent(route.request().postData() ?? "");
       if (body.includes("/documents/wallets")) await route.abort("failed");
       else await route.continue();
     });
-    await openWallet(page, guardian, f);
+    await page.getByRole("link", { name: "Carteira", exact: true }).click(); // navegação no cliente, sem recarregar
+    await expect(card(page, f.ana.id)).toBeVisible();
+    await expect(card(page, f.bia.id)).toBeVisible();
     await expect(balance(page, f.ana.id)).toContainText("R$ 50,00"); // carga inicial pelo servidor, sem listener
     await fillTransfer(page, f, "12,50");
     await page.getByRole("button", { name: "Transferir" }).click();
