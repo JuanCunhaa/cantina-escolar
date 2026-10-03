@@ -1,6 +1,10 @@
 import { EXTRA_PERMISSIONS, type ExtraPermission, type Role } from "./roles";
 
-/** Capacidades por papel geral. Custos e lucro pertencem somente à administração (docs/domains/access.md). */
+/**
+ * Capacidades por papel geral. Custos e lucro pertencem somente à administração (docs/domains/access.md). Estoque (F10):
+ * `inventory.read` = quantidades, lotes e reservas SEM custo (cantina e administração); `inventory.loss` = registrar perdas
+ * (cantina e administração); `inventory.manage` = entradas com custo, estorno, contagem/ajuste e cotas (só administração).
+ */
 export const CAPABILITIES = [
   "students.search",
   "orders.operate",
@@ -8,6 +12,9 @@ export const CAPABILITIES = [
   "catalog.photos.manage",
   "catalog.manage",
   "menu.manage",
+  "inventory.read",
+  "inventory.loss",
+  "inventory.manage",
   "topup.register",
   "topup.reverse",
   "costs.read",
@@ -22,7 +29,7 @@ export type Capability = (typeof CAPABILITIES)[number];
 const BY_ROLE: Record<Role, readonly Capability[]> = {
   guardian: [],
   student: [],
-  cantina: ["students.search", "orders.operate", "pos.operate", "catalog.photos.manage"],
+  cantina: ["students.search", "orders.operate", "pos.operate", "catalog.photos.manage", "inventory.read", "inventory.loss"],
   secretaria: ["students.search", "topup.register"],
   admin: CAPABILITIES,
 };
