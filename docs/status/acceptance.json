@@ -271,7 +271,7 @@
       "npm run lint exit 0",
       "npm test 172/172 (inclui tests/unit/inventory-cost.test.ts e inventory-model.test.ts)",
       "npm run test:rules 43/43 (inclui tests/rules/inventory.rules.test.ts)",
-      "npm run test:integration 188/188 (inclui tests/integration/inventory-api.test.ts, 25 testes no Firestore Emulator)",
+      "npm run test:integration 189/189 (inclui tests/integration/inventory-api.test.ts, 26 testes no Firestore Emulator)",
       "npm run test:e2e 32/32 (inclui tests/e2e/inventory.spec.ts)",
       "npm run build:webpack exit 0; npm run audit:prod 0 vulnerabilidades",
       "gitleaks git --redact: sem vazamentos; gitleaks dir por pasta (src, tests, scripts, docs, firebase): sem vazamentos (Semgrep só no CI)"
@@ -287,7 +287,7 @@
       "npm run lint exit 0",
       "npm test 172/172 (inclui tests/unit/inventory-cost.test.ts e inventory-model.test.ts)",
       "npm run test:rules 43/43 (inclui tests/rules/inventory.rules.test.ts)",
-      "npm run test:integration 188/188 (inclui tests/integration/inventory-api.test.ts, 25 testes no Firestore Emulator)",
+      "npm run test:integration 189/189 (inclui tests/integration/inventory-api.test.ts, 26 testes no Firestore Emulator)",
       "npm run test:e2e 32/32 (inclui tests/e2e/inventory.spec.ts)",
       "npm run build:webpack exit 0; npm run audit:prod 0 vulnerabilidades",
       "gitleaks git --redact: sem vazamentos; gitleaks dir por pasta (src, tests, scripts, docs, firebase): sem vazamentos (Semgrep só no CI)"
@@ -303,7 +303,7 @@
       "npm run lint exit 0",
       "npm test 172/172 (inclui tests/unit/inventory-cost.test.ts e inventory-model.test.ts)",
       "npm run test:rules 43/43 (inclui tests/rules/inventory.rules.test.ts)",
-      "npm run test:integration 188/188 (inclui tests/integration/inventory-api.test.ts, 25 testes no Firestore Emulator)",
+      "npm run test:integration 189/189 (inclui tests/integration/inventory-api.test.ts, 26 testes no Firestore Emulator)",
       "npm run test:e2e 32/32 (inclui tests/e2e/inventory.spec.ts)",
       "npm run build:webpack exit 0; npm run audit:prod 0 vulnerabilidades",
       "gitleaks git --redact: sem vazamentos; gitleaks dir por pasta (src, tests, scripts, docs, firebase): sem vazamentos (Semgrep só no CI)"
@@ -319,7 +319,7 @@
       "npm run lint exit 0",
       "npm test 172/172 (inclui tests/unit/inventory-cost.test.ts e inventory-model.test.ts)",
       "npm run test:rules 43/43 (inclui tests/rules/inventory.rules.test.ts)",
-      "npm run test:integration 188/188 (inclui tests/integration/inventory-api.test.ts, 25 testes no Firestore Emulator)",
+      "npm run test:integration 189/189 (inclui tests/integration/inventory-api.test.ts, 26 testes no Firestore Emulator)",
       "npm run test:e2e 32/32 (inclui tests/e2e/inventory.spec.ts)",
       "npm run build:webpack exit 0; npm run audit:prod 0 vulnerabilidades",
       "gitleaks git --redact: sem vazamentos; gitleaks dir por pasta (src, tests, scripts, docs, firebase): sem vazamentos (Semgrep só no CI)"
