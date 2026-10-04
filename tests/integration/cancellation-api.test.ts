@@ -473,6 +473,35 @@ describe("não cancela o que já foi entregue, cancelado ou resolvido", () => {
     const r = await cancelAs(guardianA, "guardian", part.orderId);
     expect(r.body).toMatchObject({ status: "delivered", refundCents: 1000, remainingUnits: 0 }); // o entregue (R$ 5,00) não volta
     expect(await moneyOf(part.orderId, [p])).toEqual({ total: 1500, refunded: 1000, revenue: 500 });
+    expect((await doc(`orders/${part.orderId}`))!.deliveredAt).toBeTruthy(); // virou "entregue" por cancelamento do restante: mesmo carimbo da entrega completa
+  });
+
+  it("pedido de data PASSADA e sem entrega: a cantina não cancela direto (marca não retirado); a administração cancela e a família também fica de fora", async () => {
+    const p = await newProduct({ price: 500, stock: 20 });
+    const { student, orderId } = await placeOrder([{ productId: p }]);
+    // Fixture do EMULADOR: o dia do consumo já passou e o uso comprometido (F09) acompanha a data.
+    await db().doc(`orders/${orderId}`).update({ consumptionDate: d(-1) });
+    await db().doc(`studentUsage/${student}/days/${d(-1)}`).set({ studentId: student, date: d(-1), committedCents: 500, version: 1 });
+    await db().doc(`studentUsage/${student}/weeks/${school.weekStartOf(d(-1))}`).set({ studentId: student, weekStart: school.weekStartOf(d(-1)), committedCents: 500, version: 1 });
+    const before = await snapshot(student, [p], d(-1));
+    expect((await cancelAs(cantina, "cantina", orderId)).body).toMatchObject({ error: "past_date_requires_resolution" });
+    expect(await snapshot(student, [p], d(-1))).toEqual(before);
+    expect((await cancelAs(admin, "admin", orderId)).status).toBe(200);
+    expect((await refunds(student)).length).toBe(1);
+  });
+
+  it("linha de valor pago ZERO (desconto total): cancela e libera reserva/uso sem lançamento nem mudança de saldo", async () => {
+    const p = await newProduct({ price: 500, stock: 20 });
+    const { student, orderId } = await placeOrder([{ productId: p }], { date: d(3) });
+    await db().doc(`orders/${orderId}`).update({ items: (await itemsOf(orderId)).map((i) => ({ ...i, subtotalCents: 0 })), totalCents: 0 }); // fixture do emulador
+    const before = await snapshot(student, [p], d(3));
+    const r = await cancelAs(guardianA, "guardian", orderId);
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body).toMatchObject({ status: "cancelled", refundCents: 0, wallet: { entryId: null, balanceCents: before.balanceCents, version: before.version } });
+    const after = await snapshot(student, [p], d(3));
+    expect([after.balanceCents, after.version, after.entries]).toEqual([before.balanceCents, before.version, before.entries]);
+    expect(after).toMatchObject({ usage: 0, stock: { [p]: { reserved: 0 } } });
+    expect(await refunds(student)).toHaveLength(0);
   });
 
   it("não retirado pendente ou resolvido não se cancela pelo comando comum (a administração resolve)", async () => {
@@ -843,6 +872,15 @@ describe("Meus pedidos, recibo, extrato e telas operacionais refletem o cancelam
     const stmt = await call(statementRoute, guardianA, "GET", `/api/wallets/entries?studentId=${student}`);
     expect((stmt.body.entries as { type: string; amountCents: number; orderId: string | null }[]).filter((e) => e.type === "order_refund").map((e) => [e.amountCents, e.orderId])).toEqual(expect.arrayContaining([[400, orderId], [800, orderId]]));
     expect((await call(detailRoute, guardianB, "GET", `/api/orders/${orderId}`, undefined, orderId)).status).toBe(403);
+  });
+
+  it("linha do tempo em ordem cronológica: cancelamento do responsável antes da entrega do restante", async () => {
+    const p = await newProduct({ price: 400, stock: 30 });
+    const { student, orderId } = await placeOrder([{ productId: p, quantity: 2 }]);
+    expect((await cancelAs(guardianA, "guardian", orderId, { lines: [{ lineNo: 1, quantity: 1 }] })).status).toBe(200);
+    expect((await deliver(cantina, orderId, student, [{ lineNo: 1, quantity: 1 }])).status).toBe(200);
+    const detail = await call(detailRoute, guardianA, "GET", `/api/orders/${orderId}`, undefined, orderId);
+    expect((detail.body.timeline as { kind: string }[]).map((t) => t.kind)).toEqual(["created", "paid", "cancellation", "delivery"]);
   });
 
   it("depois do prazo (dia do consumo, horário passado) o detalhe não oferece cancelamento à família", async () => {

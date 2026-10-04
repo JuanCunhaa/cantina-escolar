@@ -199,7 +199,7 @@
       "npm run audit:prod 0 vulnerabilidades",
       "tests/integration/cancellation-api.test.ts (F14, emulador): limite exato do prazo (1 ms antes cancela; em `agora >= limite` e depois a família é recusada sem efeito), prazo = snapshot do pedido (não o calendário), depois do prazo só cantina/administração com motivo e auditoria, sem prazo registrado = família recusada, entregue não cancela (família e equipe), aluno/secretaria/outra família/anônimo negados, autorização revogada (vínculo, perfil desativado/rebaixado, replay)",
       "tests/e2e/cancellation.spec.ts: prazo encerrado no detalhe (sem botão, explicação, servidor recusa a família e a equipe cancela)",
-      "F14 (04/10/2026, branch feat/f14-cancelamentos-reembolsos): typecheck 0; lint 0; npm test 211/211; npm run test:rules 49/49; npm run test:integration 298/298; npm run test:e2e 56/56; build:webpack 0; audit:prod 0; gitleaks dir src/tests/scripts/docs/firebase e git --redact: sem vazamentos (logs .agent-logs/f14-check-*.log)"
+      "F14 (04/10/2026, branch feat/f14-cancelamentos-reembolsos): typecheck 0; lint 0; npm test 211/211; npm run test:rules 49/49; npm run test:integration 301/301; npm run test:e2e 56/56; build:webpack 0; audit:prod 0; gitleaks dir src/tests/scripts/docs/firebase e git --redact: sem vazamentos (logs .agent-logs/f14-check-*.log)"
     ],
     "notes": "Parcial: cancelamento familiar com prazo do snapshot, limite exato e 'não cancela entregue' provados no emulador (API, integração e interface) com pedidos reais do checkout; horários configuráveis seguem da F05. Sem prova no Firestore real (sem crédito artificial na HML) e sem PDV (F15). Permanece not_run."
   },
@@ -244,7 +244,7 @@
       "F11 (04/10/2026) tests/integration/checkout-api.test.ts (emulador, saldo só por fixture): pedido guarda snapshot (nome, unidade, quantidade, preço unitário, priceVersion, subtotal, total); mudar R$ 8 → R$ 9 depois da compra não altera o pedido; preço diferente do visto (maior ou menor) → 409 price_changed SEM cobrança, com o carrinho do servidor; total/saldo/preço no corpo → 400; replay devolve o pedido original mesmo com preço novo. tests/e2e/checkout.spec.ts (tela): preço muda durante a revisão → \"Nada foi cobrado\", novo total, nova confirmação cobra R$ 9. Cancelamento devolvendo R$ 8: F14.",
       "tests/integration/cancellation-api.test.ts (F14, emulador): pedido comprado a R$ 8 devolve R$ 8 depois do cadastro mudar para R$ 9; o corpo do comando recusa qualquer campo de valor/preço (400) e nada muda",
       "tests/unit/cancellation.test.ts: reembolso usa só o subtotal gravado no pedido",
-      "F14 (04/10/2026, branch feat/f14-cancelamentos-reembolsos): typecheck 0; lint 0; npm test 211/211; npm run test:rules 49/49; npm run test:integration 298/298; npm run test:e2e 56/56; build:webpack 0; audit:prod 0; gitleaks dir src/tests/scripts/docs/firebase e git --redact: sem vazamentos (logs .agent-logs/f14-check-*.log)"
+      "F14 (04/10/2026, branch feat/f14-cancelamentos-reembolsos): typecheck 0; lint 0; npm test 211/211; npm run test:rules 49/49; npm run test:integration 301/301; npm run test:e2e 56/56; build:webpack 0; audit:prod 0; gitleaks dir src/tests/scripts/docs/firebase e git --redact: sem vazamentos (logs .agent-logs/f14-check-*.log)"
     ],
     "notes": "Parcial: 'comprar a R$ 8 e devolver R$ 8 depois da mudança de preço' e 'manipular valor no request falha' provados no emulador. Sem prova no Firestore real. Permanece not_run."
   },
@@ -356,7 +356,7 @@
       "tests/unit/cancellation.test.ts: propriedade em 400 sequências aleatórias de entregas/cancelamentos (Σ = pago, nunca negativo, nunca acima do restante)",
       "tests/e2e/cancellation.spec.ts: cancelamento parcial e depois total pelo detalhe, parcial pela lista do dia",
       "Mutação dirigida em cancellation.ts (sem liberar uso F09 / sem liberar reserva-cota / sem prazo / sem conferir restante) derrubou 8 / 9 / 3 / 2 testes da integração (.agent-logs/f14-mutation-*.log)",
-      "F14 (04/10/2026, branch feat/f14-cancelamentos-reembolsos): typecheck 0; lint 0; npm test 211/211; npm run test:rules 49/49; npm run test:integration 298/298; npm run test:e2e 56/56; build:webpack 0; audit:prod 0; gitleaks dir src/tests/scripts/docs/firebase e git --redact: sem vazamentos (logs .agent-logs/f14-check-*.log)"
+      "F14 (04/10/2026, branch feat/f14-cancelamentos-reembolsos): typecheck 0; lint 0; npm test 211/211; npm run test:rules 49/49; npm run test:integration 301/301; npm run test:e2e 56/56; build:webpack 0; audit:prod 0; gitleaks dir src/tests/scripts/docs/firebase e git --redact: sem vazamentos (logs .agent-logs/f14-check-*.log)"
     ],
     "notes": "Parcial: entrega parcial (F13) e cancelamento parcial com reembolso acumulado ≤ pagamento provados no emulador, com pedidos reais do checkout. Falta Firestore real com saldo (sem recarga/fixture na HML). Permanece not_run."
   },
@@ -367,7 +367,7 @@
       "F13 (04/10/2026, branch feat/f13-preparacao-entrega-nao-retirada): typecheck 0; lint 0; npm test 199/199; npm run test:rules 47/47; npm run test:integration 262/262; npm run test:e2e 51/51; build:webpack 0; audit:prod 0; gitleaks dir src/tests/docs/firebase sem vazamentos (logs .agent-logs/f13-check-*.log; reexecutado inteiro depois da revisão (04/10/2026), logs .agent-logs/f13b-check-*.log)",
       "tests/integration/cancellation-api.test.ts (F14, emulador): ENTREGA × CANCELAMENTO simultâneos em 8 pedidos (exatamente um vence por pedido; nunca entregue com estorno nem crédito duplicado; carteira, livro, uso e estoque reconciliam), entrega parcial × cancelamento parcial (4 rodadas), 4 cancelamentos simultâneos (família ×2, cantina, administração) = 1 crédito, 6 parciais de 1 un. sobre 3 = 3 créditos, mesma chave ×6 = 1 crédito, resolução de não retirado × cancelamento × marcação (uma só liquidação)",
       "tests/integration/fulfillment-api.test.ts (F13): entregas concorrentes",
-      "F14 (04/10/2026, branch feat/f14-cancelamentos-reembolsos): typecheck 0; lint 0; npm test 211/211; npm run test:rules 49/49; npm run test:integration 298/298; npm run test:e2e 56/56; build:webpack 0; audit:prod 0; gitleaks dir src/tests/scripts/docs/firebase e git --redact: sem vazamentos (logs .agent-logs/f14-check-*.log)"
+      "F14 (04/10/2026, branch feat/f14-cancelamentos-reembolsos): typecheck 0; lint 0; npm test 211/211; npm run test:rules 49/49; npm run test:integration 301/301; npm run test:e2e 56/56; build:webpack 0; audit:prod 0; gitleaks dir src/tests/scripts/docs/firebase e git --redact: sem vazamentos (logs .agent-logs/f14-check-*.log)"
     ],
     "notes": "Parcial: corridas entrega × cancelamento, dois cancelamentos e resolução × cancelamento provadas no emulador (leituras do pedido na transação serializam os comandos). Concorrência real do Firestore não medida (HML sem saldo). Permanece not_run."
   },
@@ -535,7 +535,7 @@
       "F13 (04/10/2026, branch feat/f13-preparacao-entrega-nao-retirada): typecheck 0; lint 0; npm test 199/199; npm run test:rules 47/47; npm run test:integration 262/262; npm run test:e2e 51/51; build:webpack 0; audit:prod 0; gitleaks dir src/tests/docs/firebase sem vazamentos (logs .agent-logs/f13-check-*.log; reexecutado inteiro depois da revisão (04/10/2026), logs .agent-logs/f13b-check-*.log)",
       "tests/integration/cancellation-api.test.ts (F14, emulador): replay devolve a resposta original sem novo crédito, payload diferente = conflito, clique duplo com chaves diferentes = 1 crédito, falha forçada no último passo (auditoria) e falha de estoque (descarte impossível) desfazem tudo (carteira, livro, reserva, cota, uso, pedido) e o retry credita uma vez; uso diário/semanal liberado na mesma transação (F09)",
       "tests/integration/cancellation-api.test.ts: liberação de reserva/cota sem entrada física (onHand/movimentos/valor intactos) e descarte como perda explícita com custo e motivo",
-      "F14 (04/10/2026, branch feat/f14-cancelamentos-reembolsos): typecheck 0; lint 0; npm test 211/211; npm run test:rules 49/49; npm run test:integration 298/298; npm run test:e2e 56/56; build:webpack 0; audit:prod 0; gitleaks dir src/tests/scripts/docs/firebase e git --redact: sem vazamentos (logs .agent-logs/f14-check-*.log)"
+      "F14 (04/10/2026, branch feat/f14-cancelamentos-reembolsos): typecheck 0; lint 0; npm test 211/211; npm run test:rules 49/49; npm run test:integration 301/301; npm run test:e2e 56/56; build:webpack 0; audit:prod 0; gitleaks dir src/tests/scripts/docs/firebase e git --redact: sem vazamentos (logs .agent-logs/f14-check-*.log)"
     ],
     "notes": "Parcial: retry/falha/replay e liberação de uso do cancelamento provados no emulador; sem chamada externa no callback (não há gateway). Pagamento/e-mail e Firestore real seguem pendentes (F17–F19). Permanece not_run."
   },
