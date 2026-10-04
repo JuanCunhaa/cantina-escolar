@@ -20,6 +20,13 @@ const ROLE_LABEL: Record<Role, string> = {
 };
 
 /** Casca compartilhada do portal e da operação: pular para o conteúdo, cabeçalho, navegação por papel e área principal. */
+/** Item atual: igualdade exata ou o item de caminho MAIS longo que contém a página (detalhe /portal/pedidos/{id} acende "Meus pedidos"). */
+function isCurrent(pathname: string, href: string, all: readonly string[]): boolean {
+  if (pathname === href) return true;
+  const parent = all.filter((h) => pathname.startsWith(`${h}/`)).sort((a, b) => b.length - a.length)[0];
+  return parent === href;
+}
+
 export function AppShell({ area, children }: { area: "portal" | "operacao"; children: ReactNode }) {
   const session = useSession();
   const pathname = usePathname();
@@ -71,7 +78,7 @@ export function AppShell({ area, children }: { area: "portal" | "operacao"; chil
             {navigationFor(role).map((item) => (
               <li key={item.href}>
                 {item.ready ? (
-                  <Link href={item.href} aria-current={pathname === item.href ? "page" : undefined}>
+                  <Link href={item.href} aria-current={isCurrent(pathname, item.href, navigationFor(role).map((n) => n.href)) ? "page" : undefined}>
                     {item.label}
                   </Link>
                 ) : (

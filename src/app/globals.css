@@ -326,3 +326,23 @@ fieldset { min-width: 0; }
   .checkout-line .muted { grid-column: 1 / -1; order: 3; }
 }
 .checkout-day h3::first-letter, .checkout li > strong::first-letter { text-transform: uppercase; }
+
+/* F12: Meus pedidos e recibo. Lista aberta com separadores; selo com TEXTO (cor nunca é o único sinal). */
+.order-tabs { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0; }
+.order-row { display: grid; gap: var(--space-1); }
+.order-row p { margin: 0; }
+.order-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); align-items: center; }
+.order-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); align-items: center; }
+.order-foot a { min-height: var(--touch-target); display: inline-flex; align-items: center; }
+.badge { display: inline-block; padding: 0.1rem var(--space-2); border-radius: var(--radius); border: 1px solid var(--color-line); font-size: 0.875rem; background: var(--color-surface); }
+.badge-pending { border-color: var(--color-accent); color: var(--color-accent-strong); background: var(--color-accent-soft); }
+.badge-completed { border-color: var(--color-muted); color: var(--color-text); }
+.badge-cancelled { border-color: var(--color-danger); color: var(--color-danger); }
+.badge-warn { border-color: #8a5a00; color: #6b4600; background: #fff4d6; }
+.receipt-grid { display: grid; grid-template-columns: minmax(8rem, max-content) 1fr; gap: var(--space-1) var(--space-3); margin: 0 0 var(--space-3); }
+.receipt-grid dt { color: var(--color-muted); }
+.receipt-grid dd { margin: 0; }
+@media (max-width: 30rem) { .receipt-grid { grid-template-columns: 1fr; } .receipt-grid dd { margin-bottom: var(--space-2); } }
+@media print { .shell-header, .shell-nav, .skip-link, .no-print { display: none !important; } .shell-main { padding: 0; } }
+.toolbar-compact .field { margin-bottom: var(--space-2); }
+@media (max-width: 40rem) { .toolbar-compact { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--space-2); } .toolbar-compact input, .toolbar-compact select { width: 100%; } }
