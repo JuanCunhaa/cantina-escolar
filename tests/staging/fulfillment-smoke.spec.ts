@@ -69,6 +69,9 @@ test("consultas vazias e índices publicados: dia/turno, filtros, previsão e pe
     expect([panel.status, panel.body.rows, panel.body.forecast, panel.body.attention], q).toEqual([200, [], [], []]);
     expect(panel.body.forecastFrom).toBe(TODAY);
   }
+  const attention = await get(request, cantina, "/api/operations/preparation?scope=attention");
+  expect([attention.status, attention.body.rows, attention.body.forecast, attention.body.attention]).toEqual([200, [], [], []]);
+  expect((await get(request, cantina, "/api/operations/preparation?scope=tudo")).status).toBe(400);
 });
 
 test("validação e recusas dos comandos: entrada inválida 400; pedido inexistente 404; reembolso/reagendamento indisponíveis (F14/F16)", async ({ request }) => {
