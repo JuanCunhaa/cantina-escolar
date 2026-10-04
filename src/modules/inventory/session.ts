@@ -104,6 +104,8 @@ export type ExitInput = {
   consumptionDate: LocalDate;
   /** Entrega de um pedido: baixa esta reserva (e a cota planejada) sem duplo desconto. Sem ela = venda de balcão. */
   reservationId?: string;
+  /** Com `reservationId`: pedido que deve ser o dono da reserva; reserva de outro pedido é recusada (`reservation_mismatch`). */
+  orderRef?: string;
   referenceType: string;
   referenceId: string;
   /** Receita da venda (centavos, snapshot do preço autorizado) para a margem; opcional. */
@@ -279,10 +281,11 @@ export class StockSession {
   }
 
   /** Libera (cancelamento, reembolso, reagendamento) o que ainda não foi entregue. Não cria entrada fictícia nem mexe em custo. */
-  async release(input: { productId: string; reservationId: string; quantity?: number }): Promise<ReleaseResult> {
+  async release(input: { productId: string; reservationId: string; quantity?: number; orderRef?: string }): Promise<ReleaseResult> {
     const p = await this.product(input.productId);
     const tracked = await this.reservation(p, input.reservationId);
     if (!tracked) throw notFound("reservation_not_found", "Reserva não encontrada.");
+    if (input.orderRef !== undefined && tracked.value.orderRef !== input.orderRef) throw conflict("reservation_mismatch", "A reserva pertence a outro pedido.");
     const r = tracked.value;
     const remaining = remainingOf(r);
     const quantity = input.quantity ?? remaining;
@@ -319,6 +322,7 @@ export class StockSession {
     if (input.reservationId) {
       reservation = await this.reservation(p, input.reservationId);
       if (!reservation) throw notFound("reservation_not_found", "Reserva não encontrada.");
+      if (input.orderRef !== undefined && reservation.value.orderRef !== input.orderRef) throw conflict("reservation_mismatch", "A reserva pertence a outro pedido.");
       const remaining = remainingOf(reservation.value);
       if (remaining < quantity) throw conflict("reservation_closed", "A reserva não cobre esta quantidade (já entregue, liberada ou menor).", { remaining });
     }

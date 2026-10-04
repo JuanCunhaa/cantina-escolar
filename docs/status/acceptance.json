@@ -301,9 +301,12 @@
       "npm run test:integration 189/189 (inclui tests/integration/inventory-api.test.ts, 26 testes no Firestore Emulator)",
       "npm run test:e2e 32/32 (inclui tests/e2e/inventory.spec.ts)",
       "npm run build:webpack exit 0; npm run audit:prod 0 vulnerabilidades",
-      "gitleaks git --redact: sem vazamentos; gitleaks dir por pasta (src, tests, scripts, docs, firebase): sem vazamentos (Semgrep só no CI)"
+      "gitleaks git --redact: sem vazamentos; gitleaks dir por pasta (src, tests, scripts, docs, firebase): sem vazamentos (Semgrep só no CI)",
+      "tests/integration/fulfillment-api.test.ts (F13, emulador): entrega baixa o físico UMA vez pela reserva do próprio pedido, custo médio histórico exato no livro (sale_exit), carteira/livro intactos; entrega parcial em duas partes conserva unidades e custo; replay não baixa de novo; clique duplo e 8 entregas simultâneas da mesma última unidade = 1 baixa; 6 de 1 sobre pedido de 3 = 3; 2 de 2 sobre 3 = só uma; pedidos diferentes do mesmo produto reconciliam; falha no último passo desfaz tudo e o retry baixa uma vez; planejado sem entrada = entry_required e nada gravado, com entrada entrega; falha intermediária em 2 itens não baixa o físico; estoque de 5 para pedidos de 2 e 3 não consome a reserva alheia; reserva de outro pedido = reservation_mismatch; perda real deixa o pedido sem lastro (insufficient_stock)",
+      "Mutação dirigida (remover checagem de quantidade, de dia, de dono da reserva e de aluno) derrubou 3, 1, 1 e 1 testes da integração",
+      "F13 (04/10/2026, branch feat/f13-preparacao-entrega-nao-retirada): typecheck 0; lint 0; npm test 198/198; npm run test:rules 47/47; npm run test:integration 261/261; npm run test:e2e 51/51; build:webpack 0; audit:prod 0; gitleaks dir src/tests/docs/firebase sem vazamentos (logs .agent-logs/f13-check-*.log; depois da correção da consulta de previsão: integração fulfillment 31/31 e e2e fulfillment 5/5 reexecutados)"
     ],
-    "notes": "Parcial: regra provada nos contratos de estoque (emulador). Entrega e cancelamento reais de pedidos dependem de F11/F13/F14; na homologação só entradas/perdas/cotas/Rules (tests/staging/inventory-smoke.spec.ts). Permanece not_run."
+    "notes": "Parcial: entrega, baixa única, custo histórico, reserva própria e planejado exigindo entrada provados no emulador com pedidos reais do checkout. Cancelar reserva sem entrada fictícia segue provado na F10; entrega × cancelamento real é da F14. Na homologação só validações/recusas/Rules/índices (tests/staging/fulfillment-smoke.spec.ts, 5/5 contra o Firestore HML com servidor local em 04/10/2026; pós-merge: URL publicada). Sem compra com saldo no Firestore real. Permanece not_run."
   },
   "A20": {
     "status": "not_run",
@@ -339,13 +342,20 @@
   },
   "A22": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/integration/fulfillment-api.test.ts (F13, emulador): entrega parcial por quantidade de item (situação agregada partially_delivered, restante, quantidade > restante recusada, linhas independentes), unidades e custo entregues conservados, carteira inalterada; tests/unit/fulfillment.test.ts: aggregateStatus determinística, restante com canceledQty, conservação agendadas = canceladas + entregues + restantes + não retiradas",
+      "tests/e2e/fulfillment.spec.ts: entrega parcial 1 de 3, depois 'Entregar tudo' com clique duplo = uma entrega",
+      "F13 (04/10/2026, branch feat/f13-preparacao-entrega-nao-retirada): typecheck 0; lint 0; npm test 198/198; npm run test:rules 47/47; npm run test:integration 261/261; npm run test:e2e 51/51; build:webpack 0; audit:prod 0; gitleaks dir src/tests/docs/firebase sem vazamentos (logs .agent-logs/f13-check-*.log; depois da correção da consulta de previsão: integração fulfillment 31/31 e e2e fulfillment 5/5 reexecutados)"
+    ],
+    "notes": "Parcial: a metade de ENTREGA parcial está provada; cancelamento parcial e reembolso acumulado ≤ pagamento são da F14 (canceledQty já entra no restante, sem comando que o grave). Permanece not_run."
   },
   "A23": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/integration/fulfillment-api.test.ts (F13, emulador): duas entregas concorrentes não excedem o restante e não duplicam baixa (8×1 unidade; 6×1 sobre 3; 2×2 sobre 3); as leituras do pedido dentro da transação serializam os comandos",
+      "F13 (04/10/2026, branch feat/f13-preparacao-entrega-nao-retirada): typecheck 0; lint 0; npm test 198/198; npm run test:rules 47/47; npm run test:integration 261/261; npm run test:e2e 51/51; build:webpack 0; audit:prod 0; gitleaks dir src/tests/docs/firebase sem vazamentos (logs .agent-logs/f13-check-*.log; depois da correção da consulta de previsão: integração fulfillment 31/31 e e2e fulfillment 5/5 reexecutados)"
+    ],
+    "notes": "Parcial: a metade 'entrega concorrente' está provada. A corrida entrega × cancelamento e dois cancelamentos simultâneos exigem o cancelamento da F14 e ficam como integração a comprovar lá (registrado em docs/decisions.md, 'Decisões de F13'). Permanece not_run."
   },
   "A24": {
     "status": "not_run",
@@ -366,8 +376,12 @@
   },
   "A27": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/integration/fulfillment-api.test.ts (F13, emulador): marcar não retirado só registra (carteira, livro, reserva, estoque e perdas intactos; entrega bloqueada; aparece na lista do dia e nas pendências); resolução só da administração e com motivo; cancel_refund/reschedule recusados como indisponíveis (F14/F16); encerrar com cobrança mantida classifica retained_charge_not_picked_up sem novo lançamento, sem reembolso e sem perda; descarte só das unidades listadas gera movimento de perda explícito com custo exato; falha intermediária no descarte de planejado desfaz tudo; pedido vencido sem marcação aparece como pendência; família vê a situação sem motivo/ator",
+      "tests/e2e/fulfillment.spec.ts: marcar com motivo (cantina), resolução só pela administração, reembolso/reagendamento desabilitados com a dependência visível, painel de pendências",
+      "F13 (04/10/2026, branch feat/f13-preparacao-entrega-nao-retirada): typecheck 0; lint 0; npm test 198/198; npm run test:rules 47/47; npm run test:integration 261/261; npm run test:e2e 51/51; build:webpack 0; audit:prod 0; gitleaks dir src/tests/docs/firebase sem vazamentos (logs .agent-logs/f13-check-*.log; depois da correção da consulta de previsão: integração fulfillment 31/31 e e2e fulfillment 5/5 reexecutados)"
+    ],
+    "notes": "Parcial: não retirada e resolução com cobrança mantida provadas no emulador. Reembolso/cancelamento (F14) e reagendamento (F16) ainda não existem: seguem pendências visíveis, sem simular conclusão. Sem pedido real no Firestore real. Permanece not_run."
   },
   "A28": {
     "status": "not_run",
@@ -502,9 +516,11 @@
       "npm run test:e2e 30/30",
       "npm run build:webpack exit 0",
       "Homologação publicada 03/10/2026 (tests/staging/policies-smoke.spec.ts, 5/5, sem dinheiro/compra): Rules negam escrita de uso/exceção/política pelo cliente; concorrência de limites só no emulador",
-      "F11 (04/10/2026) tests/integration/checkout-api.test.ts (emulador, saldo só por fixture): o callback não faz I/O externo e reexecuta com estado estável (IDs de ator + chave + data; relógio lido a cada tentativa); sem movimento duplicado em retry (clique duplo, ×6 simultâneas, falha forçada + retry); documentos de uso diário/semanal impedem o contorno concorrente dos limites. Pagamento/e-mail não existem nesta tarefa."
+      "F11 (04/10/2026) tests/integration/checkout-api.test.ts (emulador, saldo só por fixture): o callback não faz I/O externo e reexecuta com estado estável (IDs de ator + chave + data; relógio lido a cada tentativa); sem movimento duplicado em retry (clique duplo, ×6 simultâneas, falha forçada + retry); documentos de uso diário/semanal impedem o contorno concorrente dos limites. Pagamento/e-mail não existem nesta tarefa.",
+      "tests/integration/fulfillment-api.test.ts (F13, emulador): o callback de entrega/preparo/não retirada/resolução não faz I/O externo; retry após falha no último passo e replay não duplicam movimentos de estoque nem entregas; mesma chave com payload diferente = idempotency_conflict",
+      "F13 (04/10/2026, branch feat/f13-preparacao-entrega-nao-retirada): typecheck 0; lint 0; npm test 198/198; npm run test:rules 47/47; npm run test:integration 261/261; npm run test:e2e 51/51; build:webpack 0; audit:prod 0; gitleaks dir src/tests/docs/firebase sem vazamentos (logs .agent-logs/f13-check-*.log; depois da correção da consulta de previsão: integração fulfillment 31/31 e e2e fulfillment 5/5 reexecutados)"
     ],
-    "notes": "Parcial: documentos de uso diário/semanal impedem contornar limites concorrentes (emulador, comando de teste com a sequência do guard); 'callback em retry não chama pagamento/e-mail' não se aplica a este guard (sem efeito externo) e o do pedido real é de F11/F15; Firestore real não medido. Mantém as evidências da carteira. Manter not_run."
+    "notes": "Parcial (acrescenta a entrega ao guard/carteira/checkout já provados): retry não duplica baixa nem evento de entrega (emulador). Pagamento/e-mail não se aplicam à entrega; gateway é F18. Firestore real não medido. Permanece not_run."
   },
   "A36": {
     "status": "not_run",

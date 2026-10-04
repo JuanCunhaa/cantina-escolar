@@ -4,10 +4,13 @@ import { EXTRA_PERMISSIONS, type ExtraPermission, type Role } from "./roles";
  * Capacidades por papel geral. Custos e lucro pertencem somente à administração (docs/domains/access.md). Estoque (F10):
  * `inventory.read` = quantidades, lotes e reservas SEM custo (cantina e administração); `inventory.loss` = registrar perdas
  * (cantina e administração); `inventory.manage` = entradas com custo, estorno, contagem/ajuste e cotas (só administração).
+ * Pedidos (F13): `orders.operate` = pedidos do dia, preparo, entrega e marcar não retirado (cantina e administração);
+ * `orders.resolve` = resolver não retirado (só administração).
  */
 export const CAPABILITIES = [
   "students.search",
   "orders.operate",
+  "orders.resolve",
   "pos.operate",
   "catalog.photos.manage",
   "catalog.manage",

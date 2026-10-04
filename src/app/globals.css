@@ -346,3 +346,13 @@ fieldset { min-width: 0; }
 @media print { .shell-header, .shell-nav, .skip-link, .no-print { display: none !important; } .shell-main { padding: 0; } }
 .toolbar-compact .field { margin-bottom: var(--space-2); }
 @media (max-width: 40rem) { .toolbar-compact { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--space-2); } .toolbar-compact input, .toolbar-compact select { width: 100%; } }
+
+/* Operação de pedidos (F13): lista do dia com ações; sem cards, linhas abertas com divisória. */
+.day-list { display: grid; gap: 0; padding: 0; }
+.day-row { padding: var(--space-3) 0; border-top: 1px solid var(--color-line); }
+.day-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-2); }
+.day-items { padding: 0; margin: var(--space-1) 0; }
+.day-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.day-actions .notice, .day-panel { flex-basis: 100%; }
+.day-panel { padding: var(--space-2) 0; }
+@media print { .day-row { break-inside: avoid; } }
