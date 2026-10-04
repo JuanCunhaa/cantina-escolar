@@ -22,7 +22,8 @@ import {
   remainingOf,
   resolveSchema,
   totalsOf,
-  valueOfUnits,
+  deliveryRevenueOf,
+  remainingValueOf,
   type PrepStage,
 } from "./fulfillment-model";
 import type { OrderItem } from "./model";
@@ -61,7 +62,27 @@ async function readOrder(tx: FirebaseFirestore.Transaction, db: Firestore, order
 }
 
 const itemsView = (items: readonly OrderItem[]) => items.map((i) => ({ lineNo: i.lineNo, quantity: i.quantity, deliveredQty: deliveredOf(i), remainingQty: remainingOf(i) }));
-const unitsRemainingCents = valueOfUnits;
+
+/**
+ * Pedidos (que não este) com reserva ativa do produto, das datas mais distantes para as mais próximas, até somar o déficit.
+ * A lista do estoque não serve aqui: ela lê o estado já gravado, em que a reserva deste pedido (liberada só em memória na
+ * sessão) ainda aparece ativa. Só leituras (as gravações da sessão ficam para o `commit`).
+ */
+async function otherOrdersCovering(db: Firestore, tx: FirebaseFirestore.Transaction, productId: string, orderId: string, shortfall: number): Promise<string[]> {
+  const snap = await tx.get(db.collection(`stockBalances/${productId}/reservations`).where("status", "==", "active").limit(500));
+  const rows = snap.docs
+    .map((d) => ({ orderRef: String(d.get("orderRef")), date: String(d.get("consumptionDate")), remaining: Number(d.get("quantity") ?? 0) - Number(d.get("deliveredQty") ?? 0) - Number(d.get("releasedQty") ?? 0) }))
+    .filter((r) => r.orderRef !== orderId && r.remaining > 0)
+    .sort((a, b) => b.date.localeCompare(a.date) || a.orderRef.localeCompare(b.orderRef));
+  const out: string[] = [];
+  let covered = 0;
+  for (const r of rows) {
+    if (covered >= shortfall) break;
+    out.push(r.orderRef);
+    covered += r.remaining;
+  }
+  return out;
+}
 
 /* -------------------------------------------------------------------------------------------------- preparo */
 
@@ -142,7 +163,7 @@ export async function deliverOrder(db: Firestore, actor: Actor, raw: unknown, cl
         orderRef: input.orderId,
         referenceType: "order",
         referenceId: input.orderId,
-        revenueCents: unitsRemainingCents(item, line.quantity),
+        revenueCents: deliveryRevenueOf(item, line.quantity),
       });
       movements.push({ lineNo: item.lineNo, productId: item.productId, name: item.name, quantity: line.quantity, movementId: exit.movementId, movementSeq: exit.seq });
     }
@@ -215,7 +236,7 @@ export async function markNotPickedUp(db: Firestore, actor: Actor, raw: unknown,
     if (order.consumptionDate > today) throw conflict("not_consumption_date", "Só é possível marcar como não retirado a partir do dia do consumo.", { consumptionDate: order.consumptionDate, today });
     const totals = totalsOf(order.items);
     if (totals.remaining === 0) throw conflict("nothing_remaining", "Não há unidades por entregar.");
-    const remainingCents = order.items.reduce((sum, i) => sum + unitsRemainingCents(i, remainingOf(i)), 0);
+    const remainingCents = order.items.reduce((sum, i) => sum + remainingValueOf(i), 0);
     const status = aggregateStatus({ items: order.items, prep: order.prep, nonPickup: { resolved: false } });
     const stamp = FieldValue.serverTimestamp();
     tx.update(order.ref, {
@@ -246,6 +267,9 @@ export type ResolveResult = {
   retainedCents: number;
   returnedUnits: number;
   discardedUnits: number;
+  /** Unidades de OUTROS pedidos que ficaram sem lastro físico por causa do descarte (0 = nenhuma) e os pedidos a tratar. */
+  shortfallUnits: number;
+  affectedOrders: string[];
 };
 
 /**
@@ -283,11 +307,13 @@ export async function resolveNotPickedUp(db: Firestore, actor: Actor, raw: unkno
     for (const item of order.items) {
       const remaining = remainingOf(item);
       if (remaining === 0) continue;
-      retainedCents += unitsRemainingCents(item, remaining);
+      retainedCents += remainingValueOf(item);
       await stock.release({ productId: item.productId, reservationId: item.reservationId, quantity: remaining, orderRef: input.orderId });
       returned += remaining;
     }
     let discarded = 0;
+    let shortfallUnits = 0;
+    const affected = new Set<string>();
     for (const [lineNo, quantity] of discards) {
       const item = byLine.get(lineNo)!;
       const loss = await stock.removeUnits({
@@ -300,6 +326,8 @@ export async function resolveNotPickedUp(db: Firestore, actor: Actor, raw: unkno
         referenceId: input.orderId,
       });
       losses.push({ lineNo, productId: item.productId, quantity, movementId: loss.movementId });
+      shortfallUnits += loss.shortfallUnits;
+      if (loss.shortfallUnits > 0) for (const ref of await otherOrdersCovering(db, tx, item.productId, input.orderId, loss.shortfallUnits)) affected.add(ref);
       discarded += quantity;
     }
 
@@ -333,9 +361,9 @@ export async function resolveNotPickedUp(db: Firestore, actor: Actor, raw: unkno
       target: { type: "order", id: input.orderId },
       reason: input.reason,
       before: { status: order.status },
-      after: { status, classification: RETAINED_CLASSIFICATION, retainedCents, returnedUnits: returned - discarded, discardedUnits: discarded, losses },
+      after: { status, classification: RETAINED_CLASSIFICATION, retainedCents, returnedUnits: returned - discarded, discardedUnits: discarded, losses, shortfallUnits, affectedOrders: [...affected] },
     });
     stock.commit();
-    return { orderId: input.orderId, status, statusLabel: statusInfo(status).label, version: order.version + 1, classification: RETAINED_CLASSIFICATION, retainedCents, returnedUnits: returned - discarded, discardedUnits: discarded };
+    return { orderId: input.orderId, status, statusLabel: statusInfo(status).label, version: order.version + 1, classification: RETAINED_CLASSIFICATION, retainedCents, returnedUnits: returned - discarded, discardedUnits: discarded, shortfallUnits, affectedOrders: [...affected] };
   });
 }

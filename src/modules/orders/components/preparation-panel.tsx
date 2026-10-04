@@ -78,7 +78,7 @@ export function PreparationBoard({ user }: { user: User }) {
     const q = new URLSearchParams({ date });
     if (shiftId) q.set("shiftId", shiftId);
     const result = await api<DayOrders>(user, "GET", `/api/operations/orders?${q.toString()}`);
-    if (!result.ok) return setExportError(true);
+    if (!result.ok || result.data.truncated) return setExportError(true); // lista incompleta nunca vira arquivo "completo"
     const rows: (string | number)[][] = [["Data", "Turno", "Turma", "Aluno", "Produto", "Quantidade", "Entregues", "Restantes", "Situação"]];
     for (const o of result.data.orders) for (const i of o.items) rows.push([o.consumptionDate, o.shiftName ?? "", o.className ?? "", o.studentName, i.name, i.quantity, i.deliveredQty, i.remainingQty, o.statusLabel]);
     downloadCsv(`lista-nominal-${date}.csv`, rows);
@@ -127,7 +127,7 @@ export function PreparationBoard({ user }: { user: User }) {
       </p>
       {exportError && (
         <p role="alert" className="notice notice-error">
-          Não foi possível gerar a lista nominal agora.
+          Não foi possível gerar a lista nominal completa agora (falha de leitura ou mais pedidos que o limite: filtre por turno).
         </p>
       )}
       {panel.status === "loading" && <p role="status">Carregando…</p>}

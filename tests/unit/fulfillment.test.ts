@@ -11,6 +11,8 @@ import {
   resolveSchema,
   toCsv,
   totalsOf,
+  deliveryRevenueOf,
+  remainingValueOf,
   valueOfUnits,
   type PrepStage,
 } from "@/modules/orders/fulfillment-model";
@@ -83,6 +85,22 @@ describe("quantidades e preparo", () => {
   it("valor das unidades é proporcional ao subtotal pago", () => {
     expect(valueOfUnits({ quantity: 4, subtotalCents: 2000 }, 3)).toBe(1500);
     expect(valueOfUnits({ quantity: 4, subtotalCents: 2000 }, 0)).toBe(0);
+  });
+});
+
+describe("valores por acumulado (sem deriva de centavos)", () => {
+  it("receita das entregas + restante = subtotal pago, mesmo com divisão inexata", () => {
+    const line = { quantity: 3, subtotalCents: 100 };
+    let delivered = 0;
+    let revenue = 0;
+    for (let i = 0; i < 3; i++) {
+      revenue += deliveryRevenueOf({ ...line, deliveredQty: delivered }, 1);
+      delivered += 1;
+    }
+    expect(revenue).toBe(100); // 33+33+33 perderia 1 centavo
+    expect(remainingValueOf({ ...line, deliveredQty: 1 }) + deliveryRevenueOf(line, 1)).toBe(100);
+    expect(remainingValueOf({ ...line, deliveredQty: 3 })).toBe(0);
+    expect(remainingValueOf({ ...line, deliveredQty: 1, canceledQty: 1 })).toBe(33); // 100 − valor acumulado de 2 un. (67)
   });
 });
 

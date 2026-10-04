@@ -34,6 +34,16 @@ export const remainingOf = (i: ItemProgress): number => Math.max(0, i.quantity -
 /** Valor (centavos) de `units` unidades de uma linha, proporcional ao subtotal pago (exato enquanto não houver desconto). */
 export const valueOfUnits = (item: { quantity: number; subtotalCents: number }, units: number): number => (item.quantity === 0 ? 0 : Math.round((item.subtotalCents * units) / item.quantity));
 
+/**
+ * Valor ainda não entregue/cancelado da linha = subtotal pago − valor (arredondado UMA vez) das unidades já entregues/canceladas.
+ * Calculado pelo acumulado, nunca por fatias arredondadas separadamente: Σ das entregas + restante = subtotal pago, sem deriva de centavos.
+ */
+export const remainingValueOf = (item: { quantity: number; subtotalCents: number; deliveredQty?: number; canceledQty?: number }): number =>
+  Math.max(0, item.subtotalCents - valueOfUnits(item, (item.deliveredQty ?? 0) + (item.canceledQty ?? 0)));
+/** Receita da entrega de `units` unidades: diferença do acumulado (a soma de todas as entregas = subtotal da linha). */
+export const deliveryRevenueOf = (item: { quantity: number; subtotalCents: number; deliveredQty?: number }, units: number): number =>
+  valueOfUnits(item, (item.deliveredQty ?? 0) + units) - valueOfUnits(item, item.deliveredQty ?? 0);
+
 export const totalsOf = (items: readonly ItemProgress[]) => ({
   scheduled: items.reduce((n, i) => n + i.quantity, 0),
   delivered: items.reduce((n, i) => n + deliveredOf(i), 0),

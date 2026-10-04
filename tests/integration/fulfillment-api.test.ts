@@ -662,6 +662,23 @@ describe("não retirada: sem reembolso nem perda automáticos, resolução expl�
     await expectStock(p);
   });
 
+  it("descarte que deixa OUTRO pedido sem lastro físico avisa (shortfallUnits e pedidos afetados) e audita", async () => {
+    const p = await newProduct({ stock: 3 });
+    const x = await placeOrder([{ productId: p, quantity: 2 }]);
+    const y = await placeOrder([{ productId: p }]);
+    await notPickedUp(cantina, x.orderId);
+    const loss = await call(lossesRoute, cantina, "POST", "/api/inventory/losses", { key: randomUUID(), productId: p, quantity: 1, reason: "breakage", note: "Quebra de uma unidade" });
+    expect(loss.status, JSON.stringify(loss.body)).toBe(200); // já falta 1 unidade para as 3 reservadas
+
+    const key = randomUUID();
+    const r = await call(resolveRoute, admin, "POST", `/api/operations/orders/${x.orderId}/resolve`, { key, resolution: "close_charged", reason: "Política da escola: cobrança mantida", discards: [{ lineNo: 1, quantity: 2 }] }, x.orderId);
+    expect(r.body).toMatchObject({ status: "not_picked_up_closed", discardedUnits: 2, shortfallUnits: 1, affectedOrders: [y.orderId] });
+    expect(await doc(`auditLog/${admin.uid}__orders.resolve__${key}`)).toMatchObject({ after: { shortfallUnits: 1, affectedOrders: [y.orderId] } });
+    // nada cancela o pedido afetado sozinho: ele segue pago e a entrega é recusada por falta de lastro
+    expect(await doc(`orders/${y.orderId}`)).toMatchObject({ status: "paid" });
+    expect((await deliver(cantina, y.orderId, y.student, [{ lineNo: 1, quantity: 1 }])).body.error).toBe("insufficient_stock");
+  });
+
   it("falha intermediária na resolução (descarte de planejado sem unidade física): tudo desfeito, pedido segue pendente", async () => {
     const p = await newProduct({ mode: "planned", capacity: { [`${BASE}@${ST}`]: 5 } });
     const { student, orderId } = await placeOrder([{ productId: p, quantity: 2 }]);
@@ -705,6 +722,11 @@ describe("pedidos do dia e painel de preparação", () => {
     const ready = await call(dayRoute, cantina, "GET", `/api/operations/orders?date=${BASE}&status=ready&q=${encodeURIComponent(tag)}`);
     expect((ready.body.orders as { orderId: string }[]).map((r) => r.orderId)).toEqual([mine[1]]);
     expect((all.body.counts as Record<string, number>)).toMatchObject({ paid: 1, ready: 1 });
+
+    // aviso da lista do dia: só pendências (sem ler totais do dia nem a previsão)
+    const onlyAttention = await call(panelRoute, cantina, "GET", "/api/operations/preparation?scope=attention");
+    expect([onlyAttention.status, onlyAttention.body.rows, onlyAttention.body.forecast]).toEqual([200, [], []]);
+    expect((await call(panelRoute, cantina, "GET", "/api/operations/preparation?scope=tudo")).status).toBe(400);
 
     const tomorrow = await call(dayRoute, admin, "GET", `/api/operations/orders?date=${d(1)}&q=${encodeURIComponent(tag)}`);
     expect(tomorrow.body).toMatchObject({ canDeliver: false });

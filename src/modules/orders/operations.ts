@@ -14,7 +14,7 @@ import {
   isNotPickedUp,
   remainingOf,
   totalsOf,
-  valueOfUnits,
+  remainingValueOf,
   type DayItemView,
   type DayOrderView,
   type DayOrders,
@@ -87,7 +87,7 @@ export async function listDayOrders(db: Firestore, actor: Actor, rawQuery: unkno
   const needle = q.q ? normalizeName(q.q) : "";
 
   const all: DayOrderView[] = raw
-    .filter((o) => o.data.channel === "advance" || o.data.channel === undefined)
+    .filter((o) => o.data.channel === "advance")
     .map((o) => {
       const items = itemsOf(o.data);
       const status = String(o.data.status ?? "paid");
@@ -125,9 +125,10 @@ export async function listDayOrders(db: Firestore, actor: Actor, rawQuery: unkno
 /** Painel "O que preparar": totais da data/turno + previsão dos próximos sete dias + pendências de resolução. */
 export async function preparationPanel(db: Firestore, actor: Actor, rawQuery: unknown, clock: () => Date = () => new Date()): Promise<Preparation> {
   authorize(actor, "orders.operate");
-  const q = z.object({ date: dayQuerySchema.shape.date, shiftId: dayQuerySchema.shape.shiftId }).strict().parse(rawQuery);
+  const q = z.object({ date: dayQuerySchema.shape.date, shiftId: dayQuerySchema.shape.shiftId, scope: z.enum(["all", "attention"]).default("all") }).strict().parse(rawQuery);
   const today = localDateOf(clock());
   const date = q.date ?? today;
+  const attentionOnly = q.scope === "attention";
   const forecastTo = addDays(today, 6);
 
   let dayQuery: Query = db.collection("orders").where("consumptionDate", "==", date);
@@ -137,19 +138,21 @@ export async function preparationPanel(db: Firestore, actor: Actor, rawQuery: un
   const forecastQuery: Query = db.collection("orders").where("consumptionDate", ">=", today).where("consumptionDate", "<=", forecastTo);
 
   const [daySnap, forecastSnap, markedSnap, overdueSnap, shifts] = await Promise.all([
-    dayQuery.limit(MAX_DAY_ORDERS + 1).get(),
-    forecastQuery.limit(MAX_FORECAST_ORDERS + 1).get(),
+    // `scope=attention` (aviso da lista do dia): só as pendências, sem ler o dia nem a previsão.
+    attentionOnly ? Promise.resolve(null) : dayQuery.limit(MAX_DAY_ORDERS + 1).get(),
+    attentionOnly ? Promise.resolve(null) : forecastQuery.limit(MAX_FORECAST_ORDERS + 1).get(),
     db.collection("orders").where("status", "==", NOT_PICKED_UP).limit(MAX_ATTENTION + 1).get(),
     db.collection("orders").where("status", "in", [...OPEN_STATUSES]).where("consumptionDate", "<", today).limit(MAX_ATTENTION + 1).get(),
     namesOf(db, "shifts"),
   ]);
   const prepOf = (docs: readonly QueryDocumentSnapshot[]) =>
     toRaw(docs)
-      .filter((o) => o.data.channel === "advance" || o.data.channel === undefined)
+      .filter((o) => o.data.channel === "advance")
       .map((o) => ({ consumptionDate: String(o.data.consumptionDate), shiftId: String(o.data.shiftId ?? ""), status: String(o.data.status ?? "paid"), items: itemsOf(o.data) }));
 
-  const forecastTruncated = forecastSnap.size > MAX_FORECAST_ORDERS;
-  const attention = [...markedSnap.docs.slice(0, MAX_ATTENTION).map((d) => ({ d, marked: true })), ...overdueSnap.docs.slice(0, MAX_ATTENTION).map((d) => ({ d, marked: false }))]
+  const forecastTruncated = (forecastSnap?.size ?? 0) > MAX_FORECAST_ORDERS;
+  const advanceOnly = (d: QueryDocumentSnapshot) => d.get("channel") === "advance";
+  const attention = [...markedSnap.docs.filter(advanceOnly).slice(0, MAX_ATTENTION).map((d) => ({ d, marked: true })), ...overdueSnap.docs.filter(advanceOnly).slice(0, MAX_ATTENTION).map((d) => ({ d, marked: false }))]
     .map(({ d, marked }) => {
       const items = itemsOf(d.data());
       return {
@@ -159,7 +162,7 @@ export async function preparationPanel(db: Firestore, actor: Actor, rawQuery: un
         shiftId: String(d.get("shiftId") ?? ""),
         status: String(d.get("status")),
         remainingUnits: totalsOf(items).remaining,
-        remainingCents: items.reduce((sum, i) => sum + valueOfUnits(i, remainingOf(i)), 0),
+        remainingCents: items.reduce((sum, i) => sum + remainingValueOf(i), 0),
         marked,
       };
     })
@@ -169,12 +172,12 @@ export async function preparationPanel(db: Firestore, actor: Actor, rawQuery: un
     date,
     today,
     shiftId: q.shiftId ?? null,
-    rows: aggregatePreparation(prepOf(daySnap.docs.slice(0, MAX_DAY_ORDERS))),
-    forecast: aggregatePreparation(prepOf(forecastSnap.docs.slice(0, MAX_FORECAST_ORDERS)).filter((o) => !q.shiftId || o.shiftId === q.shiftId)),
+    rows: daySnap ? aggregatePreparation(prepOf(daySnap.docs.slice(0, MAX_DAY_ORDERS))) : [],
+    forecast: forecastSnap ? aggregatePreparation(prepOf(forecastSnap.docs.slice(0, MAX_FORECAST_ORDERS)).filter((o) => !q.shiftId || o.shiftId === q.shiftId)) : [],
     forecastFrom: today,
     forecastTo,
     attention,
-    truncated: daySnap.size > MAX_DAY_ORDERS || forecastTruncated || markedSnap.size > MAX_ATTENTION || overdueSnap.size > MAX_ATTENTION,
+    truncated: (daySnap?.size ?? 0) > MAX_DAY_ORDERS || forecastTruncated || markedSnap.size > MAX_ATTENTION || overdueSnap.size > MAX_ATTENTION,
     shifts,
   };
 }

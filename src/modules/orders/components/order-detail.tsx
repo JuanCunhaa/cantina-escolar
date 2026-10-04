@@ -7,6 +7,7 @@ import { api, errorText } from "@/lib/api-client";
 import { localDateOf } from "@/lib/dates/school-time";
 import { formatBRL } from "@/lib/money/format";
 import { clockLabel, longDayLabel } from "@/modules/menu/format";
+import { isNotPickedUp } from "../fulfillment-model";
 import { CHANNEL_LABEL, type OrderDetail } from "../history-model";
 import { orderDayText, StatusBadge } from "./my-orders";
 
@@ -86,7 +87,7 @@ export function OrderDetailView({ user, orderId }: { user: User; orderId: string
                 <td>{i.name}</td>
                 <td>{i.quantity}</td>
                 <td data-testid="item-delivered">{i.deliveredQty}</td>
-                <td data-testid="item-remaining">{o.status === "not_picked_up" || o.status === "not_picked_up_closed" ? `${i.remainingQty} (não retiradas)` : i.remainingQty}</td>
+                <td data-testid="item-remaining">{isNotPickedUp(o.status) ? `${i.remainingQty} (não retiradas)` : i.remainingQty}</td>
                 <td>{formatBRL(i.unitPriceCents)}</td>
                 <td>{formatBRL(i.subtotalCents)}</td>
               </tr>
@@ -110,7 +111,7 @@ export function OrderDetailView({ user, orderId }: { user: User; orderId: string
         {o.cancelDeadlineAt && <li className="muted">Prazo de cancelamento até {when(o.cancelDeadlineAt)}</li>}
       </ol>
       {o.nonPickup && (
-        <p className={o.nonPickup.resolved ? "notice" : "notice"} data-testid="order-non-pickup">
+        <p className="notice" data-testid="order-non-pickup">
           {o.nonPickup.resolved ? (
             <>
               A escola encerrou este pedido como <strong>não retirado</strong>, com a cobrança mantida ({formatBRL(o.nonPickup.retainedCents ?? 0)} das unidades não retiradas). {o.nonPickup.classification}.

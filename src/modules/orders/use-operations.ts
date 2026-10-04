@@ -96,5 +96,5 @@ export function downloadCsv(filename: string, rows: readonly (readonly (string |
   link.href = url;
   link.download = filename;
   link.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 10000); // alguns navegadores iniciam o download de forma assíncrona
 }

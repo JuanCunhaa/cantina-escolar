@@ -6,7 +6,7 @@ import type { User } from "firebase/auth";
 import { localDateOf } from "@/lib/dates/school-time";
 import { formatBRL } from "@/lib/money/format";
 import { longDayLabel } from "@/modules/menu/format";
-import { PENDING_RESOLUTIONS, OPEN_STATUSES, type DayOrderView, type DayOrders, type Preparation } from "../fulfillment-model";
+import { PENDING_RESOLUTIONS, isOpenStatus, type DayOrderView, type DayOrders, type Preparation } from "../fulfillment-model";
 import { useOrderCommand, useServerQuery, type CommandMessage } from "../use-operations";
 
 type Filters = { date: string; shiftId: string; classId: string; status: string; q: string };
@@ -24,7 +24,6 @@ const STATUS_FILTERS: [string, string][] = [
 ];
 
 const badgeClass = (status: string) => (status === "delivered" || status === "not_picked_up_closed" ? "badge-completed" : status === "not_picked_up" ? "badge-warn" : "badge-pending");
-const isOpen = (status: string) => (OPEN_STATUSES as readonly string[]).includes(status);
 
 function initialFilters(): Filters {
   const params = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
@@ -52,7 +51,7 @@ function OrderActions({ user, order, canDeliver, canResolve, onDone }: { user: U
   const [qty, setQty] = useState<Record<number, string>>({});
   const [reason, setReason] = useState("");
   const base = `/api/operations/orders/${encodeURIComponent(order.orderId)}`;
-  const open = isOpen(order.status);
+  const open = isOpenStatus(order.status);
   const remaining = order.items.filter((i) => i.remainingQty > 0);
   const label = order.studentName;
 
@@ -157,7 +156,7 @@ function ResolveForm({ order, busy, run, base, onClose }: { order: DayOrderView;
       onSubmit={(e) => {
         e.preventDefault();
         const discards = items.map((i) => ({ lineNo: i.lineNo, quantity: toQty(discard[i.lineNo] ?? "", i.remainingQty) })).filter((d) => d.quantity > 0);
-        void run(`${base}/resolve`, { resolution: "close_charged", reason, discards }, (d) => `Encerrado com cobrança mantida (${formatBRL(Number(d.retainedCents ?? 0))}). ${d.discardedUnits ? `${d.discardedUnits} unidade(s) descartada(s) como perda.` : "Nenhuma perda registrada."}`).then((ok) => ok && onClose());
+        void run(`${base}/resolve`, { resolution: "close_charged", reason, discards }, (d) => `Encerrado com cobrança mantida (${formatBRL(Number(d.retainedCents ?? 0))}). ${d.discardedUnits ? `${d.discardedUnits} unidade(s) descartada(s) como perda.` : "Nenhuma perda registrada."}${Number(d.shortfallUnits ?? 0) > 0 ? ` ATENÇÃO: o descarte deixou ${d.shortfallUnits} unidade(s) de outros pedidos sem estoque físico — trate esses pedidos (Estoque).` : ""}`).then((ok) => ok && onClose());
       }}
     >
       <h3>Resolver não retirado — {order.studentName}</h3>
@@ -205,7 +204,7 @@ export function DayOrdersBoard({ user, canResolve }: { user: User; canResolve: b
   const params = new URLSearchParams();
   for (const [k, v] of Object.entries(filters)) if (v) params.set(k, v);
   const list = useServerQuery<DayOrders>(user, "/api/operations/orders", params.toString());
-  const attention = useServerQuery<Preparation>(user, "/api/operations/preparation", "");
+  const attention = useServerQuery<Preparation>(user, "/api/operations/preparation", "scope=attention");
   const data = list.data;
   const reloadAll = () => {
     list.reload();
