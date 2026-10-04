@@ -5,7 +5,7 @@
 // Firestore real EXIGE índice composto mesmo sem documentos, que os índices novos (dia/turno, previsão, pendências vencidas,
 // não retirados) estão publicados e prontos; Rules (entregas fechadas ao cliente) e as telas vazias.
 // NÃO prova: entrega/estoque/custo, parcial, concorrência, replay, não retirada nem resolução com dados no Firestore real — isso
-// só existe no emulador (tests/integration/fulfillment-api.test.ts, e2e/fulfillment.spec.ts). Corrida entrega × cancelamento: F14.
+// só existe no emulador (tests/integration/fulfillment-api.test.ts, e2e/fulfillment.spec.ts). Corrida entrega × cancelamento: tests/integration/cancellation-api.test.ts (F14).
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { DEMO_SHIFTS } from "../../scripts/lib/demo-seed.ts";
 import { localDateOf } from "../../src/lib/dates/school-time";
@@ -74,7 +74,7 @@ test("consultas vazias e índices publicados: dia/turno, filtros, previsão e pe
   expect((await get(request, cantina, "/api/operations/preparation?scope=tudo")).status).toBe(400);
 });
 
-test("validação e recusas dos comandos: entrada inválida 400; pedido inexistente 404; reembolso/reagendamento indisponíveis (F14/F16)", async ({ request }) => {
+test("validação e recusas dos comandos: entrada inválida 400; pedido inexistente 404; reagendamento indisponível (F16)", async ({ request }) => {
   expect((await get(request, cantina, "/api/operations/orders?date=2026-02-30")).status).toBe(400);
   expect((await get(request, cantina, "/api/operations/orders?outro=1")).status).toBe(400);
   const key = () => newKey("hml-fu");
@@ -91,10 +91,11 @@ test("validação e recusas dos comandos: entrada inválida 400; pedido inexiste
     const r = await call(request, user, "POST", `/api/operations/orders/ord_inexistente/${route}`, body);
     expect([r.status, r.body.error], route).toEqual([404, "order_not_found"]);
   }
-  for (const [resolution, task] of [["cancel_refund", "F14"], ["reschedule", "F16"]] as const) {
-    const r = await call(request, fam.admin, "POST", "/api/operations/orders/ord_inexistente/resolve", { key: key(), resolution, reason: "Decisão da direção" });
-    expect([r.status, r.body.error, r.body.details?.availableIn], resolution).toEqual([409, "resolution_unavailable", task]);
-  }
+  // cancel_refund passou a existir na F14 (pedido inexistente → 404); só o reagendamento segue indisponível (F16).
+  const refund = await call(request, fam.admin, "POST", "/api/operations/orders/ord_inexistente/resolve", { key: key(), resolution: "cancel_refund", reason: "Decisão da direção" });
+  expect([refund.status, refund.body.error]).toEqual([404, "order_not_found"]);
+  const reschedule = await call(request, fam.admin, "POST", "/api/operations/orders/ord_inexistente/resolve", { key: key(), resolution: "reschedule", reason: "Decisão da direção" });
+  expect([reschedule.status, reschedule.body.error, reschedule.body.details?.availableIn]).toEqual([409, "resolution_unavailable", "F16"]);
 });
 
 test("Rules publicadas: pedidos e entregas seguem fechados ao cliente (família, cantina, administração, anônimo)", async () => {

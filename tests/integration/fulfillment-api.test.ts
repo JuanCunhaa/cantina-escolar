@@ -3,7 +3,7 @@
 // duplo e entregas concorrentes; falha intermediária (planejado sem entrada, falha no último passo); autorização revogada;
 // não retirada sem reembolso/perda automáticos e sua resolução (cobrança retida classificada, descarte = perda explícita);
 // consultas do dia/painel e a visão da família. Pedidos reais nascem do checkout real; o saldo vem SÓ de fixture do emulador.
-// Corrida ENTREGA × CANCELAMENTO não é provada aqui: o cancelamento é da F14 (registrado como integração a comprovar).
+// Corrida ENTREGA × CANCELAMENTO e cancel_refund: tests/integration/cancellation-api.test.ts (F14).
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fundDemoWallet } from "../../scripts/lib/demo-seed.ts";
@@ -597,7 +597,7 @@ describe("não retirada: sem reembolso nem perda automáticos, resolução expl�
     expect((panel.body.attention as { orderId: string; marked: boolean; remainingCents: number }[]).find((o) => o.orderId === orderId)).toMatchObject({ marked: true, remainingCents: 1000 });
   });
 
-  it("resolução é só da administração, exige motivo e recusa reembolso/reagendamento ainda inexistentes (F14/F16)", async () => {
+  it("resolução é só da administração, exige motivo e recusa o reagendamento ainda inexistente (F16)", async () => {
     const p = await newProduct({ stock: 10 });
     const { student, orderId } = await placeOrder([{ productId: p }]);
     await notPickedUp(cantina, orderId);
@@ -607,7 +607,6 @@ describe("não retirada: sem reembolso nem perda automáticos, resolução expl�
     expect((await resolve(guardianA, orderId)).status).toBe(403);
     expect((await resolve(null, orderId)).status).toBe(401);
     expect((await resolve(admin, orderId, { reason: "x" })).status).toBe(400);
-    expect((await resolve(admin, orderId, { resolution: "cancel_refund" })).body).toMatchObject({ error: "resolution_unavailable", details: { availableIn: "F14" } });
     expect((await resolve(admin, orderId, { resolution: "reschedule" })).body).toMatchObject({ error: "resolution_unavailable", details: { availableIn: "F16" } });
     expect(await snapshot(student, [p])).toEqual(before);
     expect(await doc(`orders/${orderId}`)).toMatchObject({ status: "not_picked_up" });
