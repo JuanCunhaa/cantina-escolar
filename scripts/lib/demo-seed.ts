@@ -116,7 +116,7 @@ export function demoPhotoPath(productId: string): string {
   return `products/${productId}/demo.png`;
 }
 
-type Plain = string | number | boolean | null | Plain[] | { [key: string]: Plain };
+type Plain = string | number | boolean | null | Date | Plain[] | { [key: string]: Plain };
 
 /** Mesma chave de unicidade dos comandos reais (src/modules/students/normalize.ts `unitSlug`), sem imports `@/`. */
 export function nameSlug(name: string): string {
@@ -186,6 +186,7 @@ function toValue(value: Plain): Record<string, unknown> {
   if (typeof value === "string") return { stringValue: value };
   if (typeof value === "boolean") return { booleanValue: value };
   if (typeof value === "number") return { integerValue: String(value) };
+  if (value instanceof Date) return { timestampValue: value.toISOString() };
   if (Array.isArray(value)) return { arrayValue: { values: value.map(toValue) } };
   return { mapValue: { fields: Object.fromEntries(Object.entries(value).map(([k, v]) => [k, toValue(v)])) } };
 }

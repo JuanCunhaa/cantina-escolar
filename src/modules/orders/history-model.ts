@@ -74,6 +74,8 @@ export function filtersFromParams(params: URLSearchParams): unknown {
 export type OrderItemView = Pick<OrderItem, "lineNo" | "productId" | "name" | "unit" | "quantity" | "unitPriceCents" | "discountCents" | "subtotalCents"> & {
   /** Unidades já entregues (F13) e ainda por entregar; pedidos anteriores à F13 = 0 entregues. */
   deliveredQty: number;
+  /** Unidades canceladas e reembolsadas (F14); pedidos anteriores = 0. */
+  canceledQty: number;
   remainingQty: number;
 };
 
@@ -92,6 +94,8 @@ export type OrderView = {
   items: OrderItemView[];
   itemCount: number;
   totalCents: number;
+  /** Total já devolvido à carteira original (F14); 0 enquanto não houve cancelamento. */
+  refundedCents: number;
   createdAt: string | null;
   version: number;
 };
@@ -109,11 +113,27 @@ export type OrderDetail = OrderView & {
   /** Papel de quem comprou (o responsável/aluno que fez a compra; nunca UID ou dado interno). */
   purchasedBy: "guardian" | "student" | "staff" | null;
   cancelDeadlineAt: string | null;
-  timeline: { kind: "created" | "paid" | "preparing" | "ready" | "delivery" | "not_picked_up" | "resolved"; at: string | null; label: string }[];
+  timeline: { kind: "created" | "paid" | "preparing" | "ready" | "delivery" | "cancellation" | "not_picked_up" | "resolved"; at: string | null; label: string }[];
+  /**
+   * Cancelamentos/reembolsos (F14), do mais antigo ao mais novo: quando, quem pediu (responsável ou escola), o que foi cancelado,
+   * quanto voltou e o lançamento no livro. O motivo só sai quando foi do PRÓPRIO responsável; o da equipe é interno, e nem o
+   * ator nem movimentos de estoque/custo saem do servidor.
+   */
+  cancellations: {
+    at: string | null;
+    by: "guardian" | "school";
+    reason: string | null;
+    lines: { name: string; quantity: number; refundCents: number }[];
+    refundCents: number;
+    walletSeq: number | null;
+    balanceAfterCents: number | null;
+  }[];
+  /** O responsável pode cancelar AGORA (aberto, ainda há restante e o prazo salvo no pedido não passou). O comando revalida tudo. */
+  cancelable: boolean;
   /** Entregas registradas (F13): só nome/quantidade/instante; nunca ator, movimento de estoque ou custo. */
   deliveries: { at: string | null; lines: { name: string; quantity: number }[] }[];
   /** Não retirada (F13): situação e classificação em linguagem de família; motivo interno e ator não saem do servidor. */
-  nonPickup: { resolved: boolean; markedAt: string | null; resolvedAt: string | null; retainedCents: number | null; classification: string | null } | null;
+  nonPickup: { resolved: boolean; kind: "close_charged" | "cancel_refund" | null; markedAt: string | null; resolvedAt: string | null; retainedCents: number | null; refundCents: number | null; classification: string | null } | null;
   receipt: OrderReceipt;
 };
 

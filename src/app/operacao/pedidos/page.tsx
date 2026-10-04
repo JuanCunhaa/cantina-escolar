@@ -15,5 +15,5 @@ export default function OperacaoPedidosPage() {
       </section>
     );
   }
-  return <DayOrdersBoard user={session.user} canResolve={can(session, "orders.resolve")} />;
+  return <DayOrdersBoard user={session.user} canResolve={can(session, "orders.resolve")} canCancel={can(session, "orders.cancel")} canDiscard={can(session, "inventory.loss")} />;
 }

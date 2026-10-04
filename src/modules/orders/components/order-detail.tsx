@@ -8,6 +8,8 @@ import { localDateOf } from "@/lib/dates/school-time";
 import { formatBRL } from "@/lib/money/format";
 import { clockLabel, longDayLabel } from "@/modules/menu/format";
 import { isNotPickedUp } from "../fulfillment-model";
+import type { CommandMessage } from "../use-operations";
+import { CancelPanel, Notice } from "./cancel-order";
 import { CHANNEL_LABEL, type OrderDetail } from "../history-model";
 import { orderDayText, StatusBadge } from "./my-orders";
 
@@ -23,8 +25,10 @@ type State = { key: string; status: "error"; code: string } | { key: string; sta
  */
 export function OrderDetailView({ user, orderId }: { user: User; orderId: string }) {
   const [loaded, setState] = useState<State | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
+  const [notice, setNotice] = useState<CommandMessage | null>(null);
   const uid = user.uid;
-  const key = `${uid}|${orderId}`;
+  const key = `${uid}|${orderId}|${reloadTick}`;
   const userRef = useRef(user);
   useEffect(() => {
     userRef.current = user;
@@ -38,7 +42,8 @@ export function OrderDetailView({ user, orderId }: { user: User; orderId: string
       current = false;
     };
   }, [key, orderId]);
-  const state = loaded?.key === key ? loaded : ({ status: "loading" } as const);
+  // Depois de um comando a tela relê o pedido; o estado anterior permanece até a resposta nova (nunca pisca "carregando").
+  const state = loaded?.key === key ? loaded : loaded && loaded.key.startsWith(`${uid}|${orderId}|`) ? loaded : ({ status: "loading" } as const);
 
   if (state.status === "loading") return <p role="status">Carregando o pedido…</p>;
   if (state.status === "error")
@@ -76,6 +81,7 @@ export function OrderDetailView({ user, orderId }: { user: User; orderId: string
               <th scope="col">Produto</th>
               <th scope="col">Qtd.</th>
               <th scope="col">Entregues</th>
+              <th scope="col">Canceladas</th>
               <th scope="col">Faltam</th>
               <th scope="col">Preço un.</th>
               <th scope="col">Subtotal</th>
@@ -87,6 +93,7 @@ export function OrderDetailView({ user, orderId }: { user: User; orderId: string
                 <td>{i.name}</td>
                 <td>{i.quantity}</td>
                 <td data-testid="item-delivered">{i.deliveredQty}</td>
+                <td data-testid="item-canceled">{i.canceledQty}</td>
                 <td data-testid="item-remaining">{isNotPickedUp(o.status) ? `${i.remainingQty} (não retiradas)` : i.remainingQty}</td>
                 <td>{formatBRL(i.unitPriceCents)}</td>
                 <td>{formatBRL(i.subtotalCents)}</td>
@@ -99,6 +106,11 @@ export function OrderDetailView({ user, orderId }: { user: User; orderId: string
       <p>
         Total pago: <strong data-testid="order-total">{formatBRL(o.totalCents)}</strong>
       </p>
+      {o.refundedCents > 0 && (
+        <p data-testid="order-refunded">
+          Devolvido à carteira de {o.studentName}: <strong>{formatBRL(o.refundedCents)}</strong>
+        </p>
+      )}
 
       <h2>Histórico do pedido</h2>
       <ol className="plain-list" data-testid="order-timeline">
@@ -112,7 +124,11 @@ export function OrderDetailView({ user, orderId }: { user: User; orderId: string
       </ol>
       {o.nonPickup && (
         <p className="notice" data-testid="order-non-pickup">
-          {o.nonPickup.resolved ? (
+          {o.nonPickup.resolved && o.nonPickup.kind === "cancel_refund" ? (
+            <>
+              A escola resolveu este pedido <strong>não retirado</strong> cancelando e devolvendo {formatBRL(o.nonPickup.refundCents ?? 0)} à carteira de {o.studentName}. {o.nonPickup.classification}.
+            </>
+          ) : o.nonPickup.resolved ? (
             <>
               A escola encerrou este pedido como <strong>não retirado</strong>, com a cobrança mantida ({formatBRL(o.nonPickup.retainedCents ?? 0)} das unidades não retiradas). {o.nonPickup.classification}.
             </>
@@ -123,7 +139,32 @@ export function OrderDetailView({ user, orderId }: { user: User; orderId: string
           )}
         </p>
       )}
-      <p className="muted">O cancelamento com reembolso à carteira ainda não está disponível nesta tela (chega com a F14).</p>
+      <Notice message={notice} testId="cancel-message" />
+      {o.cancellations.length > 0 && (
+        <>
+          <h2>Cancelamentos e reembolsos</h2>
+          <ul className="plain-list" data-testid="order-cancellations">
+            {o.cancellations.map((c, index) => (
+              <li key={index}>
+                {when(c.at)} — {c.by === "guardian" ? "cancelado pelo responsável" : "cancelado pela escola"}: {c.lines.map((l) => `${l.quantity}× ${l.name}`).join(", ")}. Devolvido à carteira: <strong>{formatBRL(c.refundCents)}</strong>
+                {c.walletSeq !== null && c.balanceAfterCents !== null ? ` (lançamento nº ${c.walletSeq}, saldo depois: ${formatBRL(c.balanceAfterCents)})` : ""}
+                {c.reason ? ` · ${c.reason}` : ""}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {o.cancelable ? (
+        <CancelPanel user={user} order={o} onDone={() => setReloadTick((n) => n + 1)} onMessage={setNotice} />
+      ) : (
+        o.cancelDeadlineAt &&
+        !["cancelled", "delivered", "not_picked_up_closed"].includes(o.status) &&
+        o.items.some((i) => i.remainingQty > 0) && (
+          <p className="muted" data-testid="cancel-unavailable">
+            O prazo para cancelar este pedido terminou. Se precisar, fale com a escola: o cancelamento depois do prazo é feito pela equipe, com motivo.
+          </p>
+        )
+      )}
 
       <h2>Recibo interno</h2>
       <dl className="receipt-grid" data-testid="order-receipt">

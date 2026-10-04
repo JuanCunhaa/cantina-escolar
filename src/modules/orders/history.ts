@@ -15,7 +15,8 @@ import {
 } from "./history-model";
 
 import { decodeCursor, encodeCursor } from "./history-cursor";
-import { CLASSIFICATION_LABEL, RETAINED_CLASSIFICATION, deliveredOf, remainingOf } from "./fulfillment-model";
+import { CLASSIFICATION_LABEL, REFUNDED_CLASSIFICATION, RETAINED_CLASSIFICATION, canceledOf, deliveredOf, isOpenStatus, remainingOf, totalsOf } from "./fulfillment-model";
+import type { OrderItem } from "./model";
 
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
 
@@ -40,6 +41,7 @@ function toItem(raw: unknown): OrderItemView | null {
     discountCents: Number(i.discountCents ?? 0),
     subtotalCents: Number(i.subtotalCents),
     deliveredQty: deliveredOf({ quantity: Number(i.quantity), deliveredQty: Number(i.deliveredQty ?? 0) }),
+    canceledQty: canceledOf({ quantity: Number(i.quantity), canceledQty: Number(i.canceledQty ?? 0) }),
     remainingQty: remainingOf({ quantity: Number(i.quantity), deliveredQty: Number(i.deliveredQty ?? 0), canceledQty: Number(i.canceledQty ?? 0) }),
   };
 }
@@ -64,6 +66,7 @@ export function toOrderView(id: string, d: FirebaseFirestore.DocumentData, shift
     items: ((d.items as unknown[] | undefined) ?? []).flatMap((x) => toItem(x) ?? []),
     itemCount: Number(d.itemCount ?? 0),
     totalCents: Number(d.totalCents),
+    refundedCents: Number(d.refundedCents ?? 0),
     createdAt: iso(d.createdAt),
     version: Number(d.version ?? 1),
   };
@@ -159,7 +162,7 @@ export async function listOrders(db: Firestore, actor: Actor, rawFilters: unknow
  * Detalhe + recibo interno. ID inexistente e pedido de outra família respondem igual (403): quem não tem vínculo atual
  * não descobre se o pedido existe. Só campos de exibição: UID do autor, exceções, reservas e política não saem.
  */
-export async function getOrderDetail(db: Firestore, actor: Actor, orderId: string): Promise<OrderDetail> {
+export async function getOrderDetail(db: Firestore, actor: Actor, orderId: string, clock: () => Date = () => new Date()): Promise<OrderDetail> {
   if (!ID.test(orderId)) throw new ForbiddenError("Pedido inválido.");
   const snap = await db.doc(`orders/${orderId}`).get();
   const d = snap.data();
@@ -167,10 +170,11 @@ export async function getOrderDetail(db: Firestore, actor: Actor, orderId: strin
   await authorizeStudent(db, actor, d.studentId, "orders.read");
 
   const entryId = typeof d.walletEntryId === "string" && ID.test(d.walletEntryId) ? d.walletEntryId : null;
-  const [names, entry, deliveriesSnap] = await Promise.all([
+  const [names, entry, deliveriesSnap, cancellationsSnap] = await Promise.all([
     shiftNamesOf(db, [String(d.shiftId ?? "")]),
     entryId ? db.doc(`wallets/${d.studentId}/entries/${entryId}`).get() : Promise.resolve(null),
     db.collection(`orders/${snap.id}/deliveries`).orderBy("seq").limit(100).get(),
+    db.collection(`orders/${snap.id}/cancellations`).orderBy("seq").limit(100).get(),
   ]);
   const view = toOrderView(snap.id, d, names);
   const role = d.createdByRole;
@@ -180,30 +184,50 @@ export async function getOrderDetail(db: Firestore, actor: Actor, orderId: strin
     at: iso(x.get("createdAt")),
     lines: ((x.get("lines") as { name?: unknown; quantity?: unknown }[] | undefined) ?? []).map((l) => ({ name: String(l.name ?? ""), quantity: Number(l.quantity ?? 0) })),
   }));
-  const np = d.nonPickup as { markedAt?: unknown; remainingCents?: unknown; resolution?: { classification?: unknown; amountCents?: unknown; resolvedAt?: unknown } | null } | undefined;
+  const cancellations = cancellationsSnap.docs.map((x) => {
+    const byStaff = x.get("actorRole") !== "guardian";
+    return {
+      at: iso(x.get("createdAt")),
+      by: (byStaff ? "school" : "guardian") as "guardian" | "school",
+      reason: !byStaff && typeof x.get("reason") === "string" ? String(x.get("reason")) : null,
+      lines: ((x.get("lines") as { name?: unknown; quantity?: unknown; refundCents?: unknown }[] | undefined) ?? []).map((l) => ({ name: String(l.name ?? ""), quantity: Number(l.quantity ?? 0), refundCents: Number(l.refundCents ?? 0) })),
+      refundCents: Number(x.get("refundCents") ?? 0),
+      walletSeq: typeof x.get("walletSeq") === "number" ? Number(x.get("walletSeq")) : null,
+      balanceAfterCents: typeof x.get("balanceAfterCents") === "number" ? Number(x.get("balanceAfterCents")) : null,
+    };
+  });
+  const cutoff = iso(policy.cancelCutoffAt);
+  const itemsRaw = (d.items as OrderItem[]) ?? [];
+  const cancelable = actor.role === "guardian" && isOpenStatus(view.status) && totalsOf(itemsRaw).remaining > 0 && cutoff !== null && clock().getTime() < new Date(cutoff).getTime();
+  const np = d.nonPickup as { markedAt?: unknown; remainingCents?: unknown; resolution?: { kind?: unknown; classification?: unknown; amountCents?: unknown; resolvedAt?: unknown } | null } | undefined;
   const resolved = Boolean(np?.resolution);
   const nonPickup = np
     ? {
         resolved,
+        kind: np.resolution?.kind === "cancel_refund" ? ("cancel_refund" as const) : np.resolution?.kind === "close_charged" ? ("close_charged" as const) : null,
         markedAt: iso(np.markedAt),
         resolvedAt: iso(np.resolution?.resolvedAt),
-        retainedCents: resolved ? Number(np.resolution?.amountCents ?? 0) : Number(np.remainingCents ?? 0),
-        classification: np.resolution?.classification === RETAINED_CLASSIFICATION ? CLASSIFICATION_LABEL[RETAINED_CLASSIFICATION] : null,
+        retainedCents: resolved ? (np.resolution?.kind === "cancel_refund" ? 0 : Number(np.resolution?.amountCents ?? 0)) : Number(np.remainingCents ?? 0),
+        refundCents: resolved && np.resolution?.kind === "cancel_refund" ? Number(np.resolution?.amountCents ?? 0) : null,
+        classification: np.resolution?.classification === RETAINED_CLASSIFICATION ? CLASSIFICATION_LABEL[RETAINED_CLASSIFICATION] : np.resolution?.classification === REFUNDED_CLASSIFICATION ? CLASSIFICATION_LABEL[REFUNDED_CLASSIFICATION] : null,
       }
     : null;
   return {
     ...view,
     purchasedBy: role === "guardian" || role === "student" ? role : role ? "staff" : null,
-    cancelDeadlineAt: iso(policy.cancelCutoffAt),
+    cancelDeadlineAt: cutoff,
     timeline: [
       { kind: "created", at: createdAt, label: "Pedido criado" },
       ...(view.paymentState === "paid" ? [{ kind: "paid" as const, at: createdAt, label: "Pago com o saldo da carteira" }] : []),
       ...(iso(d.preparingAt) ? [{ kind: "preparing" as const, at: iso(d.preparingAt), label: "Em preparo" }] : []),
       ...(iso(d.readyAt) ? [{ kind: "ready" as const, at: iso(d.readyAt), label: "Pronto para retirada" }] : []),
       ...deliveries.map((x) => ({ kind: "delivery" as const, at: x.at, label: `Entrega: ${x.lines.map((l) => `${l.quantity}× ${l.name}`).join(", ")}` })),
+      ...cancellations.map((c) => ({ kind: "cancellation" as const, at: c.at, label: `${c.by === "guardian" ? "Cancelado pelo responsável" : "Cancelado pela escola"}: ${c.lines.map((l) => `${l.quantity}× ${l.name}`).join(", ")}` })),
       ...(nonPickup ? [{ kind: "not_picked_up" as const, at: nonPickup.markedAt, label: "Marcado como não retirado" }] : []),
-      ...(nonPickup?.resolved ? [{ kind: "resolved" as const, at: nonPickup.resolvedAt, label: "Encerrado com cobrança mantida" }] : []),
+      ...(nonPickup?.resolved ? [{ kind: "resolved" as const, at: nonPickup.resolvedAt, label: nonPickup.kind === "cancel_refund" ? "Encerrado: cancelado e reembolsado à carteira" : "Encerrado com cobrança mantida" }] : []),
     ],
+    cancellations,
+    cancelable,
     deliveries,
     nonPickup,
     receipt: {

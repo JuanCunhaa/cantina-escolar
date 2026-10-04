@@ -1,6 +1,6 @@
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { localDateOf } from "@/lib/dates/school-time";
-import { conflict, notFound } from "@/lib/domain-error";
+import { conflict } from "@/lib/domain-error";
 import { deterministicId, runIdempotentCommand } from "@/lib/firebase/command";
 import type { Actor } from "@/modules/access/actor";
 import { authorize } from "@/modules/access/authorize";
@@ -10,6 +10,7 @@ import { openStockSession } from "@/modules/inventory/session";
 import { statusInfo } from "./history-model";
 import {
   PENDING_RESOLUTIONS,
+  REFUNDED_CLASSIFICATION,
   RETAINED_CLASSIFICATION,
   aggregateStatus,
   canPrepare,
@@ -21,12 +22,13 @@ import {
   prepareSchema,
   remainingOf,
   resolveSchema,
+  type ResolveInput,
   totalsOf,
   deliveryRevenueOf,
   remainingValueOf,
-  type PrepStage,
 } from "./fulfillment-model";
-import type { OrderItem } from "./model";
+import { planCancellation } from "./cancellation";
+import { itemsView, otherOrdersCovering, readOrder, sessionActor, type OrderState } from "./order-state";
 
 /**
  * Comandos de operação do pedido (F13, docs/domains/fulfillment.md §12): preparo, entrega (direta ou parcial),
@@ -37,52 +39,8 @@ import type { OrderItem } from "./model";
  * Estoque: sempre pela `StockSession` da F10 na mesma transação do pedido; a reserva usada é a do PRÓPRIO pedido
  * (`orderRef` conferido), então uma entrega nunca consome o que está reservado para outro pedido.
  */
-const sessionActor = (actor: Actor) => ({ uid: actor.uid, role: actor.role ?? null });
 const allowOperate = (p: { role: Actor["role"]; permissions: readonly string[] }) => can(p, "orders.operate");
 const allowResolve = (p: { role: Actor["role"]; permissions: readonly string[] }) => can(p, "orders.resolve");
-
-type OrderState = {
-  ref: FirebaseFirestore.DocumentReference;
-  data: FirebaseFirestore.DocumentData;
-  items: OrderItem[];
-  status: string;
-  prep: PrepStage;
-  version: number;
-  consumptionDate: string;
-};
-
-async function readOrder(tx: FirebaseFirestore.Transaction, db: Firestore, orderId: string): Promise<OrderState> {
-  const ref = db.doc(`orders/${orderId}`);
-  const snap = await tx.get(ref);
-  const data = snap.data();
-  if (!data || typeof data.studentId !== "string" || !Array.isArray(data.items)) throw notFound("order_not_found", "Pedido não encontrado.");
-  if (data.channel !== "advance") throw conflict("channel_not_supported", "Este comando atende pedidos antecipados.");
-  const prep = data.prep === "preparing" || data.prep === "ready" ? (data.prep as PrepStage) : "none";
-  return { ref, data, items: data.items as OrderItem[], status: String(data.status ?? "paid"), prep, version: Number(data.version ?? 1), consumptionDate: String(data.consumptionDate) };
-}
-
-const itemsView = (items: readonly OrderItem[]) => items.map((i) => ({ lineNo: i.lineNo, quantity: i.quantity, deliveredQty: deliveredOf(i), remainingQty: remainingOf(i) }));
-
-/**
- * Pedidos (que não este) com reserva ativa do produto, das datas mais distantes para as mais próximas, até somar o déficit.
- * A lista do estoque não serve aqui: ela lê o estado já gravado, em que a reserva deste pedido (liberada só em memória na
- * sessão) ainda aparece ativa. Só leituras (as gravações da sessão ficam para o `commit`).
- */
-async function otherOrdersCovering(db: Firestore, tx: FirebaseFirestore.Transaction, productId: string, orderId: string, shortfall: number): Promise<string[]> {
-  const snap = await tx.get(db.collection(`stockBalances/${productId}/reservations`).where("status", "==", "active").limit(500));
-  const rows = snap.docs
-    .map((d) => ({ orderRef: String(d.get("orderRef")), date: String(d.get("consumptionDate")), remaining: Number(d.get("quantity") ?? 0) - Number(d.get("deliveredQty") ?? 0) - Number(d.get("releasedQty") ?? 0) }))
-    .filter((r) => r.orderRef !== orderId && r.remaining > 0)
-    .sort((a, b) => b.date.localeCompare(a.date) || a.orderRef.localeCompare(b.orderRef));
-  const out: string[] = [];
-  let covered = 0;
-  for (const r of rows) {
-    if (covered >= shortfall) break;
-    out.push(r.orderRef);
-    covered += r.remaining;
-  }
-  return out;
-}
 
 /* -------------------------------------------------------------------------------------------------- preparo */
 
@@ -263,8 +221,13 @@ export type ResolveResult = {
   status: string;
   statusLabel: string;
   version: number;
-  classification: typeof RETAINED_CLASSIFICATION;
+  resolution: "close_charged" | "cancel_refund";
+  classification: typeof RETAINED_CLASSIFICATION | typeof REFUNDED_CLASSIFICATION;
+  /** Valor já pago e MANTIDO pela escola (`close_charged`); 0 em `cancel_refund`. */
   retainedCents: number;
+  /** Valor devolvido à carteira ORIGINAL do aluno (`cancel_refund`); 0 em `close_charged`. */
+  refundCents: number;
+  wallet: { studentId: string; entryId: string; seq: number; balanceCents: number; version: number } | null;
   returnedUnits: number;
   discardedUnits: number;
   /** Unidades de OUTROS pedidos que ficaram sem lastro físico por causa do descarte (0 = nenhuma) e os pedidos a tratar. */
@@ -276,20 +239,22 @@ export type ResolveResult = {
  * Resolução (SÓ administração, com motivo) de um não retirado. Implementada: `close_charged` = encerrar COM cobrança —
  * o valor já pago fica retido com a classificação `retained_charge_not_picked_up` (sem novo lançamento no livro, sem
  * reembolso, sem receita duplicada). As unidades restantes saem da reserva (voltam à disponibilidade, sem entrada
- * fictícia) e SÓ as listadas em `discards` viram perda, com movimento de perda explícito pelo estoque. Cancelar/reembolsar
- * (F14) e reagendar (F16) ainda não existem: são recusados com a pendência explícita, sem simular conclusão.
+ * fictícia) e SÓ as listadas em `discards` viram perda, com movimento de perda explícito pelo estoque.
+ * `cancel_refund` (F14) = cancelar e REEMBOLSAR o restante não retirado à carteira original (valor pago registrado, mesmo
+ * ponto de liquidação do cancelamento: livro, reserva/cota, uso da F09 e auditoria na mesma transação). Reagendar (F16) ainda
+ * não existe: é recusado com a pendência explícita, sem simular conclusão.
  */
 export async function resolveNotPickedUp(db: Firestore, actor: Actor, raw: unknown): Promise<ResolveResult & { replayed: boolean }> {
   authorize(actor, "orders.resolve");
   const input = resolveSchema.parse(raw);
-  if (input.resolution !== "close_charged") {
+  if (input.resolution === "reschedule") {
     const pending = PENDING_RESOLUTIONS[input.resolution];
     throw conflict("resolution_unavailable", `${pending.label}: ainda não disponível.`, { resolution: input.resolution, availableIn: pending.task });
   }
   return runIdempotentCommand(db, actor, { scope: "orders.resolve", key: input.key, payload: input, allow: allowResolve }, async ({ tx, actor: current, auditId }) => {
     const today = localDateOf(new Date());
     const order = await readOrder(tx, db, input.orderId);
-    if (order.status === "not_picked_up_closed") throw conflict("already_resolved", "Este pedido já foi resolvido.");
+    if (order.status === "not_picked_up_closed" || order.data.nonPickup?.resolution) throw conflict("already_resolved", "Este pedido já foi resolvido.");
     if (order.status !== "not_picked_up") throw conflict("invalid_transition", "Só pedidos marcados como não retirados podem ser resolvidos.", { status: order.status });
 
     const byLine = new Map(order.items.map((i) => [i.lineNo, i]));
@@ -299,6 +264,8 @@ export async function resolveNotPickedUp(db: Firestore, actor: Actor, raw: unkno
       if (!item) throw conflict("line_not_found", "Item não encontrado no pedido.", { lineNo });
       if (quantity > remainingOf(item)) throw conflict("quantity_exceeds_remaining", "O descarte supera o que ficou sem retirar.", { lineNo, remaining: remainingOf(item), requested: quantity });
     }
+
+    if (input.resolution === "cancel_refund") return refundNotPickedUp(db, tx, { order, current, auditId, input, today });
 
     const stock = openStockSession(db, tx, { today, actor: sessionActor(current) });
     const losses: { lineNo: number; productId: string; quantity: number; movementId: string }[] = [];
@@ -364,6 +331,86 @@ export async function resolveNotPickedUp(db: Firestore, actor: Actor, raw: unkno
       after: { status, classification: RETAINED_CLASSIFICATION, retainedCents, returnedUnits: returned - discarded, discardedUnits: discarded, losses, shortfallUnits, affectedOrders: [...affected] },
     });
     stock.commit();
-    return { orderId: input.orderId, status, statusLabel: statusInfo(status).label, version: order.version + 1, classification: RETAINED_CLASSIFICATION, retainedCents, returnedUnits: returned - discarded, discardedUnits: discarded, shortfallUnits, affectedOrders: [...affected] };
+    return { orderId: input.orderId, status, statusLabel: statusInfo(status).label, version: order.version + 1, resolution: "close_charged", classification: RETAINED_CLASSIFICATION, retainedCents, refundCents: 0, wallet: null, returnedUnits: returned - discarded, discardedUnits: discarded, shortfallUnits, affectedOrders: [...affected] };
   });
+}
+
+/**
+ * `cancel_refund`: o restante não retirado é cancelado e reembolsado pela MESMA liquidação do cancelamento (`planCancellation`):
+ * valor pago registrado → carteira original, reserva/cota e uso liberados, descarte só nas unidades listadas. A resolução fica
+ * registrada em `nonPickup.resolution` (kind `cancel_refund`) e a situação passa a `cancelled` (nada entregue) ou `delivered`
+ * (parte já entregue antes). Nada de cobrança retida aqui.
+ */
+async function refundNotPickedUp(
+  db: Firestore,
+  tx: FirebaseFirestore.Transaction,
+  p: { order: OrderState; current: Actor; auditId: string; input: ResolveInput; today: string },
+): Promise<ResolveResult> {
+  const { order, current, input } = p;
+  const cancellationId = deterministicId("can", current.uid, input.key);
+  const cancel = new Map(order.items.filter((i) => remainingOf(i) > 0).map((i) => [i.lineNo, remainingOf(i)] as const));
+  const plan = await planCancellation(db, tx, { order, actor: current, today: p.today, cancellationId, kind: "not_picked_up", reason: input.reason, cancel, discards: new Map(input.discards.map((d) => [d.lineNo, d.quantity])) });
+  const status = aggregateStatus({ items: plan.items, prep: order.prep, nonPickup: null });
+  const returned = plan.canceledUnits - plan.discardedUnits;
+  const discards = plan.discards.map((d) => ({ lineNo: d.lineNo, quantity: d.quantity, movementId: d.movementId }));
+  plan.commit();
+  tx.update(order.ref, {
+    ...plan.orderPatch(status),
+    nonPickup: {
+      ...((order.data.nonPickup ?? {}) as Record<string, unknown>),
+      resolution: {
+        kind: "cancel_refund",
+        classification: REFUNDED_CLASSIFICATION,
+        amountCents: plan.refundCents,
+        refundCents: plan.refundCents,
+        returnedUnits: returned,
+        discardedUnits: plan.discardedUnits,
+        discards,
+        cancellationId,
+        reason: input.reason,
+        resolvedByUid: current.uid,
+        resolvedByRole: current.role ?? null,
+        resolvedAt: FieldValue.serverTimestamp(),
+      },
+    },
+  });
+  auditInTransaction(db, tx, p.auditId, {
+    action: "orders.resolve_not_picked_up",
+    actorUid: current.uid,
+    actorRole: current.role ?? null,
+    target: { type: "order", id: input.orderId },
+    reason: input.reason,
+    before: { status: order.status, refundedCents: Number(order.data.refundedCents ?? 0), balanceCents: plan.wallet.previousBalanceCents },
+    after: {
+      status,
+      resolution: "cancel_refund",
+      classification: REFUNDED_CLASSIFICATION,
+      cancellationId,
+      studentId: plan.wallet.studentId,
+      studentStatus: plan.studentStatus,
+      refundCents: plan.refundCents,
+      balanceCents: plan.wallet.balanceCents,
+      walletEntryId: plan.wallet.entryId,
+      returnedUnits: returned,
+      discardedUnits: plan.discardedUnits,
+      discards,
+      shortfallUnits: plan.shortfallUnits,
+      affectedOrders: plan.affectedOrders,
+    },
+  });
+  return {
+    orderId: input.orderId,
+    status,
+    statusLabel: statusInfo(status).label,
+    version: order.version + 1,
+    resolution: "cancel_refund",
+    classification: REFUNDED_CLASSIFICATION,
+    retainedCents: 0,
+    refundCents: plan.refundCents,
+    wallet: { studentId: plan.wallet.studentId, entryId: plan.wallet.entryId, seq: plan.wallet.seq, balanceCents: plan.wallet.balanceCents, version: plan.wallet.version },
+    returnedUnits: returned,
+    discardedUnits: plan.discardedUnits,
+    shortfallUnits: plan.shortfallUnits,
+    affectedOrders: plan.affectedOrders,
+  };
 }
