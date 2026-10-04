@@ -359,8 +359,10 @@
   },
   "A26": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "F12 (04/10/2026) tests/integration/orders-history-api.test.ts (emulador, 9 testes): abas Pendentes/Concluídos/Cancelados, situação detalhada, canal (incl. balcão por fixture), turno, período, um filho ou todos; paginação por cursor em 2 alunos com datas repetidas sem duplicar/omitir e com pedido novo entre páginas; snapshot x produto alterado; sem vazamento de campos internos; isolamento, vínculo revogado, aluno com login, equipe sem escopo; extrato paginado (tipo, período, empate de instante). tests/unit/order-history.test.ts (9). tests/e2e/my-orders.spec.ts (7): pedidos do checkout real na tela, filtros, paginação 20+4, troca de conta/vínculo revogado, tempo real, estados, celular."
+    ],
+    "notes": "Parcial: entrega, cancelamento e balcão REAIS (F13/F14/F15) ainda não existem — os grupos Concluídos/Cancelados e o canal balcão foram provados com pedidos de fixture no formato do documento, e 'parcial' (cancelamento parcial) não tem dado nem tela. Firestore real: índices compostos novos NÃO validados na nuvem (emulador não exige índice)."
   },
   "A27": {
     "status": "not_run",
@@ -476,9 +478,10 @@
       "npm run test:e2e:propagation 1/1 local (emulador). CI (GitHub Actions, run 37092027313, head 892a253): o teste de propagação FALHOU na pré-condição (a sessão observadora seguia em \"connecting\" após o timeout padrão de 5 s; a propagação em si não chegou a ser exercitada). Local (emulador, Windows): passou em 3 execuções. Timeout não foi aumentado. Run seguinte da CI (37093327283): 1/1 passou. Total de amostras na CI: 1 falha, 1 aprovação.",
       "Aplicação publicada (Vercel HML + Firebase HML, 03/10/2026, smoke dirigido sem crédito, tests/staging/wallet-smoke.spec.ts 5/5): tela: leitura em tempo real `live` com as Rules publicadas (1 execução, timeout padrão) e recusa exibida como recusa; propagação de alteração entre sessões NÃO testada na publicada",
       "Propagação entre sessões na CI: 4 execuções, 1 falha (pré-condição) e 3 aprovações (runs 37093327283, 37095532196, 37096071690); passo não bloqueante",
-      "F11 tests/e2e/checkout.spec.ts: a confirmação da compra vem da RESPOSTA do servidor e o saldo é reconciliado por version (applyCheckout); o listener atrasado não confirma nem desfaz (texto \"Atualizando a leitura em tempo real…\" só informativo). Atraso do listener NÃO investigado nesta tarefa (pendência existente preservada)."
+      "F11 tests/e2e/checkout.spec.ts: a confirmação da compra vem da RESPOSTA do servidor e o saldo é reconciliado por version (applyCheckout); o listener atrasado não confirma nem desfaz (texto \"Atualizando a leitura em tempo real…\" só informativo). Atraso do listener NÃO investigado nesta tarefa (pendência existente preservada).",
+      "F12 (04/10/2026) tests/e2e/my-orders.spec.ts: listener limitado a wallets/{aluno} (um documento por aluno do escopo) dispara releitura reconciliada por versão; escopo muda com vínculo revogado e na troca de conta (assinaturas encerradas, resposta antiga descartada); cache não confirma compra. Sem mudança de Rules (orders segue fechado ao cliente)."
     ],
-    "notes": "Parcial: saldo da carteira por listener privado (escopo do vínculo) + leitura do servidor reconciliados por versão; dado de listener/cache não confirma operação. Pedidos/estoque (F11/F12/F10) e troca de aluno na interface seguem pendentes; atraso de listener da homologação NÃO reproduzido nem medido nesta tarefa (inconclusivo, PR #4). Propagação entre sessões pelo listener: NÃO comprovada de forma estável — passou 3× localmente e na CI 1 falha + 1 aprovação (ver evidência); sem homologação."
+    "notes": "Parcial: saldo da carteira por listener privado (escopo do vínculo) + leitura do servidor reconciliados por versão; dado de listener/cache não confirma operação. Pedidos/estoque (F11/F12/F10) e troca de aluno na interface seguem pendentes; atraso de listener da homologação NÃO reproduzido nem medido nesta tarefa (inconclusivo, PR #4). Propagação entre sessões pelo listener: NÃO comprovada de forma estável — passou 3× localmente e na CI 1 falha + 1 aprovação (ver evidência); sem homologação. F12: pedidos agora lidos por API autenticada + aviso por listener da carteira; atraso conhecido de listener NÃO retomado. Estoque ao vivo segue pendente."
   },
   "A35": {
     "status": "not_run",
@@ -526,7 +529,8 @@
       "tests/unit/photo-navigation.test.ts: navegação por papel",
       "inspeção visual de capturas desktop/mobile (lista aberta com separadores, cards só nas fotos)",
       "F06 (02/10/2026): tests/e2e/catalog.spec.ts — operação de produtos a 375 px sem rolagem horizontal (tabela vira blocos), formulários com labels/fieldsets/legends, rádio e checkboxes por teclado; portal com catálogo real (só balcão sem controle, etiqueta de turno); capturas test-results/f06-{portal,operacao}-{375,1280}.png inspecionadas",
-      "Homologação PUBLICADA 02/10/2026 (https://cantina-escolar-hml.vercel.app, deployment da main cf477e1; Firebase cantina-escolar-hml + R2 cantina-fotos-staging; dados fictícios): shell-photos (teclado, 375 px, reduced motion, perfis) e catalog.spec (operação a 375 px sem rolagem horizontal) verdes pela URL publicada"
+      "Homologação PUBLICADA 02/10/2026 (https://cantina-escolar-hml.vercel.app, deployment da main cf477e1; Firebase cantina-escolar-hml + R2 cantina-fotos-staging; dados fictícios): shell-photos (teclado, 375 px, reduced motion, perfis) e catalog.spec (operação a 375 px sem rolagem horizontal) verdes pela URL publicada",
+      "F12 (04/10/2026) tests/e2e/my-orders.spec.ts: Meus pedidos/detalhe/extrato a 375 px sem rolagem horizontal, filtros por rótulo, abas operáveis por teclado (aria-pressed), selo com texto (cor não é único sinal), @media print do recibo; captura mobile inspecionada."
     ],
     "notes": "Parcial: cobre portal (catálogo real F06) e tela de produtos (cadastro, preço, histórico, fotos). Contraste conferido por tokens (muted 6.3:1, accent/branco 6.0:1), sem axe automatizado. PDV, entrega, pedidos e demais telas (F11–F16) devem repetir a prova; manter not_run."
   },

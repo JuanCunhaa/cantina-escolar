@@ -148,7 +148,8 @@ test("perfis: responsável não acessa a operação; navegação mostra só o qu
     await expect(page).toHaveURL(/\/portal$/, { timeout: 4000 });
   }).toPass({ timeout: 30000 });
   await expect(page.getByRole("heading", { name: "Portal da família" })).toBeVisible({ timeout: 20000 }); // 1ª compilação da rota no dev server
-  await expect(page.getByText("Meus pedidos (em breve)")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Navegação principal" }).getByRole("link", { name: "Meus pedidos" })).toBeVisible(); // F12: tela pronta, deixa de ser "(em breve)"
+  await expect(page.getByText("Meus pedidos (em breve)")).toHaveCount(0);
 });
 
 test("operação: funcionário envia foto válida; arquivo inválido e grande demais são recusados (A36)", async ({ page, request }) => {
