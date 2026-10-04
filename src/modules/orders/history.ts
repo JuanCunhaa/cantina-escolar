@@ -5,8 +5,6 @@ import { ForbiddenError } from "@/modules/access/errors";
 import { invalid } from "@/lib/domain-error";
 import {
   compareNewestFirst,
-  decodeCursor,
-  encodeCursor,
   listFiltersSchema,
   statusInfo,
   statusesOf,
@@ -15,6 +13,8 @@ import {
   type OrderPage,
   type OrderView,
 } from "./history-model";
+
+import { decodeCursor, encodeCursor } from "./history-cursor";
 
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
 
@@ -90,16 +90,18 @@ async function scopeStudents(db: Firestore, actor: Actor, requested: string | un
   } else throw invalid("student_required", "Informe o aluno.");
   ids = ids.filter((id) => ID.test(id));
   // Cada aluno é reautorizado com o vínculo/perfil atuais; quem perdeu acesso entre as duas leituras sai da consulta.
-  const allowed: string[] = [];
-  for (const id of ids) {
-    try {
-      await authorizeStudent(db, actor, id, "orders.read");
-      allowed.push(id);
-    } catch (error) {
-      if (!(error instanceof ForbiddenError)) throw error;
-    }
-  }
-  return allowed;
+  const checks = await Promise.all(
+    ids.map(async (id) => {
+      try {
+        await authorizeStudent(db, actor, id, "orders.read");
+        return true;
+      } catch (error) {
+        if (error instanceof ForbiddenError) return false;
+        throw error;
+      }
+    }),
+  );
+  return ids.filter((_, i) => checks[i]);
 }
 
 /**

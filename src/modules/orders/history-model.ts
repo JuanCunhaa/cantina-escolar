@@ -68,17 +68,6 @@ export function filtersFromParams(params: URLSearchParams): unknown {
   return out;
 }
 
-export type OrderCursor = { d: string; o: string };
-export const encodeCursor = (c: OrderCursor): string => Buffer.from(JSON.stringify(c)).toString("base64url");
-export function decodeCursor(raw: string): OrderCursor | null {
-  try {
-    const parsed = z.object({ d: localDate, o: z.string().regex(ID) }).strict().safeParse(JSON.parse(Buffer.from(raw, "base64url").toString("utf8")));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
-  }
-}
-
 /** Item exatamente como gravado na compra (snapshot). Campos internos (reserva, categoria) não saem do servidor. */
 export type OrderItemView = Pick<OrderItem, "lineNo" | "productId" | "name" | "unit" | "quantity" | "unitPriceCents" | "discountCents" | "subtotalCents">;
 

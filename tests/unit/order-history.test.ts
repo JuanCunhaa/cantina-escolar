@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { decodeCursor, encodeCursor } from "@/modules/orders/history-cursor";
 import {
   appendPage,
   compareNewestFirst,
-  decodeCursor,
-  encodeCursor,
   filtersFromParams,
   KNOWN_STATUSES,
   listFiltersSchema,

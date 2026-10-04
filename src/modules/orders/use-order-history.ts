@@ -116,7 +116,8 @@ export function useOrderHistory(user: User, filters: HistoryFilters, listenIds: 
               const known = baseline.get(id);
               baseline.set(id, Math.max(known ?? -1, version));
               setLiveErrorKey((k) => (k === key ? "" : k));
-              if (known !== undefined && version > known) refresh();
+              // O 1º snapshot também relê: uma alteração entre a leitura inicial do servidor e este snapshot não pode ficar de fora.
+              if (known === undefined || version > known) refresh();
             },
             () => {
               if (started === generation.current) setLiveErrorKey(key);
