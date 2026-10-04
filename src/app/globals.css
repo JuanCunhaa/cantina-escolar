@@ -312,3 +312,17 @@ fieldset { min-width: 0; }
   .stock-table td[data-label]::before { content: attr(data-label) ": "; color: var(--color-muted); font-size: 0.8125rem; }
   .stock-table td:last-child { grid-column: 1 / -1; }
 }
+
+/* Revisão e confirmação da compra (F11): seção aberta no fluxo da página, sem cartões nem animação. */
+.checkout { border-top: 2px solid var(--color-line); margin-top: var(--space-5); padding-top: var(--space-3); }
+.checkout h2:focus { outline: none; }
+.checkout-day h3 { margin: var(--space-3) 0 var(--space-1); }
+.checkout-line { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--space-1) var(--space-3); align-items: baseline; }
+.checkout-amount { font-variant-numeric: tabular-nums; text-align: right; min-width: 5rem; }
+.checkout-day-total, .checkout-total { margin: var(--space-1) 0; }
+.checkout-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0; }
+@media (max-width: 40rem) {
+  .checkout-line { grid-template-columns: minmax(0, 1fr) auto; }
+  .checkout-line .muted { grid-column: 1 / -1; order: 3; }
+}
+.checkout-day h3::first-letter, .checkout li > strong::first-letter { text-transform: uppercase; }
