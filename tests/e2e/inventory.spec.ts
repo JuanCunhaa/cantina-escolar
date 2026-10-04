@@ -12,9 +12,10 @@ async function login(page: Page, path: string, email: string) {
 }
 
 /**
- * Chamadas de API feitas DEPOIS de interações longas na tela usam conexão nova e sem keep-alive: o servidor de desenvolvimento
- * (Node) fecha sockets ociosos após ~5 s e o contexto de requisições do Playwright pode reaproveitar um já fechado
- * (ECONNRESET intermitente no CI). Não muda nenhuma asserção.
+ * Chamadas de API feitas DEPOIS de interações longas na tela usam conexão nova e sem keep-alive (mitigação do
+ * ECONNRESET intermitente no CI). A CAUSA NÃO foi comprovada: a hipótese (o servidor de desenvolvimento fecha sockets
+ * ociosos após ~5 s e o contexto de requisições do Playwright reaproveita um já fechado) nunca foi medida. Não muda
+ * nenhuma asserção.
  */
 const freshApi = (playwright: PlaywrightWorkerArgs["playwright"]): Promise<APIRequestContext> =>
   playwright.request.newContext({ baseURL: test.info().project.use.baseURL, extraHTTPHeaders: { connection: "close" } });
