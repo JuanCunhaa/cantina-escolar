@@ -46,6 +46,19 @@ function toItem(raw: unknown): OrderItemView | null {
   };
 }
 
+/** Eventos em ordem cronológica (estável: empates e instantes ausentes mantêm a posição, herdando o instante do anterior). */
+function chronological<T extends { at: string | null }>(events: readonly T[]): T[] {
+  let last = 0;
+  return events
+    .map((event, index) => {
+      const time = event.at ? Date.parse(event.at) : Number.NaN;
+      if (!Number.isNaN(time)) last = time;
+      return { event, index, key: last };
+    })
+    .sort((a, b) => a.key - b.key || a.index - b.index)
+    .map((x) => x.event);
+}
+
 /** Visão do pedido a partir do SNAPSHOT gravado na compra; nome/preço atuais do produto nunca entram. */
 export function toOrderView(id: string, d: FirebaseFirestore.DocumentData, shiftNames: ReadonlyMap<string, string>): OrderView {
   const status = typeof d.status === "string" ? d.status : "paid";
@@ -216,7 +229,7 @@ export async function getOrderDetail(db: Firestore, actor: Actor, orderId: strin
     ...view,
     purchasedBy: role === "guardian" || role === "student" ? role : role ? "staff" : null,
     cancelDeadlineAt: cutoff,
-    timeline: [
+    timeline: chronological([
       { kind: "created", at: createdAt, label: "Pedido criado" },
       ...(view.paymentState === "paid" ? [{ kind: "paid" as const, at: createdAt, label: "Pago com o saldo da carteira" }] : []),
       ...(iso(d.preparingAt) ? [{ kind: "preparing" as const, at: iso(d.preparingAt), label: "Em preparo" }] : []),
@@ -225,7 +238,7 @@ export async function getOrderDetail(db: Firestore, actor: Actor, orderId: strin
       ...cancellations.map((c) => ({ kind: "cancellation" as const, at: c.at, label: `${c.by === "guardian" ? "Cancelado pelo responsável" : "Cancelado pela escola"}: ${c.lines.map((l) => `${l.quantity}× ${l.name}`).join(", ")}` })),
       ...(nonPickup ? [{ kind: "not_picked_up" as const, at: nonPickup.markedAt, label: "Marcado como não retirado" }] : []),
       ...(nonPickup?.resolved ? [{ kind: "resolved" as const, at: nonPickup.resolvedAt, label: nonPickup.kind === "cancel_refund" ? "Encerrado: cancelado e reembolsado à carteira" : "Encerrado com cobrança mantida" }] : []),
-    ],
+    ]),
     cancellations,
     cancelable,
     deliveries,

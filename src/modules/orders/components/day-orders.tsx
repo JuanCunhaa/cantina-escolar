@@ -8,6 +8,7 @@ import { formatBRL } from "@/lib/money/format";
 import { longDayLabel } from "@/modules/menu/format";
 import { PENDING_RESOLUTIONS, isOpenStatus, type DayOrderView, type DayOrders, type Preparation } from "../fulfillment-model";
 import { useOrderCommand, useServerQuery, type CommandMessage } from "../use-operations";
+import { toQty } from "./qty";
 
 type Filters = { date: string; shiftId: string; classId: string; status: string; q: string };
 
@@ -39,11 +40,6 @@ function Notice({ message, testId }: { message: CommandMessage | null; testId: s
     </p>
   );
 }
-
-const toQty = (text: string, max: number): number => {
-  const n = /^\d+$/.test(text.trim()) ? Number(text.trim()) : 0;
-  return Math.min(Math.max(n, 0), max);
-};
 
 /** Ações de UM pedido: entregar tudo, entrega parcial por quantidade, preparo, não retirado e (administração) resolução. */
 function OrderActions({ user, order, canDeliver, canResolve, canCancel, canDiscard, onDone }: { user: User; order: DayOrderView; canDeliver: boolean; canResolve: boolean; canCancel: boolean; canDiscard: boolean; onDone: () => void }) {

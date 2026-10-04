@@ -227,7 +227,7 @@ export type ResolveResult = {
   retainedCents: number;
   /** Valor devolvido à carteira ORIGINAL do aluno (`cancel_refund`); 0 em `close_charged`. */
   refundCents: number;
-  wallet: { studentId: string; entryId: string; seq: number; balanceCents: number; version: number } | null;
+  wallet: { studentId: string; entryId: string | null; seq: number; balanceCents: number; version: number } | null;
   returnedUnits: number;
   discardedUnits: number;
   /** Unidades de OUTROS pedidos que ficaram sem lastro físico por causa do descarte (0 = nenhuma) e os pedidos a tratar. */

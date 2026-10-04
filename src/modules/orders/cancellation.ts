@@ -57,7 +57,7 @@ export type CancelPlan = {
   shortfallUnits: number;
   affectedOrders: string[];
   studentStatus: string | null;
-  wallet: { studentId: string; entryId: string; seq: number; balanceCents: number; version: number; previousBalanceCents: number };
+  wallet: { studentId: string; entryId: string | null; seq: number; balanceCents: number; version: number; previousBalanceCents: number };
   /** Campos do pedido a gravar (progresso e situação), com a versão incrementada. */
   orderPatch(status: string): Record<string, unknown>;
   /** Todas as gravações do cancelamento, exceto pedido e auditoria (do chamador). */
@@ -95,7 +95,7 @@ export async function planCancellation(
   const refundCents = lines.reduce((n, l) => n + l.refundCents, 0);
   const canceledUnits = lines.reduce((n, l) => n + l.quantity, 0);
   const alreadyRefunded = Number(order.data.refundedCents ?? 0);
-  if (refundCents < 1) throw new Error("Invariante violada: reembolso sem valor.");
+  if (refundCents < 0) throw new Error("Invariante violada: reembolso negativo.");
   if (alreadyRefunded + refundCents > Number(order.data.totalCents)) throw new Error("Invariante violada: reembolsos acumulados acima do valor pago.");
 
   // Leituras (nenhuma escrita antes do fim delas): carteira ORIGINAL do pedido, cadastro do aluno, estoque e uso.
@@ -130,8 +130,10 @@ export async function planCancellation(
   }
 
   const before = parseWalletState(walletSnap.data());
-  const after = applyDelta(before, refundCents); // + : respeita o teto de saldo; falha aborta tudo
-  const entryId = `${cancellationId}_refund`;
+  // Linha de valor pago zero (ex.: desconto total) cancela e libera reserva/cota/uso, mas NÃO cria lançamento nem mexe no saldo.
+  const credit = refundCents > 0;
+  const after = credit ? applyDelta(before, refundCents) : before; // + : respeita o teto de saldo; falha aborta tudo
+  const entryId = credit ? `${cancellationId}_refund` : null;
   const canceling = new Map(lines.map((l) => [l.lineNo, l.quantity]));
   const items = order.items.map((i) => (canceling.has(i.lineNo) ? { ...i, canceledQty: canceledOf(i) + canceling.get(i.lineNo)! } : i));
   const seq = Number(order.data.cancelCount ?? 0) + 1;
@@ -160,26 +162,30 @@ export async function planCancellation(
       version: order.version + 1,
       updatedAt: FieldValue.serverTimestamp(),
       ...(status === CANCELLED ? { canceledAt: FieldValue.serverTimestamp() } : {}),
+      // Restante cancelado depois de entrega parcial: o pedido passa a "entregue" e precisa do mesmo carimbo da entrega completa.
+      ...(status === "delivered" && !order.data.deliveredAt ? { deliveredAt: FieldValue.serverTimestamp() } : {}),
     }),
     commit() {
       const stamp = FieldValue.serverTimestamp();
       stock.commit();
       writeUsage();
-      tx.create(db.doc(`wallets/${studentId}/entries/${entryId}`), {
-        type: "order_refund",
-        seq: after.version,
-        amountCents: refundCents,
-        balanceAfterCents: after.balanceCents,
-        reason: ledgerReason(kind, order.consumptionDate),
-        orderId: order.ref.id,
-        cancellationId,
-        actorUid: actor.uid,
-        actorRole: actor.role ?? null,
-        referenceType: "order",
-        referenceId: order.ref.id,
-        createdAt: stamp,
-      });
-      tx.set(walletRef, { studentId, currency: "BRL", balanceCents: after.balanceCents, version: after.version, updatedAt: stamp, ...(walletSnap.exists ? {} : { createdAt: stamp }) }, { merge: true });
+      if (credit && entryId) {
+        tx.create(db.doc(`wallets/${studentId}/entries/${entryId}`), {
+          type: "order_refund",
+          seq: after.version,
+          amountCents: refundCents,
+          balanceAfterCents: after.balanceCents,
+          reason: ledgerReason(kind, order.consumptionDate),
+          orderId: order.ref.id,
+          cancellationId,
+          actorUid: actor.uid,
+          actorRole: actor.role ?? null,
+          referenceType: "order",
+          referenceId: order.ref.id,
+          createdAt: stamp,
+        });
+        tx.set(walletRef, { studentId, currency: "BRL", balanceCents: after.balanceCents, version: after.version, updatedAt: stamp, ...(walletSnap.exists ? {} : { createdAt: stamp }) }, { merge: true });
+      }
       tx.create(db.doc(`orders/${order.ref.id}/cancellations/${cancellationId}`), {
         cancellationId,
         orderId: order.ref.id,
@@ -190,7 +196,7 @@ export async function planCancellation(
         canceledUnits,
         refundCents,
         walletEntryId: entryId,
-        walletSeq: after.version,
+        walletSeq: credit ? after.version : null,
         balanceAfterCents: after.balanceCents,
         discards,
         reason: p.reason,
@@ -218,7 +224,7 @@ export type CancelResult = {
   items: { lineNo: number; quantity: number; deliveredQty: number; remainingQty: number }[];
   remainingUnits: number;
   /** Carteira ORIGINAL depois do reembolso: a tela reconcilia pela `version` do servidor (nunca pelo listener). */
-  wallet: { studentId: string; entryId: string; seq: number; balanceCents: number; version: number };
+  wallet: { studentId: string; entryId: string | null; seq: number; balanceCents: number; version: number };
   discardedUnits: number;
   /** Só para quem descartou: unidades de OUTROS pedidos que ficaram sem lastro físico e os pedidos a tratar. */
   shortfallUnits: number;
@@ -282,18 +288,21 @@ export async function cancelOrder(db: Firestore, actor: Actor, raw: unknown, clo
       if (isNotPickedUp(order.status)) throw conflict("already_resolved", "Este pedido já foi resolvido.", { status: order.status });
       if (!isOpenStatus(order.status)) throw conflict("order_not_cancelable", "A situação atual do pedido não permite cancelar.", { status: order.status });
 
+      // Pedido de data JÁ PASSADA e sem entrega: a decisão de reembolsar é da administração (`orders.resolve`) pela resolução de
+      // não retirado (F13); a cantina marca "não retirado" e não contorna essa porta cancelando direto.
+      if (!guardian && order.consumptionDate < today && !can(current, "orders.resolve")) {
+        throw conflict("past_date_requires_resolution", "Pedido de data passada: marque como não retirado para a administração resolver (cancelar e reembolsar).", { consumptionDate: order.consumptionDate, today });
+      }
+
       if (guardian) {
         const cutoff = asDate((order.data.policy as { cancelCutoffAt?: unknown } | undefined)?.cancelCutoffAt);
         if (!cutoff) throw conflict("cancel_deadline_unknown", "O prazo de cancelamento deste pedido não está registrado: fale com a escola.");
         if (!isCancellationOpen(now, { cancelCutoffAt: cutoff })) throw conflict("cancel_deadline_passed", "O prazo para cancelar este pedido terminou: fale com a escola.", { cancelCutoffAt: cutoff.toISOString() });
       }
 
-      const byLine = new Map(order.items.map((i) => [i.lineNo, i]));
       const cancel = new Map<number, number>();
       if (input.lines) for (const l of input.lines) cancel.set(l.lineNo, l.quantity);
       else for (const i of order.items) if (remainingOf(i) > 0) cancel.set(i.lineNo, remainingOf(i));
-      if (cancel.size === 0) throw conflict("nothing_remaining", "Não há unidades a cancelar.");
-      for (const lineNo of cancel.keys()) if (!byLine.has(lineNo)) throw conflict("line_not_found", "Item não encontrado no pedido.", { lineNo });
 
       const plan = await planCancellation(db, tx, { order, actor: current, today, cancellationId, kind, reason: input.reason, cancel, discards: new Map(input.discards.map((d) => [d.lineNo, d.quantity])) });
       const status = aggregateStatus({ items: plan.items, prep: order.prep, nonPickup: null });

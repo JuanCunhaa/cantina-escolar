@@ -6,14 +6,10 @@ import { formatBRL } from "@/lib/money/format";
 import { refundValueOf } from "../fulfillment-model";
 import type { OrderDetail } from "../history-model";
 import { useOrderCommand, type CommandMessage } from "../use-operations";
+import { toQty } from "./qty";
 
 const REASONS = ["Mudança de planos", "O aluno não vai à escola nesse dia", "Pedido feito por engano", "Outro motivo"] as const;
 const OTHER = REASONS[REASONS.length - 1];
-
-const toQty = (text: string, max: number): number => {
-  const n = /^\d+$/.test(text.trim()) ? Number(text.trim()) : 0;
-  return Math.min(Math.max(n, 0), max);
-};
 
 export function Notice({ message, testId }: { message: CommandMessage | null; testId: string }) {
   if (!message) return null;
