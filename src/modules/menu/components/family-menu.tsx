@@ -1,19 +1,23 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import type { User } from "firebase/auth";
 import { ProductPhoto } from "@/components/ui/product-photo";
 import { errorText } from "@/lib/api-client";
 import { formatBRL } from "@/lib/money/format";
 import type { Role } from "@/modules/access/roles";
 import { useFamilyStudents } from "@/modules/guardians/use-family-students";
+import { CheckoutPanel, MAX_BATCH_LINES, MAX_LINES_PER_DATE, type CartLine } from "@/modules/orders/components/checkout-panel";
+import { MAX_LINE_QUANTITY } from "@/modules/orders/model";
+import { useWallets } from "@/modules/wallet/use-wallets";
 import { clockLabel, dayMonth, longDayLabel, weekdayLabel } from "../format";
 import type { MenuDay, MenuProduct, MenuWeek } from "../model";
 import { useMenuWeek } from "../use-menu";
 
 /**
  * Portal: cardápio por data e turno do aluno, resolvido no servidor (padrão + extras − ocultos; suspensão e calendário).
- * A quantidade é só uma prévia: preço, horário e disponibilidade finais são revalidados no checkout (etapa futura).
+ * O carrinho junta várias datas do mesmo aluno; a revisão e a confirmação (F11) revalidam preço, horário e
+ * disponibilidade no servidor — a tela nunca define o valor cobrado.
  */
 export function FamilyMenu({ user, role }: { user: User; role: Role }) {
   return role === "guardian" ? <GuardianMenu user={user} /> : <StudentMenu user={user} studentId={null} />;
@@ -114,25 +118,59 @@ function groupItems(day: MenuDay, products: Map<string, MenuProduct>): [string, 
 function StudentMenu({ user, studentId, selector = null }: { user: User; studentId: string | null; selector?: ReactNode }) {
   const state = useMenuWeek(user, studentId);
   const week = state.week;
+  const { reload } = state;
   const [picked, setPicked] = useState<string | null>(null);
-  const [quantities, setQuantities] = useState<{ date: string; values: Record<string, number> }>({ date: "", values: {} });
-  const products = useMemo(() => new Map((week?.products ?? []).map((p) => [p.id, p])), [week]);
+  const [cart, setCart] = useState<Record<string, Record<string, number>>>({});
+  const [reviewing, setReviewing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [serverPrices, setServerPrices] = useState<{ at: string; prices: Record<string, number> }>({ at: "", prices: {} });
+  const { wallets, refresh, applyCheckout } = useWallets(user, week ? [week.student.id] : []);
+  // Preços devolvidos pelo servidor numa recusa valem só até o cardápio recarregar (a leitura nova já os traz).
+  const products = useMemo(() => {
+    const overrides = week && serverPrices.at === week.serverNow ? serverPrices.prices : {};
+    return new Map((week?.products ?? []).map((p) => [p.id, { ...p, priceCents: overrides[p.id] ?? p.priceCents }]));
+  }, [week, serverPrices]);
 
   const days = week?.days ?? [];
   const fallback = days.find((d) => d.allowed)?.date ?? days[0]?.date ?? null;
   const date = picked && days.some((d) => d.date === picked) ? picked : fallback;
   const day = days.find((d) => d.date === date) ?? null;
-  const values = quantities.date === date ? quantities.values : {};
+  const values = (date ? cart[date] : undefined) ?? {};
   const buyable = Boolean(day?.allowed && week?.canPurchase);
 
-  const change = (id: string, delta: number) =>
-    setQuantities((current) => {
-      const base = current.date === date ? current.values : {};
-      return { date: date ?? "", values: { ...base, [id]: Math.max(0, Math.min(20, (base[id] ?? 0) + delta)) } };
+  /** Linhas do carrinho de TODAS as datas ainda compráveis (a data pode fechar enquanto a tela está aberta). */
+  const lines: CartLine[] = days.flatMap((d) =>
+    d.allowed && week?.canPurchase
+      ? d.items.flatMap((i) => {
+          const product = products.get(i.productId);
+          const quantity = cart[d.date]?.[i.productId] ?? 0;
+          return product && quantity > 0 && product.channels.includes("advance") ? [{ date: d.date, productId: i.productId, name: product.name, quantity, unitPriceCents: product.priceCents }] : [];
+        })
+      : [],
+  );
+  const dayLineCount = lines.filter((l) => l.date === date).length;
+  const canAddNew = dayLineCount < MAX_LINES_PER_DATE && lines.length < MAX_BATCH_LINES;
+  const totalCents = lines.reduce((sum, l) => sum + l.unitPriceCents * l.quantity, 0);
+  const itemCount = lines.reduce((sum, l) => sum + l.quantity, 0);
+  const cartDates = [...new Set(lines.map((l) => l.date))];
+
+  const change = (id: string, delta: number) => {
+    if (!date) return;
+    setCart((current) => {
+      const day = current[date] ?? {};
+      const next = Math.max(0, Math.min(MAX_LINE_QUANTITY, (day[id] ?? 0) + delta));
+      return { ...current, [date]: { ...day, [id]: next } };
     });
-  const selected = buyable ? (day?.items ?? []).filter((i) => (values[i.productId] ?? 0) > 0 && products.get(i.productId)?.channels.includes("advance")) : [];
-  const totalCents = selected.reduce((sum, i) => sum + (products.get(i.productId)?.priceCents ?? 0) * (values[i.productId] ?? 0), 0);
-  const itemCount = selected.reduce((sum, i) => sum + (values[i.productId] ?? 0), 0);
+  };
+  const onConfirmed = useCallback(
+    (result: Parameters<typeof applyCheckout>[0]) => {
+      applyCheckout(result);
+      setCart({});
+      setReviewing(false);
+      reload();
+    },
+    [applyCheckout, reload],
+  );
 
   return (
     <div className="menu-layout">
@@ -202,11 +240,18 @@ function StudentMenu({ user, studentId, selector = null }: { user: User; student
                                 {!online && <span className="tag tag-off">Só no balcão</span>}
                                 {online && buyable && (
                                   <span className="qty" role="group" aria-label={`Quantidade de ${product.name}`}>
-                                    <button type="button" className="secondary" aria-label={`Diminuir ${product.name}`} disabled={quantity === 0} onClick={() => change(product.id, -1)}>
+                                    <button type="button" className="secondary" aria-label={`Diminuir ${product.name}`} disabled={quantity === 0 || busy} onClick={() => change(product.id, -1)}>
                                       −
                                     </button>
                                     <output aria-live="polite">{quantity}</output>
-                                    <button type="button" className="secondary" aria-label={`Aumentar ${product.name}`} onClick={() => change(product.id, 1)}>
+                                    <button
+                                      type="button"
+                                      className="secondary"
+                                      aria-label={`Aumentar ${product.name}`}
+                                      disabled={busy || quantity >= MAX_LINE_QUANTITY || (quantity === 0 && !canAddNew)}
+                                      title={quantity === 0 && !canAddNew ? "Limite de produtos do carrinho atingido." : undefined}
+                                      onClick={() => change(product.id, 1)}
+                                    >
                                       +
                                     </button>
                                   </span>
@@ -221,6 +266,21 @@ function StudentMenu({ user, studentId, selector = null }: { user: User; student
                 ))}
               </section>
             )}
+            <CheckoutPanel
+              user={user}
+              student={week.student}
+              lines={lines}
+              reviewing={reviewing}
+              onClose={() => setReviewing(false)}
+              wallet={wallets[week.student.id]}
+              onConfirmed={onConfirmed}
+              onServerPrices={(prices) => {
+                setServerPrices({ at: week.serverNow, prices });
+                state.reload();
+              }}
+              refreshWallet={() => refresh(week.student.id)}
+              onBusy={setBusy}
+            />
           </>
         )}
       </div>
@@ -229,10 +289,16 @@ function StudentMenu({ user, studentId, selector = null }: { user: User; student
           <strong data-testid="summary-total">{formatBRL(totalCents)}</strong>{" "}
           <span className="muted">
             · {itemCount} {itemCount === 1 ? "item" : "itens"}
-            {day && buyable ? ` · ${dayMonth(day.date)}` : ""}
+            {cartDates.length > 0 ? ` · ${cartDates.length === 1 ? dayMonth(cartDates[0]!) : `${cartDates.length} datas`}` : ""}
           </span>
         </p>
-        <p className="muted">Prévia: o pagamento com a carteira do aluno será habilitado na etapa de checkout.</p>
+        {itemCount > 0 ? (
+          <button type="button" onClick={() => setReviewing(true)} disabled={busy} data-testid="open-review">
+            Revisar e confirmar
+          </button>
+        ) : (
+          <p className="muted">{buyable ? "Escolha produtos para uma ou mais datas." : "Sem compra pelo site nesta seleção."}</p>
+        )}
       </aside>
     </div>
   );

@@ -6,7 +6,7 @@ import type { ApiResult } from "@/lib/api-client";
  * servidor; um resultado incerto nunca vira falha: a MESMA operação (mesma chave) é repetida, e a idempotência do
  * servidor devolve o resultado original sem novo movimento.
  */
-export type Outcome<T> = { phase: "confirmed"; data: T } | { phase: "refused"; status: number; error: string } | { phase: "uncertain"; attempts: number };
+export type Outcome<T> = { phase: "confirmed"; data: T } | { phase: "refused"; status: number; error: string; details?: Record<string, unknown> } | { phase: "uncertain"; attempts: number };
 
 /** Sem resposta (rede/tempo esgotado) ou erro transitório do servidor: o comando pode ou não ter sido aplicado. */
 export function isUncertain(result: ApiResult<unknown>): boolean {
@@ -23,7 +23,7 @@ export async function executeWithRetry<T>(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const result = await send();
     if (result.ok) return { phase: "confirmed", data: result.data };
-    if (!isUncertain(result)) return { phase: "refused", status: result.status, error: result.error };
+    if (!isUncertain(result)) return { phase: "refused", status: result.status, error: result.error, details: result.details };
     if (attempt < maxAttempts) await sleep(backoff[Math.min(attempt - 1, backoff.length - 1)] ?? 0);
   }
   return { phase: "uncertain", attempts: maxAttempts };

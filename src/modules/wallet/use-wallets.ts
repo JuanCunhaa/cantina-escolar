@@ -7,6 +7,7 @@ import { api } from "@/lib/api-client";
 import { getFirebaseClient } from "@/lib/firebase/client";
 import type { LedgerEntryView, WalletReading as ServerReading } from "./queries";
 import type { TransferResult } from "./commands";
+import type { CheckoutResult } from "@/modules/orders/commands";
 import { applyReading, mergeEntries, syncState, type SyncState, type WalletReading, type WalletView } from "./view";
 
 export type WalletSlot = { view: WalletView | null; entries: LedgerEntryView[]; sync: SyncState | "unknown"; listenerError: boolean; readError: boolean };
@@ -83,6 +84,20 @@ export function useWallets(user: User, studentIds: readonly string[]) {
     [feed],
   );
 
+  /** Resultado CONFIRMADO de um checkout: saldo e lançamentos pela versão do servidor, sem esperar o listener. */
+  const applyCheckout = useCallback(
+    (result: CheckoutResult) => {
+      let balanceAfter = result.wallet.balanceCents;
+      const entries: LedgerEntryView[] = [];
+      for (const order of [...result.orders].reverse()) {
+        entries.push({ id: order.walletEntryId, seq: order.walletSeq, type: "advance_purchase", amountCents: -order.totalCents, balanceAfterCents: balanceAfter, counterpartStudentId: null, reason: `Compra antecipada para ${order.consumptionDate}`, createdAt: null });
+        balanceAfter += order.totalCents;
+      }
+      feed(result.wallet.studentId, { balanceCents: result.wallet.balanceCents, version: result.wallet.version, source: "command" }, entries);
+    },
+    [feed],
+  );
+
   useEffect(() => {
     epoch.current += 1;
     const ids = idsKey ? idsKey.split(",") : [];
@@ -125,5 +140,5 @@ export function useWallets(user: User, studentIds: readonly string[]) {
     return out;
   }, [slots, idsKey]);
 
-  return { wallets: result, refresh, applyTransfer };
+  return { wallets: result, refresh, applyTransfer, applyCheckout };
 }
