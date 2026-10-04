@@ -174,7 +174,7 @@ function OrdersView({ user, role, family }: { user: User; role: Role; family: { 
               <p className="muted">
                 {names.get(o.studentId) ?? o.studentName} · {CHANNEL_LABEL[o.channel as keyof typeof CHANNEL_LABEL] ?? "Compra"}
               </p>
-              <p>{o.items.map((i) => `${i.quantity}× ${i.name}`).join(", ")}</p>
+              <p>{o.items.map((i) => (i.deliveredQty > 0 && i.deliveredQty < i.quantity ? `${i.quantity}× ${i.name} (${i.deliveredQty} entregue${i.deliveredQty > 1 ? "s" : ""})` : `${i.quantity}× ${i.name}`)).join(", ")}</p>
               <p className="order-foot">
                 <span>
                   Total <strong>{formatBRL(o.totalCents)}</strong>

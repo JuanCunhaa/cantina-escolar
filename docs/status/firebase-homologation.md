@@ -117,3 +117,8 @@ npm run staging:selftest    # ensaio local sem nuvem
 ```
 
 Logs locais (ignorados pelo Git): `.agent-logs/staging-real-1.log` (falha corrigida), `.agent-logs/staging-real-2.log` (28/28), `.agent-logs/staging-selftest-2.log`.
+
+## F13 — índices publicados e smoke (04/10/2026)
+
+- `npm run staging:deploy` (expandir antes de mesclar): Rules INALTERADAS ("already up to date") e índice composto novo `orders (status asc, consumptionDate asc)` publicado no `cantina-escolar-hml`; compatível com a main publicada (a main não o consulta). O CLI não mostra o estado do índice: o smoke abaixo consulta `status in [...]` + `consumptionDate <` no Firestore real, o que só responde 200 com o índice pronto.
+- `tests/staging/fulfillment-smoke.spec.ts` (servidor local + Firestore HML): 1ª execução FALHOU em `GET /api/operations/preparation?shiftId=…` — `shiftId ==` + intervalo de `consumptionDate` pede composto que o emulador não cobra. A consulta de previsão passou a filtrar o turno em memória (sem índice novo); 2ª execução 5/5 (`.agent-logs/f13-staging-hml-local-2.log`). Sem pedido, saldo ou crédito criados; contas efêmeras removidas.

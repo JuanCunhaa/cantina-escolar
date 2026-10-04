@@ -19,13 +19,15 @@ export type OrderGroup = (typeof GROUPS)[number];
 export const GROUP_LABEL: Record<OrderGroup, string> = { pending: "Pendentes", completed: "Concluídos", cancelled: "Cancelados", all: "Todos" };
 
 type StatusInfo = { group: Exclude<OrderGroup, "all">; label: string; payment: "paid" | "pending" };
-/** Situações conhecidas. Entrega/cancelamento/balcão são produzidos por F13/F14/F15; aqui só são EXIBIDOS se existirem. */
+/** Situações conhecidas. Preparo/entrega/não retirada vêm da F13; cancelamento/balcão (F14/F15) só são EXIBIDOS se existirem. */
 export const STATUS_INFO: Record<string, StatusInfo> = {
   payment_pending: { group: "pending", label: "Pagamento pendente", payment: "pending" },
   paid: { group: "pending", label: "Pago · aguardando entrega", payment: "paid" },
   preparing: { group: "pending", label: "Em preparo", payment: "paid" },
   ready: { group: "pending", label: "Pronto para retirada", payment: "paid" },
-  not_picked_up: { group: "pending", label: "Não retirado · aguardando resolução", payment: "paid" },
+  partially_delivered: { group: "pending", label: "Entregue em parte · restante aguardando retirada", payment: "paid" },
+  not_picked_up: { group: "pending", label: "Não retirado · aguardando resolução da escola", payment: "paid" },
+  not_picked_up_closed: { group: "completed", label: "Não retirado · encerrado com cobrança mantida", payment: "paid" },
   delivered: { group: "completed", label: "Entregue", payment: "paid" },
   cancelled: { group: "cancelled", label: "Cancelado · valor devolvido à carteira", payment: "paid" },
 };
@@ -69,7 +71,11 @@ export function filtersFromParams(params: URLSearchParams): unknown {
 }
 
 /** Item exatamente como gravado na compra (snapshot). Campos internos (reserva, categoria) não saem do servidor. */
-export type OrderItemView = Pick<OrderItem, "lineNo" | "productId" | "name" | "unit" | "quantity" | "unitPriceCents" | "discountCents" | "subtotalCents">;
+export type OrderItemView = Pick<OrderItem, "lineNo" | "productId" | "name" | "unit" | "quantity" | "unitPriceCents" | "discountCents" | "subtotalCents"> & {
+  /** Unidades já entregues (F13) e ainda por entregar; pedidos anteriores à F13 = 0 entregues. */
+  deliveredQty: number;
+  remainingQty: number;
+};
 
 export type OrderView = {
   orderId: string;
@@ -103,7 +109,11 @@ export type OrderDetail = OrderView & {
   /** Papel de quem comprou (o responsável/aluno que fez a compra; nunca UID ou dado interno). */
   purchasedBy: "guardian" | "student" | "staff" | null;
   cancelDeadlineAt: string | null;
-  timeline: { kind: "created" | "paid"; at: string | null; label: string }[];
+  timeline: { kind: "created" | "paid" | "preparing" | "ready" | "delivery" | "not_picked_up" | "resolved"; at: string | null; label: string }[];
+  /** Entregas registradas (F13): só nome/quantidade/instante; nunca ator, movimento de estoque ou custo. */
+  deliveries: { at: string | null; lines: { name: string; quantity: number }[] }[];
+  /** Não retirada (F13): situação e classificação em linguagem de família; motivo interno e ator não saem do servidor. */
+  nonPickup: { resolved: boolean; markedAt: string | null; resolvedAt: string | null; retainedCents: number | null; classification: string | null } | null;
   receipt: OrderReceipt;
 };
 

@@ -79,6 +79,10 @@ export type OrderItem = {
   subtotalCents: number;
   source: "default" | "extra";
   reservationId: string;
+  /** Progresso operacional (F13): unidades já entregues; ausente em pedidos anteriores = 0. A baixa de estoque é só destas. */
+  deliveredQty?: number;
+  /** Unidades canceladas/reembolsadas (F14 grava; ausente = 0). Já entram no cálculo de "restante". */
+  canceledQty?: number;
 };
 
 export const ORDER_STATUSES = ["paid"] as const;

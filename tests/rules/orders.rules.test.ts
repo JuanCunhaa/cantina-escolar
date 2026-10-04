@@ -53,3 +53,38 @@ describe("Firestore rules — F11: pedidos são só do servidor", () => {
     await assertFails(setDoc(doc(db, "dailyCapacity/p1_2026-10-05_shf"), { reserved: 0 }));
   });
 });
+
+/**
+ * F13 grava entregas em `orders/{id}/deliveries` (movimentos de estoque, ator) só pelo servidor: sem regra nova, o
+ * default-deny cobre a subcoleção — nem a equipe que entrega nem a família dona leem ou escrevem direto.
+ */
+describe("Firestore rules — F13: entregas e progresso do pedido são só do servidor", () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "orders/ord_1/deliveries/dlv_1"), { orderId: "ord_1", studentId: "stu_a", seq: 1, lines: [{ lineNo: 1, movementId: "m000000001" }], actorUid: "cant" });
+    });
+  });
+
+  it("nenhum cliente lê, lista, cria, altera ou apaga entrega (família dona, aluno, cantina, secretaria, admin, anônimo)", async () => {
+    const contexts = [await as("famA", "guardian"), await as("famB", "guardian"), await as("aluA", "student"), await as("cant", "cantina"), await as("sec", "secretaria"), await as("adm", "admin"), env.unauthenticatedContext()];
+    for (const ctx of contexts) {
+      const db = ctx.firestore();
+      await assertFails(getDoc(doc(db, "orders/ord_1/deliveries/dlv_1")));
+      await assertFails(getDocs(collection(db, "orders/ord_1/deliveries")));
+      await assertFails(setDoc(doc(db, "orders/ord_1/deliveries/dlv_2"), { orderId: "ord_1", seq: 2 }));
+      await assertFails(updateDoc(doc(db, "orders/ord_1/deliveries/dlv_1"), { totalUnits: 99 }));
+      await assertFails(deleteDoc(doc(db, "orders/ord_1/deliveries/dlv_1")));
+      // A equipe também não entrega nem resolve pelo cliente: progresso do pedido é do servidor.
+      await assertFails(updateDoc(doc(db, "orders/ord_1"), { status: "delivered", deliveredQty: 1 }));
+    }
+  });
+
+  it("estoque e custos seguem fechados a escrita do cliente (baixa só pelo StockSession no servidor)", async () => {
+    for (const role of ["cantina", "admin"]) {
+      const db = (await as(`u_${role}`, role)).firestore();
+      await assertFails(setDoc(doc(db, "stockBalances/p1"), { onHand: 0 }));
+      await assertFails(setDoc(doc(db, "stockCosts/p1/movements/m000000001"), { type: "sale_exit", quantity: -1 }));
+      await assertFails(setDoc(doc(db, "dailyCapacity/p1_2026-10-05_shf"), { delivered: 5 }));
+    }
+  });
+});

@@ -7,6 +7,7 @@ import { api, errorText } from "@/lib/api-client";
 import { localDateOf } from "@/lib/dates/school-time";
 import { formatBRL } from "@/lib/money/format";
 import { clockLabel, longDayLabel } from "@/modules/menu/format";
+import { isNotPickedUp } from "../fulfillment-model";
 import { CHANNEL_LABEL, type OrderDetail } from "../history-model";
 import { orderDayText, StatusBadge } from "./my-orders";
 
@@ -74,6 +75,8 @@ export function OrderDetailView({ user, orderId }: { user: User; orderId: string
             <tr>
               <th scope="col">Produto</th>
               <th scope="col">Qtd.</th>
+              <th scope="col">Entregues</th>
+              <th scope="col">Faltam</th>
               <th scope="col">Preço un.</th>
               <th scope="col">Subtotal</th>
             </tr>
@@ -83,6 +86,8 @@ export function OrderDetailView({ user, orderId }: { user: User; orderId: string
               <tr key={i.lineNo}>
                 <td>{i.name}</td>
                 <td>{i.quantity}</td>
+                <td data-testid="item-delivered">{i.deliveredQty}</td>
+                <td data-testid="item-remaining">{isNotPickedUp(o.status) ? `${i.remainingQty} (não retiradas)` : i.remainingQty}</td>
                 <td>{formatBRL(i.unitPriceCents)}</td>
                 <td>{formatBRL(i.subtotalCents)}</td>
               </tr>
@@ -97,15 +102,28 @@ export function OrderDetailView({ user, orderId }: { user: User; orderId: string
 
       <h2>Histórico do pedido</h2>
       <ol className="plain-list" data-testid="order-timeline">
-        {o.timeline.map((t) => (
-          <li key={t.kind}>
+        {o.timeline.map((t, index) => (
+          <li key={`${t.kind}-${index}`}>
             {t.label}: {when(t.at)}
           </li>
         ))}
         {o.purchasedBy && <li>Comprado por: {PURCHASER[o.purchasedBy]}</li>}
         {o.cancelDeadlineAt && <li className="muted">Prazo de cancelamento até {when(o.cancelDeadlineAt)}</li>}
       </ol>
-      <p className="muted">Entrega e cancelamento ainda não estão disponíveis nesta tela.</p>
+      {o.nonPickup && (
+        <p className="notice" data-testid="order-non-pickup">
+          {o.nonPickup.resolved ? (
+            <>
+              A escola encerrou este pedido como <strong>não retirado</strong>, com a cobrança mantida ({formatBRL(o.nonPickup.retainedCents ?? 0)} das unidades não retiradas). {o.nonPickup.classification}.
+            </>
+          ) : (
+            <>
+              Este pedido foi marcado como <strong>não retirado</strong> e aguarda a decisão da escola. Nenhum valor foi devolvido ainda ({formatBRL(o.nonPickup.retainedCents ?? 0)} das unidades não retiradas seguem pagos).
+            </>
+          )}
+        </p>
+      )}
+      <p className="muted">O cancelamento com reembolso à carteira ainda não está disponível nesta tela (chega com a F14).</p>
 
       <h2>Recibo interno</h2>
       <dl className="receipt-grid" data-testid="order-receipt">

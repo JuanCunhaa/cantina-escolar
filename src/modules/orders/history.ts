@@ -15,6 +15,7 @@ import {
 } from "./history-model";
 
 import { decodeCursor, encodeCursor } from "./history-cursor";
+import { CLASSIFICATION_LABEL, RETAINED_CLASSIFICATION, deliveredOf, remainingOf } from "./fulfillment-model";
 
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
 
@@ -38,6 +39,8 @@ function toItem(raw: unknown): OrderItemView | null {
     unitPriceCents: Number(i.unitPriceCents),
     discountCents: Number(i.discountCents ?? 0),
     subtotalCents: Number(i.subtotalCents),
+    deliveredQty: deliveredOf({ quantity: Number(i.quantity), deliveredQty: Number(i.deliveredQty ?? 0) }),
+    remainingQty: remainingOf({ quantity: Number(i.quantity), deliveredQty: Number(i.deliveredQty ?? 0), canceledQty: Number(i.canceledQty ?? 0) }),
   };
 }
 
@@ -164,11 +167,30 @@ export async function getOrderDetail(db: Firestore, actor: Actor, orderId: strin
   await authorizeStudent(db, actor, d.studentId, "orders.read");
 
   const entryId = typeof d.walletEntryId === "string" && ID.test(d.walletEntryId) ? d.walletEntryId : null;
-  const [names, entry] = await Promise.all([shiftNamesOf(db, [String(d.shiftId ?? "")]), entryId ? db.doc(`wallets/${d.studentId}/entries/${entryId}`).get() : Promise.resolve(null)]);
+  const [names, entry, deliveriesSnap] = await Promise.all([
+    shiftNamesOf(db, [String(d.shiftId ?? "")]),
+    entryId ? db.doc(`wallets/${d.studentId}/entries/${entryId}`).get() : Promise.resolve(null),
+    db.collection(`orders/${snap.id}/deliveries`).orderBy("seq").limit(100).get(),
+  ]);
   const view = toOrderView(snap.id, d, names);
   const role = d.createdByRole;
   const policy = (d.policy ?? {}) as { cancelCutoffAt?: unknown };
   const createdAt = view.createdAt;
+  const deliveries = deliveriesSnap.docs.map((x) => ({
+    at: iso(x.get("createdAt")),
+    lines: ((x.get("lines") as { name?: unknown; quantity?: unknown }[] | undefined) ?? []).map((l) => ({ name: String(l.name ?? ""), quantity: Number(l.quantity ?? 0) })),
+  }));
+  const np = d.nonPickup as { markedAt?: unknown; remainingCents?: unknown; resolution?: { classification?: unknown; amountCents?: unknown; resolvedAt?: unknown } | null } | undefined;
+  const resolved = Boolean(np?.resolution);
+  const nonPickup = np
+    ? {
+        resolved,
+        markedAt: iso(np.markedAt),
+        resolvedAt: iso(np.resolution?.resolvedAt),
+        retainedCents: resolved ? Number(np.resolution?.amountCents ?? 0) : Number(np.remainingCents ?? 0),
+        classification: np.resolution?.classification === RETAINED_CLASSIFICATION ? CLASSIFICATION_LABEL[RETAINED_CLASSIFICATION] : null,
+      }
+    : null;
   return {
     ...view,
     purchasedBy: role === "guardian" || role === "student" ? role : role ? "staff" : null,
@@ -176,7 +198,14 @@ export async function getOrderDetail(db: Firestore, actor: Actor, orderId: strin
     timeline: [
       { kind: "created", at: createdAt, label: "Pedido criado" },
       ...(view.paymentState === "paid" ? [{ kind: "paid" as const, at: createdAt, label: "Pago com o saldo da carteira" }] : []),
+      ...(iso(d.preparingAt) ? [{ kind: "preparing" as const, at: iso(d.preparingAt), label: "Em preparo" }] : []),
+      ...(iso(d.readyAt) ? [{ kind: "ready" as const, at: iso(d.readyAt), label: "Pronto para retirada" }] : []),
+      ...deliveries.map((x) => ({ kind: "delivery" as const, at: x.at, label: `Entrega: ${x.lines.map((l) => `${l.quantity}× ${l.name}`).join(", ")}` })),
+      ...(nonPickup ? [{ kind: "not_picked_up" as const, at: nonPickup.markedAt, label: "Marcado como não retirado" }] : []),
+      ...(nonPickup?.resolved ? [{ kind: "resolved" as const, at: nonPickup.resolvedAt, label: "Encerrado com cobrança mantida" }] : []),
     ],
+    deliveries,
+    nonPickup,
     receipt: {
       walletEntryId: entryId ?? "",
       seq: entry?.exists ? Number(entry.get("seq")) : null,
