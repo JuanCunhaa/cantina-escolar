@@ -23,7 +23,7 @@ type Op =
   | { phase: "pending" }
   | { phase: "confirmed"; result: CheckoutResult; replayed: boolean }
   | { phase: "refused"; code: string; date: string | null; cartSig: string }
-  | { phase: "price_changed"; changes: PriceChange[]; newTotalCents: number; cartSig: string }
+  | { phase: "price_changed"; changes: PriceChange[]; cartSig: string }
   | { phase: "confirm_limits"; details: LimitDetails; cartSig: string }
   | { phase: "uncertain" };
 
@@ -60,7 +60,7 @@ type Props = {
  */
 export function CheckoutPanel({ user, student, lines, reviewing, onClose, wallet, onConfirmed, onServerPrices, refreshWallet, onBusy }: Props) {
   const [op, setOp] = useState<Op>({ phase: "idle" });
-  const attempt = useRef<{ sig: string; key: string } | null>(null);
+  const attempt = useRef<{ sig: string; key: string; confirmed: boolean } | null>(null);
   const inFlight = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const cartSig = cartSigOf(lines);
@@ -69,7 +69,9 @@ export function CheckoutPanel({ user, student, lines, reviewing, onClose, wallet
   const names = new Map(lines.map((l) => [l.productId, l.name]));
 
   // Aviso de uma tentativa recusada vale só para o carrinho em que ocorreu.
-  const effective: Op = (op.phase === "refused" || op.phase === "price_changed" || op.phase === "confirm_limits") && op.cartSig !== cartSig ? { phase: "idle" } : op;
+  const stale = (op.phase === "refused" || op.phase === "price_changed" || op.phase === "confirm_limits") && op.cartSig !== cartSig;
+  // Uma compra já confirmada não prende a revisão de um NOVO carrinho (abrir a revisão volta ao início).
+  const effective: Op = stale || (op.phase === "confirmed" && reviewing) ? { phase: "idle" } : op;
   const busy = effective.phase === "pending" || effective.phase === "uncertain";
 
   useEffect(() => onBusy(busy), [busy, onBusy]);
@@ -80,7 +82,7 @@ export function CheckoutPanel({ user, student, lines, reviewing, onClose, wallet
   async function send(confirmed: boolean) {
     if (inFlight.current || lines.length === 0) return;
     const sig = `${confirmed}|${lines.map((l) => `${l.date}:${l.productId}:${l.quantity}:${l.unitPriceCents}`).join("|")}`;
-    if (attempt.current?.sig !== sig) attempt.current = { sig, key: newKey() };
+    if (attempt.current?.sig !== sig) attempt.current = { sig, key: newKey(), confirmed };
     const key = attempt.current.key;
     const body = {
       key,
@@ -104,9 +106,8 @@ export function CheckoutPanel({ user, student, lines, reviewing, onClose, wallet
     const details = outcome.details as Record<string, unknown> | undefined;
     if (outcome.error === "price_changed" && details) {
       const changes = (details.changes as PriceChange[]) ?? [];
-      const cart = details.cart as { totalCents: number } | undefined;
       onServerPrices(Object.fromEntries(changes.map((c) => [c.productId, c.currentPriceCents])));
-      return setOp({ phase: "price_changed", changes, newTotalCents: cart?.totalCents ?? totalCents, cartSig });
+      return setOp({ phase: "price_changed", changes, cartSig });
     }
     if (outcome.error === "confirmation_required" && details) return setOp({ phase: "confirm_limits", details: details as unknown as LimitDetails, cartSig });
     const date = typeof details?.date === "string" ? details.date : null;
@@ -178,7 +179,7 @@ export function CheckoutPanel({ user, student, lines, reviewing, onClose, wallet
       {effective.phase === "price_changed" && (
         <div role="alert" className="notice notice-error" data-testid="checkout-status" data-phase="price_changed">
           <p>
-            Os preços mudaram desde que você escolheu os produtos. <strong>Nada foi cobrado.</strong> O novo total é {formatBRL(effective.newTotalCents)}; revise e confirme de novo.
+            Os preços mudaram desde que você escolheu os produtos. <strong>Nada foi cobrado.</strong> O total atual é {formatBRL(totalCents)}; revise e confirme de novo.
           </p>
           <ul>
             {effective.changes.map((c) => (
@@ -206,7 +207,7 @@ export function CheckoutPanel({ user, student, lines, reviewing, onClose, wallet
           <p>
             Ainda não sabemos se a compra de {formatBRL(totalCents)} foi concluída. Nada foi repetido como uma compra nova: ao verificar, a mesma operação é consultada e não será cobrada duas vezes.
           </p>
-          <button type="button" onClick={() => void send(false)}>
+          <button type="button" onClick={() => void send(attempt.current?.confirmed ?? false)}>
             Verificar resultado
           </button>{" "}
           <button type="button" className="secondary" onClick={() => void refreshWallet()}>

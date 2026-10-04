@@ -84,6 +84,9 @@ export type OrderItem = {
 export const ORDER_STATUSES = ["paid"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
+/** Texto do lançamento no livro (usado pelo servidor e pelo extrato local reconciliado). */
+export const purchaseReason = (date: LocalDate): string => `Compra antecipada para ${date}`;
+
 export const subtotalOf = (unitPriceCents: number, quantity: number): number => unitPriceCents * quantity;
 export const totalOf = (items: readonly Pick<OrderItem, "subtotalCents">[]): number => items.reduce((sum, i) => sum + i.subtotalCents, 0);
 

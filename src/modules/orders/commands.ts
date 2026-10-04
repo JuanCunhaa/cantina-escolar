@@ -12,7 +12,7 @@ import { commitPurchaseUsage, decidePurchase, readPurchaseGuard } from "@/module
 import { checkPurchase } from "@/modules/school/settings";
 import type { PolicySnapshot } from "@/modules/school/calendar";
 import { applyDelta, parseWalletState } from "@/modules/wallet/model";
-import { checkoutSchema, priceChanges, reviewedCart, subtotalOf, totalOf, type OrderItem, type OrderStatus, type ResolvedLine } from "./model";
+import { checkoutSchema, priceChanges, purchaseReason, reviewedCart, subtotalOf, totalOf, type OrderItem, type OrderStatus, type ResolvedLine } from "./model";
 
 export type CheckoutOrder = {
   orderId: string;
@@ -148,12 +148,13 @@ export async function placeAdvanceOrders(db: Firestore, actor: Actor, raw: unkno
         const orderId = orderIdOf(current.uid, input.key, d.date);
         return { ...d, orderId };
       });
-      const grandTotal = orders.reduce((sum, o) => sum + o.lines.reduce((s, l) => s + subtotalOf(l.product.priceCents, l.quantity), 0), 0);
+      const lineSubtotal = (l: { product: { priceCents: number }; quantity: number }) => subtotalOf(l.product.priceCents, l.quantity);
+      const grandTotal = orders.reduce((sum, o) => sum + o.lines.reduce((s, l) => s + lineSubtotal(l), 0), 0);
       if (grandTotal > walletBefore.balanceCents) {
         throw conflict("insufficient_balance", "Saldo insuficiente na carteira do aluno.", { balanceCents: walletBefore.balanceCents, requiredCents: grandTotal });
       }
       const stock = openStockSession(db, tx, { today, actor: { uid: current.uid, role: current.role ?? null } });
-      const built = [];
+      const built: ((typeof orders)[number] & { items: OrderItem[]; totalCents: number })[] = [];
       for (const o of orders) {
         const items: OrderItem[] = [];
         let lineNo = 0;
@@ -171,7 +172,7 @@ export async function placeAdvanceOrders(db: Firestore, actor: Actor, raw: unkno
             unitPriceCents: l.product.priceCents,
             priceVersion: l.product.priceVersion,
             discountCents: 0,
-            subtotalCents: subtotalOf(l.product.priceCents, l.quantity),
+            subtotalCents: lineSubtotal(l),
             source: l.source,
             reservationId,
           });
@@ -192,7 +193,7 @@ export async function placeAdvanceOrders(db: Firestore, actor: Actor, raw: unkno
           seq: wallet.version,
           amountCents: -o.totalCents,
           balanceAfterCents: wallet.balanceCents,
-          reason: `Compra antecipada para ${o.date}`,
+          reason: purchaseReason(o.date),
           orderId: o.orderId,
           batchId,
           actorUid: current.uid,
@@ -248,7 +249,8 @@ export async function placeAdvanceOrders(db: Firestore, actor: Actor, raw: unkno
         });
       }
       stock.commit();
-      commitPurchaseUsage(db, tx, current, guard, evaluation, batchId);
+      // A exceção de uso único só cobre uma data (um pedido): `usedFor` aponta o pedido real; sem exceção, o lote.
+      commitPurchaseUsage(db, tx, current, guard, evaluation, built.length === 1 ? built[0]!.orderId : batchId);
       tx.set(walletRef, { studentId, currency: "BRL", balanceCents: wallet.balanceCents, version: wallet.version, updatedAt: stamp, ...(walletSnap.exists ? {} : { createdAt: stamp }) }, { merge: true });
       auditInTransaction(db, tx, auditId, {
         action: "orders.checkout",

@@ -499,7 +499,7 @@ describe("política do responsável aplicada no checkout (A10/A11)", () => {
     const ok = await buy(studentLogin, cart(student, SM, { [d(1)]: [{ productId: p }] }, { exceptionId }), "student");
     expect(ok.status, JSON.stringify(ok.body)).toBe(200);
     expect(ok.body.override).toEqual({ via: "exception", exceptionId, kind: "guardian" });
-    expect(await doc(`studentPolicies/${student}/exceptions/${exceptionId}`)).toMatchObject({ status: "used", usedBy: studentLogin.uid });
+    expect(await doc(`studentPolicies/${student}/exceptions/${exceptionId}`)).toMatchObject({ status: "used", usedBy: studentLogin.uid, usedFor: (ok.body.orders as { orderId: string }[])[0]!.orderId });
     const again = await buy(studentLogin, cart(student, SM, { [d(1)]: [{ productId: p }] }, { exceptionId }), "student");
     expect(again.body.error).toBe("policy_denied"); // já usada
   });

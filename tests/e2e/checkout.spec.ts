@@ -129,6 +129,14 @@ test.describe("checkout antecipado — comportamento da interface (A10/A16/A17/A
     expect(after).toMatchObject({ balanceCents: 3450, version: 3 });
     expect(purchases(after)).toBe(2);
     expect((await readDemoDoc(targetFromEnv(), `stockBalances/${suco.id}`))?.onHand).toBe(100); // reserva não é saída física
+
+    // Um novo carrinho depois da compra confirmada abre a revisão do NOVO carrinho (não fica preso na confirmação antiga).
+    await openDate(page, d(3));
+    await plus(page, pao.name).click();
+    await reviewOpen(page).click();
+    await expect(page.getByTestId("checkout-total")).toContainText(/R\$\s*6,50/);
+    await expect(page.getByTestId("checkout-confirm")).toBeVisible();
+    await expect(page.getByTestId("order-confirmed")).toHaveCount(0);
   });
 
   test("clique duplo em Confirmar cobra uma única vez", async ({ page, request }) => {
@@ -236,6 +244,41 @@ test.describe("checkout antecipado — comportamento da interface (A10/A16/A17/A
     await page.getByTestId("checkout-confirm-limits").click();
     await expect(status(page)).toHaveAttribute("data-phase", "confirmed", { timeout: 30000 });
     expect((await wallet(request, guardian.idToken, rich.id)).balanceCents).toBe(4100);
+  });
+
+  test("resposta perdida depois de 'Confirmar mesmo assim': verificar reenvia a MESMA operação (mesma chave, confirmed=true) e cobra uma única vez", async ({ page, request }) => {
+    const guardian = await createTestUser(`e2e-co-g7-${tag}`, "guardian");
+    const f = await family([guardian], 5000, { daily: 500 });
+    const item = await product(request, "Quiche", 900);
+    await login(page, guardian.email);
+    await expect(page.getByTestId("menu-student")).toContainText(f.name, { timeout: 30000 });
+    await openDate(page, d(1));
+    await plus(page, item.name).click();
+    await reviewOpen(page).click();
+    await page.getByTestId("checkout-confirm").click();
+    await expect(status(page)).toHaveAttribute("data-phase", "confirm_limits", { timeout: 30000 });
+
+    const keys: string[] = [];
+    await page.route("**/api/orders/checkout", async (route) => {
+      keys.push((route.request().postDataJSON() as { key: string }).key);
+      await route.fetch(); // o servidor processa, a resposta nunca chega
+      await route.abort("connectionreset");
+    });
+    await page.getByTestId("checkout-confirm-limits").click();
+    await expect(status(page)).toHaveAttribute("data-phase", "uncertain", { timeout: 40000 });
+    expect(new Set(keys).size).toBe(1); // as tentativas automáticas usam a mesma chave
+    expect((await wallet(request, guardian.idToken, f.id)).balanceCents).toBe(4100);
+
+    await page.unroute("**/api/orders/checkout");
+    const verified = page.waitForRequest("**/api/orders/checkout");
+    await page.getByRole("button", { name: "Verificar resultado" }).click();
+    const sent = (await verified).postDataJSON() as { key: string; confirmed: boolean };
+    expect(sent).toMatchObject({ key: keys[0], confirmed: true }); // MESMA operação, não uma nova
+    await expect(status(page)).toHaveAttribute("data-phase", "confirmed", { timeout: 30000 });
+    await expect(status(page)).toContainText("nada foi cobrado de novo");
+    const after = await wallet(request, guardian.idToken, f.id);
+    expect(after.balanceCents).toBe(4100);
+    expect(purchases(after)).toBe(1);
   });
 
   test("celular: revisão sem rolagem horizontal e botões acessíveis por teclado", async ({ browser, request }) => {

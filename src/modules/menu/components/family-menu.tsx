@@ -154,12 +154,16 @@ function StudentMenu({ user, studentId, selector = null }: { user: User; student
   const itemCount = lines.reduce((sum, l) => sum + l.quantity, 0);
   const cartDates = [...new Set(lines.map((l) => l.date))];
 
+  /** Datas que fecharam enquanto a tela estava aberta saem do carrinho (nada fica escondido nem volta ao envio sem aviso). */
+  const openDates = new Set(days.filter((d) => d.allowed && week?.canPurchase).map((d) => d.date));
+  const prune = (current: Record<string, Record<string, number>>) => Object.fromEntries(Object.entries(current).filter(([d]) => openDates.has(d)));
   const change = (id: string, delta: number) => {
     if (!date) return;
     setCart((current) => {
-      const day = current[date] ?? {};
+      const kept = prune(current);
+      const day = kept[date] ?? {};
       const next = Math.max(0, Math.min(MAX_LINE_QUANTITY, (day[id] ?? 0) + delta));
-      return { ...current, [date]: { ...day, [id]: next } };
+      return { ...kept, [date]: { ...day, [id]: next } };
     });
   };
   const onConfirmed = useCallback(
@@ -293,7 +297,15 @@ function StudentMenu({ user, studentId, selector = null }: { user: User; student
           </span>
         </p>
         {itemCount > 0 ? (
-          <button type="button" onClick={() => setReviewing(true)} disabled={busy} data-testid="open-review">
+          <button
+            type="button"
+            onClick={() => {
+              setCart(prune);
+              setReviewing(true);
+            }}
+            disabled={busy}
+            data-testid="open-review"
+          >
             Revisar e confirmar
           </button>
         ) : (
