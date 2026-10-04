@@ -44,3 +44,8 @@ Busca por nome: `students` por intervalo de prefixo em `nameNormalized` (custo =
 - Detalhe do pedido (F12) lê também `orders/{id}/deliveries orderBy seq limit 100` (campo único).
 - Tempo real: nenhum listener (as telas leem pela API, relêem após cada comando, no botão Atualizar e ao voltar o foco). `orders` não é legível pelo cliente.
 - `GET /api/operations/preparation?scope=attention` lê só as duas consultas de pendências (sem dia nem previsão): é o que a lista do dia usa para o aviso. O teto da previsão (3000) é aplicado ANTES do filtro de turno em memória: com muitos pedidos o turno escolhido pode ficar incompleto — a resposta marca `truncated`.
+
+### Cancelamento (F14)
+
+- `GET /api/orders/{id}` (detalhe, F12) lê também `orders/{id}/cancellations orderBy seq limit 100` (campo único, sem índice novo) e devolve `cancellations`, `refundedCents` e `cancelable` (responsável vinculado, situação aberta, restante > 0 e `policy.cancelCutoffAt` ainda no futuro pelo relógio do servidor; o comando revalida tudo).
+- Aba Cancelados: `status in [cancelled]` (lista fechada `STATUS_INFO`); extrato filtra `type == order_refund`. Nenhum listener novo: a tela confirma pela resposta do comando e relê o detalhe.
