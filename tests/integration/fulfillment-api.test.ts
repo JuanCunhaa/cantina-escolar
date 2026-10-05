@@ -597,7 +597,7 @@ describe("não retirada: sem reembolso nem perda automáticos, resolução expl�
     expect((panel.body.attention as { orderId: string; marked: boolean; remainingCents: number }[]).find((o) => o.orderId === orderId)).toMatchObject({ marked: true, remainingCents: 1000 });
   });
 
-  it("resolução é só da administração, exige motivo e recusa o reagendamento ainda inexistente (F16)", async () => {
+  it("resolução é só da administração, exige motivo e o reagendamento (F16) exige destino", async () => {
     const p = await newProduct({ stock: 10 });
     const { student, orderId } = await placeOrder([{ productId: p }]);
     await notPickedUp(cantina, orderId);
@@ -607,7 +607,8 @@ describe("não retirada: sem reembolso nem perda automáticos, resolução expl�
     expect((await resolve(guardianA, orderId)).status).toBe(403);
     expect((await resolve(null, orderId)).status).toBe(401);
     expect((await resolve(admin, orderId, { reason: "x" })).status).toBe(400);
-    expect((await resolve(admin, orderId, { resolution: "reschedule" })).body).toMatchObject({ error: "resolution_unavailable", details: { availableIn: "F16" } });
+    // Reagendar existe desde a F16 (tests/integration/amend-api.test.ts): sem data/turno de destino o corpo é inválido e nada muda.
+    expect((await resolve(admin, orderId, { resolution: "reschedule" })).body).toMatchObject({ error: "invalid_input" });
     expect(await snapshot(student, [p])).toEqual(before);
     expect(await doc(`orders/${orderId}`)).toMatchObject({ status: "not_picked_up" });
   });

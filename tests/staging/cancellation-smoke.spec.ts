@@ -1,7 +1,7 @@
 // Smoke DIRIGIDO de cancelamento/reembolso (F14) na homologação (emulador ou aplicação publicada), SEM crédito artificial e SEM
 // pedido gravado à mão: os alunos fictícios têm carteira R$ 0,00 e nenhum pedido, então NÃO existe pedido para cancelar. Prova o
 // que é possível sem compra: autorização por papel na rota nova, validação do corpo (o cliente não informa valor), 403/404 de
-// pedido inexistente (família e equipe), resolução `cancel_refund` e `reschedule` em pedido inexistente, consulta da aba
+// pedido inexistente (família e equipe), resolução `cancel_refund` e `reschedule` (F16: destino obrigatório) em pedido inexistente, consulta da aba
 // "Cancelados" e do extrato (índices prontos) e Rules (cancelamentos e reembolso fechados ao cliente).
 // NÃO prova: reembolso, liberação de reserva/cota/uso, prazo, descarte, replay e corridas com dados no Firestore real — isso só
 // existe no emulador (tests/integration/cancellation-api.test.ts, e2e/cancellation.spec.ts).
@@ -56,13 +56,14 @@ test("validação: motivo obrigatório (mínimo 5), campos de valor/aluno recusa
   }
 });
 
-test("resolução de não retirado em pedido inexistente: cancel_refund só da administração (404 do pedido); reagendamento segue indisponível (F16)", async ({ request }) => {
+test("resolução de não retirado em pedido inexistente: cancel_refund só da administração (404 do pedido); reagendar (F16) exige destino", async ({ request }) => {
   const base = { key: newKey("hml-cn"), reason: "Política da escola: reembolso" };
   expect((await call(request, fam.guardian, "POST", "/api/operations/orders/ord_x/resolve", { ...base, resolution: "cancel_refund" })).status).toBe(403);
   const refund = await call(request, fam.admin, "POST", "/api/operations/orders/ord_inexistente/resolve", { ...base, resolution: "cancel_refund" });
   expect([refund.status, refund.body.error]).toEqual([404, "order_not_found"]);
+  // Reagendar existe desde a F16: sem destino o corpo é inválido; com destino, o pedido inexistente dá 404 (smoke próprio: staging/amend-smoke.spec.ts).
   const reschedule = await call(request, fam.admin, "POST", "/api/operations/orders/ord_inexistente/resolve", { ...base, key: newKey("hml-cn"), resolution: "reschedule" });
-  expect([reschedule.status, reschedule.body.error, reschedule.body.details?.availableIn]).toEqual([409, "resolution_unavailable", "F16"]);
+  expect(reschedule.status).toBe(400);
 });
 
 test("aba Cancelados e extrato vazios respondem 200 (índices prontos), sem reembolso inventado", async ({ request }) => {

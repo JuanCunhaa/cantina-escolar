@@ -12,6 +12,7 @@ const TYPE_LABEL: Record<LedgerEntryView["type"], string> = {
   advance_purchase: "Compra antecipada",
   counter_purchase: "Compra no balcão",
   order_refund: "Reembolso de pedido",
+  order_exchange: "Troca de produto (diferença)",
   transfer_out: "Transferência enviada",
   transfer_in: "Transferência recebida",
   adjustment: "Ajuste",

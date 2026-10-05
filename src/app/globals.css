@@ -355,6 +355,11 @@ fieldset { min-width: 0; }
 .day-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .day-actions .notice, .day-panel { flex-basis: 100%; }
 .day-panel { padding: var(--space-2) 0; }
+/* Troca de produto (F16): lista compacta com foto pequena; a prévia do servidor fica numa faixa aberta, sem caixa extra. */
+.exchange-products { display: grid; gap: var(--space-1); grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); }
+.exchange-product { display: grid; grid-template-columns: auto 4rem minmax(0, 1fr); gap: var(--space-2); align-items: center; min-height: var(--touch-target); }
+.exchange-product .photo { width: 4rem; }
+.exchange-quote { border-left: 3px solid var(--color-accent, currentColor); padding-left: var(--space-2); margin: var(--space-2) 0; }
 @media print { .day-row { break-inside: avoid; } }
 
 /* PDV de balcão (F15): busca em destaque, produtos e carrinho lado a lado no tablet/computador; coluna única no celular. Sem cards nem animação. */

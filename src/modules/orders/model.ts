@@ -83,6 +83,10 @@ export type OrderItem = {
   deliveredQty?: number;
   /** Unidades canceladas/reembolsadas (F14 grava; ausente = 0). Já entram no cálculo de "restante". */
   canceledQty?: number;
+  /** Unidades TROCADAS por outro produto (F16): saem do restante; o valor pago delas virou crédito da troca. */
+  exchangedQty?: number;
+  /** Linha criada por uma troca (F16): ID da troca e linhas de origem. Preço = o do servidor no momento da troca. */
+  exchange?: { exchangeId: string; fromLineNos: number[] };
 };
 
 export const ORDER_STATUSES = ["paid"] as const;

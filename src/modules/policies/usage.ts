@@ -67,6 +67,35 @@ export function writeUsage(tx: Transaction, db: Firestore, studentId: string, sn
   }
 }
 
+/**
+ * Move comprometimento num só passo (reagendamento/troca, F16): `deltas` com sinal (+ destino/produto novo, − origem/produto
+ * trocado), somados POR documento antes de gravar — origem e destino na mesma semana (ou a mesma data) viram UMA gravação
+ * com o saldo líquido, nunca duas gravações em que a segunda apagaria a primeira. Documento com líquido zero não é regravado.
+ */
+export function applyUsageDeltas(tx: Transaction, db: Firestore, studentId: string, snapshot: UsageSnapshot, deltas: readonly UsageDelta[]): void {
+  const { perDay, perWeek } = group(deltas);
+  const writes = [
+    ...[...perDay].map(([d, a]) => ({ ref: snapshot.dayRefs.get(d) ?? dayRef(db, studentId, d), id: { date: d }, current: snapshot.days[d] ?? 0, amount: a, label: d })),
+    ...[...perWeek].map(([w, a]) => ({ ref: snapshot.weekRefs.get(w) ?? weekRef(db, studentId, w), id: { weekStart: w }, current: snapshot.weeks[w] ?? 0, amount: a, label: w })),
+  ];
+  for (const { ref, id, current, amount, label } of writes) {
+    if (amount === 0) continue;
+    const value = current + amount;
+    if (value < 0) throw new UsageInvariantError(`Uso comprometido ficaria negativo (${label}).`);
+    tx.set(ref, { studentId, ...id, committedCents: value, version: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  }
+}
+
+/** Visão do uso como se os `deltas` já tivessem sido aplicados (para avaliar o destino sem contar a origem que sai). */
+export function usageAfter(snapshot: UsageView, deltas: readonly UsageDelta[]): UsageView {
+  const { perDay, perWeek } = group(deltas);
+  const days = { ...snapshot.days };
+  const weeks = { ...snapshot.weeks };
+  for (const [d, a] of perDay) days[d] = (days[d] ?? 0) + a;
+  for (const [w, a] of perWeek) weeks[w] = (weeks[w] ?? 0) + a;
+  return { days, weeks };
+}
+
 /** Compromissos futuros (dia/semana a partir de `fromDate`), lidos na transação, para mostrar ao reduzir limites. */
 export async function readCommitmentsFrom(db: Firestore, tx: Transaction, studentId: string, fromDate: LocalDate) {
   const fromWeek = weekStartOf(fromDate);

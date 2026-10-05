@@ -261,7 +261,7 @@ test.describe("Cancelamento operacional (cantina e administração)", () => {
     await switchTo(page, admin.email, "/operacao/pedidos");
     await expect(rowOf(page, fam.name)).toBeVisible({ timeout: 30000 });
     await rowOf(page, fam.name).getByTestId("resolve-toggle").click();
-    const form = rowOf(page, fam.name).getByTestId("resolve-form");
+    const form = rowOf(page, fam.name).getByTestId("resolve-panel");
     await form.getByTestId("resolution-refund").check();
     await expect(form.getByTestId("resolve-submit")).toHaveText("Cancelar e reembolsar");
     await form.getByLabel(/Motivo \/ política aplicada/).fill("Política da escola: reembolso à carteira");

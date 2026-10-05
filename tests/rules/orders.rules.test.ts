@@ -165,3 +165,40 @@ describe("Firestore rules — F15: balcão e venda direta são só do servidor",
     await assertFails(getDoc(doc(((await as("cant", "cantina")).firestore()), "wallets/stu_a")));
   });
 });
+
+/**
+ * F16: reagendamento (`orders/{id}/reschedules`) e troca (`orders/{id}/exchanges`, lançamento `order_exchange`) são escritos só
+ * pelo servidor (comando da equipe com `orders.amend`). Sem regra nova: o default-deny cobre as subcoleções e o pedido; nenhum
+ * cliente — nem a cantina que opera, nem a família dona — muda data, troca produto ou lança a diferença direto.
+ */
+describe("Firestore rules — F16: reagendamento e troca são só do servidor", () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "orders/ord_1/reschedules/rsc_1"), { orderId: "ord_1", studentId: "stu_a", seq: 1, from: { date: "2026-10-05" }, to: { date: "2026-10-06" }, reason: "Data errada", actorUid: "cant" });
+      await setDoc(doc(ctx.firestore(), "orders/ord_1/exchanges/xch_1"), { orderId: "ord_1", studentId: "stu_a", seq: 1, differenceCents: 200, reason: "Outro produto", actorUid: "cant" });
+    });
+  });
+
+  it("nenhum cliente lê, lista, cria, altera ou apaga reagendamento/troca, nem muda data ou itens do pedido direto", async () => {
+    const contexts = [await as("famA", "guardian"), await as("famB", "guardian"), await as("aluA", "student"), await as("cant", "cantina"), await as("sec", "secretaria"), await as("adm", "admin"), env.unauthenticatedContext()];
+    for (const ctx of contexts) {
+      const db = ctx.firestore();
+      for (const sub of ["reschedules/rsc_1", "exchanges/xch_1"]) {
+        await assertFails(getDoc(doc(db, `orders/ord_1/${sub}`)));
+        await assertFails(updateDoc(doc(db, `orders/ord_1/${sub}`), { seq: 99 }));
+        await assertFails(deleteDoc(doc(db, `orders/ord_1/${sub}`)));
+      }
+      await assertFails(getDocs(collection(db, "orders/ord_1/reschedules")));
+      await assertFails(getDocs(collection(db, "orders/ord_1/exchanges")));
+      await assertFails(setDoc(doc(db, "orders/ord_1/exchanges/xch_2"), { orderId: "ord_1", differenceCents: -99999 }));
+      await assertFails(updateDoc(doc(db, "orders/ord_1"), { consumptionDate: "2026-10-09", overrideCutoff: true }));
+      await assertFails(updateDoc(doc(db, "orders/ord_1"), { items: [], totalCents: 0 }));
+    }
+  });
+
+  it("a família dona não lança a diferença da troca nem altera o saldo", async () => {
+    const db = (await as("famA", "guardian")).firestore();
+    await assertFails(setDoc(doc(db, "wallets/stu_a/entries/xch_1_diff"), { type: "order_exchange", seq: 1, amountCents: 200, balanceAfterCents: 200 }));
+    await assertFails(setDoc(doc(db, "wallets/stu_a"), { studentId: "stu_a", balanceCents: 99999, version: 1 }));
+  });
+});

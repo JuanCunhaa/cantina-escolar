@@ -163,7 +163,8 @@
       "npm run test:e2e 30/30",
       "npm run build:webpack exit 0",
       "F11 (04/10/2026) tests/integration/checkout-api.test.ts (emulador, saldo só por fixture): R$ 8 agendados deixam R$ 2 (R$ 3 pede confirmação, exatamente R$ 2 cabem; uso do dia = R$ 10); 6 compras simultâneas de R$ 4 com teto R$ 10 → 2 passam. \"Balcão\" (R$ 3 rejeitado no PDV) e reembolso liberando valor dependem de F15/F14: seguem pendentes.",
-      "F15 (04/10/2026, emulador): R$ 8 agendados (checkout) + teto diário R$ 10 → balcão R$ 3 recusado (daily_limit_exceeded 800+300>1000), R$ 2 exatos passam, depois nada cabe; cancelar o pedido antecipado (reembolso) devolve R$ 6 do comprometimento e a venda de R$ 3 passa; limite semanal vale no balcão (tests/integration/pos-api.test.ts)."
+      "F15 (04/10/2026, emulador): R$ 8 agendados (checkout) + teto diário R$ 10 → balcão R$ 3 recusado (daily_limit_exceeded 800+300>1000), R$ 2 exatos passam, depois nada cabe; cancelar o pedido antecipado (reembolso) devolve R$ 6 do comprometimento e a venda de R$ 3 passa; limite semanal vale no balcão (tests/integration/pos-api.test.ts).",
+      "F16: reagendar revalida o limite do DESTINO (R$ 8 no destino + teto R$ 10 recusa R$ 5; exceção administrativa cobre e fica usada); mover dentro da mesma semana com o teto semanal cheio passa porque a origem sai antes de avaliar; troca aplica limite/bloqueio ao que entra com o que sai descontado (tests/integration/amend-api.test.ts). Emulador apenas."
     ],
     "notes": "Parcial: reembolso/cancelamento reais (F14) e pedidos/balcão reais (F11/F15) ainda não existem; o reembolso é exercitado pela primitiva `releaseUsage`. Manter not_run. F15: balcão real provado no emulador; reagendamento (F16) e Firestore real pendentes."
   },
@@ -361,7 +362,8 @@
       "tests/unit/cancellation.test.ts: propriedade em 400 sequências aleatórias de entregas/cancelamentos (Σ = pago, nunca negativo, nunca acima do restante)",
       "tests/e2e/cancellation.spec.ts: cancelamento parcial e depois total pelo detalhe, parcial pela lista do dia",
       "Mutação dirigida em cancellation.ts (sem liberar uso F09 / sem liberar reserva-cota / sem prazo / sem conferir restante) derrubou 8 / 9 / 3 / 2 testes da integração (.agent-logs/f14-mutation-*.log)",
-      "F14 (04/10/2026, branch feat/f14-cancelamentos-reembolsos): typecheck 0; lint 0; npm test 211/211; npm run test:rules 49/49; npm run test:integration 301/301; npm run test:e2e 56/56; build:webpack 0; audit:prod 0; gitleaks dir src/tests/scripts/docs/firebase e git --redact: sem vazamentos (logs .agent-logs/f14-check-*.log)"
+      "F14 (04/10/2026, branch feat/f14-cancelamentos-reembolsos): typecheck 0; lint 0; npm test 211/211; npm run test:rules 49/49; npm run test:integration 301/301; npm run test:e2e 56/56; build:webpack 0; audit:prod 0; gitleaks dir src/tests/scripts/docs/firebase e git --redact: sem vazamentos (logs .agent-logs/f14-check-*.log)",
+      "F16: com troca, a entrega parcial e o cancelamento continuam exatos — Σ receita de entregas + Σ reembolsos + Σ créditos de troca = Σ subtotais; total líquido = teto de reembolso (tests/integration/amend-api.test.ts 'só o REMANESCENTE', 'diferença negativa… cancelamento depois'; tests/unit/amend.test.ts propriedade). Emulador apenas."
     ],
     "notes": "Parcial: entrega parcial (F13) e cancelamento parcial com reembolso acumulado ≤ pagamento provados no emulador, com pedidos reais do checkout. Falta Firestore real com saldo (sem recarga/fixture na HML). Permanece not_run."
   },
@@ -378,7 +380,13 @@
   },
   "A24": {
     "status": "not_run",
-    "evidence": [],
+    "evidence": [
+      "tests/integration/amend-api.test.ts (F16, emulador, saldo só por fixture; pedidos pelo checkout real): reagendar libera reserva/cota/uso da origem e reserva/compromete no destino na mesma transação, carteira/livro intactos (sem segunda cobrança) e preço contratado mantido mesmo com o cadastro alterado; destino validado (dia fechado, fora da janela, mesma data, outro turno, produto fora do cardápio, aluno inativo, cota planejada sem vaga, sem lastro físico) sem efeito; horário encerrado só com a exceção operacional explícita da equipe (auditada); entrega no destino pela reserva nova sem débito; resolução de não retirado com reagendamento (só administração; parte entregue recusada). Troca: só remanescentes; crédito = valor pago; cobrança = preço do servidor; só a diferença no livro (+R$ 2 cobrado, −R$ 2 devolvido, zero sem lançamento); saldo insuficiente sem efeito parcial; diferença/preço alterados recusam com nova prévia; prévia em transação somente leitura sem efeito.",
+      "tests/e2e/amend.spec.ts: reagendar pela lista do dia (clique duplo move uma vez, aviso do servidor, família vê o reagendamento sem motivo interno, celular sem rolagem lateral); troca com prévia do servidor (escolha nova descarta a prévia, diferença R$ 9,00, resposta perdida repetida com a MESMA chave = uma cobrança, extrato 'Troca de produto (diferença)'); família sem comandos (403).",
+      "tests/unit/amend.test.ts: esquemas, diferença, progresso com trocadas, propriedade (400 sequências) Σ receita + Σ reembolsos + Σ créditos de troca = pago, uso líquido por documento; tests/rules/orders.rules.test.ts (+2): reagendamentos/trocas/lançamento da diferença fechados ao cliente.",
+      "Mutação dirigida F16 (05/10/2026): avaliar destino sem descontar a origem derrubou 2 testes; troca sem checar restante 1; ignorar exceção de horário 1; troca sem mexer na carteira 9.",
+      "F16 (05/10/2026, branch feat/f16-reagendamento-troca): typecheck 0; lint 0; npm test 232/232; npm run test:rules 53/53; npm run test:integration 376 (374 na suíte completa + 2 asserções da pendência F16 atualizadas, reexecutadas 72/72); npm run test:e2e 65/65; build:webpack 0; audit:prod 0; gitleaks dir src/tests sem vazamentos (logs .agent-logs/f16-*.log). Firestore real: só autorização, validação, 404, Rules e extrato vazio (tests/staging/amend-smoke.spec.ts); reagendamento/troca com saldo NÃO comprovados na nuvem (sem crédito artificial)."
+    ],
     "notes": ""
   },
   "A25": {
@@ -543,7 +551,8 @@
       "F13 (04/10/2026, branch feat/f13-preparacao-entrega-nao-retirada): typecheck 0; lint 0; npm test 199/199; npm run test:rules 47/47; npm run test:integration 262/262; npm run test:e2e 51/51; build:webpack 0; audit:prod 0; gitleaks dir src/tests/docs/firebase sem vazamentos (logs .agent-logs/f13-check-*.log; reexecutado inteiro depois da revisão (04/10/2026), logs .agent-logs/f13b-check-*.log)",
       "tests/integration/cancellation-api.test.ts (F14, emulador): replay devolve a resposta original sem novo crédito, payload diferente = conflito, clique duplo com chaves diferentes = 1 crédito, falha forçada no último passo (auditoria) e falha de estoque (descarte impossível) desfazem tudo (carteira, livro, reserva, cota, uso, pedido) e o retry credita uma vez; uso diário/semanal liberado na mesma transação (F09)",
       "tests/integration/cancellation-api.test.ts: liberação de reserva/cota sem entrada física (onHand/movimentos/valor intactos) e descarte como perda explícita com custo e motivo",
-      "F14 (04/10/2026, branch feat/f14-cancelamentos-reembolsos): typecheck 0; lint 0; npm test 211/211; npm run test:rules 49/49; npm run test:integration 301/301; npm run test:e2e 56/56; build:webpack 0; audit:prod 0; gitleaks dir src/tests/scripts/docs/firebase e git --redact: sem vazamentos (logs .agent-logs/f14-check-*.log)"
+      "F14 (04/10/2026, branch feat/f14-cancelamentos-reembolsos): typecheck 0; lint 0; npm test 211/211; npm run test:rules 49/49; npm run test:integration 301/301; npm run test:e2e 56/56; build:webpack 0; audit:prod 0; gitleaks dir src/tests/scripts/docs/firebase e git --redact: sem vazamentos (logs .agent-logs/f14-check-*.log)",
+      "F16: reagendar/trocar idempotentes — mesma chave = resposta original (resposta perdida), payload diferente = conflito, clique duplo com chave nova recusado; operador desativado/rebaixado negado inclusive no replay; falha no último passo e falha intermediária de estoque sem efeito; corridas entrega × reagendamento (6), cancelamento × reagendamento, dois reagendamentos, troca × reagendamento, troca × entrega (6), troca × cancelamento, duas trocas da mesma unidade (×4) com dinheiro/uso/estoque coerentes; uso dia/semana gravado uma vez com o líquido (tests/integration/amend-api.test.ts, tests/unit/amend.test.ts). Emulador apenas."
     ],
     "notes": "Parcial: retry/falha/replay e liberação de uso do cancelamento provados no emulador; sem chamada externa no callback (não há gateway). Pagamento/e-mail e Firestore real seguem pendentes (F17–F19). Permanece not_run."
   },

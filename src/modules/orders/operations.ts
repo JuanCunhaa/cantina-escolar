@@ -11,6 +11,7 @@ import {
   canceledOf,
   dayQuerySchema,
   deliveredOf,
+  exchangedOf,
   isNotPickedUp,
   remainingOf,
   totalsOf,
@@ -65,6 +66,7 @@ const dayItem = (i: OrderItem): DayItemView => ({
   quantity: i.quantity,
   deliveredQty: deliveredOf(i),
   canceledQty: canceledOf(i),
+  exchangedQty: exchangedOf(i),
   remainingQty: remainingOf(i),
 });
 

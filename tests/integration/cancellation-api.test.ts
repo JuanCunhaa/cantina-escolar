@@ -830,7 +830,8 @@ describe("resolução 'cancelar e reembolsar' de não retirado (integra F13 × F
     expect(before).toMatchObject({ usage: 1500, stock: { [p]: { onHand: 19, reserved: 2 } } });
     expect((await resolve(cantina, orderId)).status).toBe(403);
     expect((await resolve(admin, orderId, { reason: "x" })).status).toBe(400);
-    expect((await resolve(admin, orderId, { resolution: "reschedule" })).body).toMatchObject({ error: "resolution_unavailable", details: { availableIn: "F16" } });
+    // Reagendar existe desde a F16 (tests/integration/amend-api.test.ts): sem data/turno de destino o corpo é inválido e nada muda.
+    expect((await resolve(admin, orderId, { resolution: "reschedule" })).body).toMatchObject({ error: "invalid_input" });
     expect(await snapshot(student, [p])).toEqual(before);
 
     const key = randomUUID();

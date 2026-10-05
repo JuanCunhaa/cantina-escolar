@@ -59,6 +59,7 @@ export function OrderDetailView({ user, orderId }: { user: User; orderId: string
   const o = state.order;
   const today = localDateOf(new Date());
   const discount = o.items.reduce((n, i) => n + i.discountCents, 0);
+  const anyExchanged = o.items.some((i) => i.exchangedQty > 0 || i.fromExchange);
   return (
     <section data-testid="order-detail" className="receipt">
       <p className="no-print">
@@ -82,6 +83,7 @@ export function OrderDetailView({ user, orderId }: { user: User; orderId: string
               <th scope="col">Qtd.</th>
               <th scope="col">Entregues</th>
               <th scope="col">Canceladas</th>
+              {anyExchanged && <th scope="col">Trocadas</th>}
               <th scope="col">Faltam</th>
               <th scope="col">Preço un.</th>
               <th scope="col">Subtotal</th>
@@ -90,10 +92,14 @@ export function OrderDetailView({ user, orderId }: { user: User; orderId: string
           <tbody>
             {o.items.map((i) => (
               <tr key={i.lineNo}>
-                <td>{i.name}</td>
+                <td>
+                  {i.name}
+                  {i.fromExchange && <span className="muted"> (entrou na troca)</span>}
+                </td>
                 <td>{i.quantity}</td>
                 <td data-testid="item-delivered">{i.deliveredQty}</td>
                 <td data-testid="item-canceled">{i.canceledQty}</td>
+                {anyExchanged && <td data-testid="item-exchanged">{i.exchangedQty}</td>}
                 <td data-testid="item-remaining">{isNotPickedUp(o.status) ? `${i.remainingQty} (não retiradas)` : i.remainingQty}</td>
                 <td>{formatBRL(i.unitPriceCents)}</td>
                 <td>{formatBRL(i.subtotalCents)}</td>
@@ -104,7 +110,7 @@ export function OrderDetailView({ user, orderId }: { user: User; orderId: string
       </div>
       {discount > 0 && <p>Descontos: {formatBRL(discount)}</p>}
       <p>
-        Total pago: <strong data-testid="order-total">{formatBRL(o.totalCents)}</strong>
+        Total pago{o.exchanges.length > 0 ? " (com as diferenças das trocas)" : ""}: <strong data-testid="order-total">{formatBRL(o.totalCents)}</strong>
       </p>
       {o.refundedCents > 0 && (
         <p data-testid="order-refunded">
@@ -124,7 +130,11 @@ export function OrderDetailView({ user, orderId }: { user: User; orderId: string
       </ol>
       {o.nonPickup && (
         <p className="notice" data-testid="order-non-pickup">
-          {o.nonPickup.resolved && o.nonPickup.kind === "cancel_refund" ? (
+          {o.nonPickup.resolved && o.nonPickup.kind === "reschedule" ? (
+            <>
+              Este pedido ficou <strong>não retirado</strong> e a escola o <strong>reagendou</strong> para outra data, sem nova cobrança (veja o histórico).
+            </>
+          ) : o.nonPickup.resolved && o.nonPickup.kind === "cancel_refund" ? (
             <>
               A escola resolveu este pedido <strong>não retirado</strong> cancelando e devolvendo {formatBRL(o.nonPickup.refundCents ?? 0)} à carteira de {o.studentName}. {o.nonPickup.classification}.
             </>
@@ -149,6 +159,35 @@ export function OrderDetailView({ user, orderId }: { user: User; orderId: string
                 {when(c.at)} — {c.by === "guardian" ? "cancelado pelo responsável" : "cancelado pela escola"}: {c.lines.map((l) => `${l.quantity}× ${l.name}`).join(", ")}. Devolvido à carteira: <strong>{formatBRL(c.refundCents)}</strong>
                 {c.walletSeq !== null && c.balanceAfterCents !== null ? ` (lançamento nº ${c.walletSeq}, saldo depois: ${formatBRL(c.balanceAfterCents)})` : ""}
                 {c.reason ? ` · ${c.reason}` : ""}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {o.reschedules.length > 0 && (
+        <>
+          <h2>Reagendamentos</h2>
+          <ul className="plain-list" data-testid="order-reschedules">
+            {o.reschedules.map((r, index) => (
+              <li key={index}>
+                {when(r.at)} — a escola mudou a data de {longDayLabel(r.fromDate)} para <strong>{longDayLabel(r.toDate)}</strong>
+                {r.toShiftName && r.toShiftName !== r.fromShiftName ? ` (turno ${r.toShiftName})` : ""}. Pagamento e preços mantidos, sem nova cobrança.
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {o.exchanges.length > 0 && (
+        <>
+          <h2>Trocas de produto</h2>
+          <ul className="plain-list" data-testid="order-exchanges">
+            {o.exchanges.map((x, index) => (
+              <li key={index}>
+                {when(x.at)} — saiu {x.removed.map((l) => `${l.quantity}× ${l.name}`).join(", ")}; entrou {x.added.map((l) => `${l.quantity}× ${l.name}`).join(", ")}.{" "}
+                <strong>
+                  {x.differenceCents > 0 ? `Diferença cobrada: ${formatBRL(x.differenceCents)}` : x.differenceCents < 0 ? `Diferença devolvida à carteira: ${formatBRL(-x.differenceCents)}` : "Sem diferença de valor"}
+                </strong>
+                {x.walletSeq !== null && x.balanceAfterCents !== null ? ` (lançamento nº ${x.walletSeq}, saldo depois: ${formatBRL(x.balanceAfterCents)})` : ""}
               </li>
             ))}
           </ul>
