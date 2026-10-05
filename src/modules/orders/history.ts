@@ -230,7 +230,7 @@ export async function getOrderDetail(db: Firestore, actor: Actor, orderId: strin
     purchasedBy: role === "guardian" || role === "student" ? role : role ? "staff" : null,
     cancelDeadlineAt: cutoff,
     timeline: chronological([
-      { kind: "created", at: createdAt, label: "Pedido criado" },
+      { kind: "created", at: createdAt, label: view.channel === "counter" ? "Venda registrada no balcão" : "Pedido criado" },
       ...(view.paymentState === "paid" ? [{ kind: "paid" as const, at: createdAt, label: "Pago com o saldo da carteira" }] : []),
       ...(iso(d.preparingAt) ? [{ kind: "preparing" as const, at: iso(d.preparingAt), label: "Em preparo" }] : []),
       ...(iso(d.readyAt) ? [{ kind: "ready" as const, at: iso(d.readyAt), label: "Pronto para retirada" }] : []),

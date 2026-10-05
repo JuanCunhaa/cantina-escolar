@@ -181,6 +181,23 @@ export async function checkPurchase(
   return evaluatePurchase({ now, date: input.date, shiftId: input.shiftId, cutoffs: resolved.cutoffs, calendar: { weekdays: settings.weekdays, days }, settingsVersion: settings.version });
 }
 
+export type CounterCheck = { allowed: true } | { allowed: false; reason: "shift_unavailable" | "non_operating_day" };
+
+/**
+ * Funcionamento do BALCÃO (PDV, F15) em `date` (hoje): turno ativo e dia de funcionamento (calendário F05). NÃO aplica o horário de
+ * fechamento da compra antecipada (docs/domains/calendar.md: o fechamento antecipado não bloqueia o PDV no próprio dia) nem a
+ * janela de 7 dias; a data da venda é sempre a do servidor. Chamar dentro da transação da venda (`tx`).
+ */
+export async function checkCounterDay(db: Firestore, input: { shiftId: string; date: LocalDate }, tx?: Transaction): Promise<CounterCheck> {
+  const read = readerFor(tx);
+  const [shiftSnap, settingsSnap, daySnap] = await Promise.all([read(db.doc(`shifts/${input.shiftId}`)), read(db.doc(SETTINGS_PATH)), read(db.doc(`calendarDays/${input.date}`))]);
+  if ((shiftSnap.data() as { status?: string } | undefined)?.status !== "active") return { allowed: false, reason: "shift_unavailable" };
+  const settings = parseSettings(settingsSnap.data());
+  const kind = (daySnap.data() as { kind?: string } | undefined)?.kind;
+  const days: Record<LocalDate, CalendarDayKind> = kind === "extra" || kind === "closed" ? { [input.date]: kind } : {};
+  return isOperatingDay({ weekdays: settings.weekdays, days }, input.date) ? { allowed: true } : { allowed: false, reason: "non_operating_day" };
+}
+
 export type WindowDay = { date: LocalDate; operating: boolean; allowed: boolean; reason: PurchaseDenial | null; purchaseCutoffAt: string | null; cancelCutoffAt: string | null };
 export type PurchaseWindow = { timezone: string; serverNow: string; today: LocalDate; cutoffs: ShiftCutoffs; days: WindowDay[] };
 

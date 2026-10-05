@@ -13,7 +13,7 @@ type Loaded<T> = { status: "loading" | "ready" | "error"; data: T | null; errorC
  * uma GERAÇÃO: resposta de outra geração (filtro/conta trocados, tela desmontada) é descartada. Sem listener: a lista é
  * relida após cada comando, pelo botão Atualizar e ao voltar o foco à aba — nunca se confirma uma entrega por dado em cache.
  */
-export function useServerQuery<T>(user: User, path: string, query: string): Loaded<T> {
+export function useServerQuery<T>(user: User, path: string, query: string, enabled = true, refreshOnFocus = true): Loaded<T> {
   const [state, setState] = useState<{ key: string; status: "ready" | "error"; data: T | null; errorCode: string | null } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const generation = useRef(0);
@@ -34,14 +34,16 @@ export function useServerQuery<T>(user: User, path: string, query: string): Load
 
   // Trocar de conta/filtro cria um `load` novo, cujo `++generation` invalida as respostas da geração anterior.
   useEffect(() => {
+    if (!enabled) return;
     void load();
     const onFocus = () => {
       setRefreshing(true);
       void load();
     };
+    if (!refreshOnFocus) return;
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [load]);
+  }, [load, enabled, refreshOnFocus]);
 
   const current = state?.key === key ? state : null;
   return { status: current?.status ?? "loading", data: current?.data ?? null, errorCode: current?.errorCode ?? null, refreshing, reload: () => {
