@@ -49,3 +49,10 @@ Busca por nome: `students` por intervalo de prefixo em `nameNormalized` (custo =
 
 - `GET /api/orders/{id}` (detalhe, F12) lê também `orders/{id}/cancellations orderBy seq limit 100` (campo único, sem índice novo) e devolve `cancellations`, `refundedCents` e `cancelable` (responsável vinculado, situação aberta, restante > 0 e `policy.cancelCutoffAt` ainda no futuro pelo relógio do servidor; o comando revalida tudo).
 - Aba Cancelados: `status in [cancelled]` (lista fechada `STATUS_INFO`); extrato filtra `type == order_refund`. Nenhum listener novo: a tela confirma pela resposta do comando e relê o detalhe.
+
+### PDV de balcão (F15)
+
+- Lista do balcão: `students where status == "active" limit 1001` (campo único, sem índice novo) + `classes`/`shifts` por coleção (poucos documentos); a busca por nome/sobrenome/matrícula é filtro no navegador sobre a lista já carregada (sem leitura por tecla). Escola de ~300 alunos; passou de 1000, `truncated: true`.
+- Aluno escolhido: `students/{id}`, `studentPolicies/{id}`, `wallets/{id}`, `studentUsage/{id}/days/{hoje}` e `weeks/{segunda}` por `get` e `studentPolicies/{id}/exceptions where status == "active" and consumptionDate == hoje limit 10` (duas igualdades, sem composto).
+- Cardápio do balcão: `menuOverrides/{hoje}__{turno}`, `defaultMenuRules where shiftIds array-contains turno`, `products where status == "active"`, `categories` e `stockBalances/{produto}` por `getAll` (+ `lots` do planejado: `orderBy openKey startAt hoje limit 60`). Todas já usadas pelo portal/estoque; nenhum índice novo.
+- Venda: só `get`/`getAll` por ID dentro da transação (aluno, vínculo, política, exceção, carteira, uso, cardápio, estoque).
