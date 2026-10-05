@@ -245,7 +245,8 @@ test.describe("Venda direta sem aluno", () => {
     await login(page, cantina.email, "/operacao/pdv");
     for (const [width, height] of [[390, 800], [820, 1100]] as const) {
       await page.setViewportSize({ width, height });
-      await page.getByTestId("pos-student-search").waitFor({ timeout: 30000 }).catch(() => undefined);
+      // Na 2ª largura o aluno já está selecionado (a busca some): espera o que existir, sem esperar 30 s por algo que não aparece.
+      await expect(page.getByTestId("pos-student-search").or(page.getByTestId("pos-selected"))).toBeVisible({ timeout: 30000 });
       if (await page.getByTestId("pos-student-search").isVisible()) {
         await page.getByTestId("pos-student-search").fill(aluno.name);
         await page.getByTestId("pos-student-option").first().click();
