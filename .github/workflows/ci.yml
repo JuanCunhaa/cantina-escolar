@@ -38,7 +38,29 @@ jobs:
       - run: npm run test:rules
       - run: npm run test:integration
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      - name: Recursos do runner (início do e2e)
+        run: |
+          mkdir -p ci-diagnostics
+          scripts/ci/resource-snapshot.sh inicio-e2e >> ci-diagnostics/resources.txt
+      - name: npm run test:e2e
+        id: e2e
+        run: npm run test:e2e
+      # Observabilidade (só diagnóstico): recursos ao terminar e evidências do Playwright quando o e2e FALHA. O passo de testes
+      # segue definindo o status do job; estes passos não o mascaram. Só dados fictícios do emulador (nada de .env/segredos).
+      - name: Recursos do runner (fim do e2e)
+        if: always()
+        run: scripts/ci/resource-snapshot.sh fim-e2e-${{ steps.e2e.outcome }} >> ci-diagnostics/resources.txt
+      - name: Evidências do e2e (resultados, error-context, relatório e traces)
+        if: failure() && steps.e2e.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-evidencias-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            test-results/
+            playwright-report/
+            ci-diagnostics/
+          if-no-files-found: warn
+          retention-days: 7
       # Propagação entre sessões pelo listener (carteira, F08): registrada À PARTE, com o timeout padrão. Não bloqueia o
       # check enquanto o dono não decidir (PR #4/#5: atraso de listener inconclusivo); a falha fica visível no passo.
       - name: e2e — propagação entre sessões (listener, não bloqueante)
