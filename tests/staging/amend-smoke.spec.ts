@@ -60,7 +60,8 @@ test("validação: motivo, destino e diferença confirmada obrigatórios; campos
   for (const bad of [{ ...reschedule(), reason: "ok" }, { ...reschedule(), toDate: "amanhã" }, { ...reschedule(), amountCents: 1 }, { ...reschedule(), studentId: fam.studentId }, { ...reschedule(), key: "x" }]) {
     expect((await call(request, cantina, "POST", `${base}/reschedule`, bad)).status, JSON.stringify(bad)).toBe(400);
   }
-  const { expectedDifferenceCents: _omit, ...withoutDiff } = exchange();
+  const withoutDiff: Record<string, unknown> = { ...exchange() };
+  delete withoutDiff.expectedDifferenceCents;
   for (const bad of [withoutDiff, { ...exchange(), differenceCents: 1 }, { ...exchange(), priceCents: 1 }, { ...exchange(), add: [{ productId: "prd_x", quantity: 21, expectedPriceCents: 500 }] }, { ...exchange(), remove: [] }]) {
     expect((await call(request, cantina, "POST", `${base}/exchange`, bad)).status, JSON.stringify(bad)).toBe(400);
   }

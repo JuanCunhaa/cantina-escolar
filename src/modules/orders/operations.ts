@@ -107,7 +107,7 @@ export async function listDayOrders(db: Firestore, actor: Actor, rawQuery: unkno
         status,
         statusLabel: statusInfo(status).label,
         items: items.map(dayItem),
-        totalUnits: totals.scheduled,
+        totalUnits: totals.scheduled - totals.exchanged, // unidades trocadas (F16) saíram do pedido
         remainingUnits: isNotPickedUp(status) ? 0 : totals.remaining,
         needsResolution: status === NOT_PICKED_UP,
         version: Number(o.data.version ?? 1),

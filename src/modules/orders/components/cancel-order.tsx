@@ -38,7 +38,7 @@ export function CancelPanel({ user, order, onDone, onMessage }: { user: User; or
   const [other, setOther] = useState("");
   const remaining = order.items.filter((i) => i.remainingQty > 0);
   const chosen = remaining.map((i) => ({ item: i, quantity: toQty(qty[i.lineNo] ?? String(i.remainingQty), i.remainingQty) })).filter((l) => l.quantity > 0);
-  const estimate = chosen.reduce((sum, l) => sum + refundValueOf({ quantity: l.item.quantity, subtotalCents: l.item.subtotalCents, deliveredQty: l.item.deliveredQty, canceledQty: l.item.canceledQty }, l.quantity), 0);
+  const estimate = chosen.reduce((sum, l) => sum + refundValueOf({ quantity: l.item.quantity, subtotalCents: l.item.subtotalCents, deliveredQty: l.item.deliveredQty, canceledQty: l.item.canceledQty, exchangedQty: l.item.exchangedQty }, l.quantity), 0);
   const reason = preset === OTHER ? other.trim() : preset;
   const total = chosen.length === remaining.length && chosen.every((l) => l.quantity === l.item.remainingQty);
 
