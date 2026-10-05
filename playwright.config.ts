@@ -16,8 +16,9 @@ export default defineConfig({
   workers: 1,
   globalTeardown: "./tests/helpers/ci-resource-teardown.ts",
   reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
-  // Traces só das falhas (observabilidade do CI): sem efeito em tempos, tentativas ou asserções.
-  use: { baseURL: "http://127.0.0.1:3100", trace: "retain-on-failure" },
+  // Evidência barata das falhas (captura de tela só quando falha). Traces NÃO ficam ligados por padrão: medidos no CI (2 CPUs) o
+  // e2e passou de ~6,5–7 min para ~12 min e houve falhas por tempo; instrumento não pode perturbar o que mede.
+  use: { baseURL: "http://127.0.0.1:3100", screenshot: "only-on-failure" },
   webServer: {
     command: "npx next dev --webpack -p 3100",
     url: "http://127.0.0.1:3100",
