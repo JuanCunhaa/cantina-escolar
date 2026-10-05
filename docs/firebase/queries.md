@@ -56,3 +56,8 @@ Busca por nome: `students` por intervalo de prefixo em `nameNormalized` (custo =
 - Aluno escolhido: `students/{id}`, `studentPolicies/{id}`, `wallets/{id}`, `studentUsage/{id}/days/{hoje}` e `weeks/{segunda}` por `get` e `studentPolicies/{id}/exceptions where status == "active" and consumptionDate == hoje limit 10` (duas igualdades, sem composto).
 - Cardápio do balcão: `menuOverrides/{hoje}__{turno}`, `defaultMenuRules where shiftIds array-contains turno`, `products where status == "active"`, `categories` e `stockBalances/{produto}` por `getAll` (+ `lots` do planejado: `orderBy openKey startAt hoje limit 60`). Todas já usadas pelo portal/estoque; nenhum índice novo.
 - Venda: só `get`/`getAll` por ID dentro da transação (aluno, vínculo, política, exceção, carteira, uso, cardápio, estoque).
+
+### Reagendamento e troca (F16)
+
+- `GET /api/operations/orders/{id}/amend-options` (`orders.amend`): pedido e aluno por ID; janela hoje…hoje+7 do turno ATUAL do aluno (`purchaseWindow`, mesma leitura do cardápio da família; horário encerrado vira `cutoffPassed`); produtos do canal antecipado na data/turno DO PEDIDO (exceção da data por ID + `defaultMenuRules where shiftIds array-contains` + `products where status ==` + categorias, iguais ao cardápio da F07). Sem índice novo.
+- Comandos leem por ID dentro da transação: pedido, aluno, política, exceção, carteira, cardápio da data, uso dia/semana (origem e destino), saldo/lotes/reservas/cotas pelo `StockSession`. Detalhe da família: `orders/{id}/reschedules` e `orders/{id}/exchanges` ordenados por `seq` (campo único, sem composto). Extrato com `type == "order_exchange"` usa a mesma consulta/índice do filtro por tipo da F12.

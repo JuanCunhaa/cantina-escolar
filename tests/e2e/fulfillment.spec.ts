@@ -177,7 +177,7 @@ test.describe("Pedidos do dia e entrega (A19/A22/A27)", () => {
 });
 
 test.describe("Não retirado e resolução (A27)", () => {
-  test("cantina marca com motivo e não resolve; administração resolve com cobrança mantida; reembolso/reagendamento ficam como pendência", async ({ page, request }) => {
+  test("cantina marca com motivo e não resolve; administração resolve com cobrança mantida; reembolso e reagendamento disponíveis", async ({ page, request }) => {
     const item = await product(request, "Torta", 600);
     const davi = await student("Davi");
     await order(request, davi.id, item, 2, true);
@@ -202,10 +202,9 @@ test.describe("Não retirado e resolução (A27)", () => {
     await switchTo(page, admin.email, "/operacao/pedidos");
     await expect(rowOf(page, davi.name)).toBeVisible({ timeout: 30000 });
     await rowOf(page, davi.name).getByTestId("resolve-toggle").click();
-    const form = rowOf(page, davi.name).getByTestId("resolve-form");
-    await expect(form.getByTestId("resolve-pending")).toContainText("depende da F16");
+    const form = rowOf(page, davi.name).getByTestId("resolve-panel");
     await expect(form.getByTestId("resolution-refund")).toBeEnabled(); // cancelar e reembolsar existe desde a F14 (provado em e2e/cancellation.spec.ts)
-    await expect(form.getByRole("button", { name: "Reagendar para outra data" })).toBeDisabled();
+    await expect(form.getByTestId("resolution-reschedule")).toBeEnabled(); // reagendar existe desde a F16 (provado em e2e/amend.spec.ts)
     await expect(form.getByTestId("resolve-submit")).toBeDisabled(); // motivo obrigatório
     await form.getByLabel(/Motivo \/ política aplicada/).fill("Política da escola: cobrança mantida");
     await form.getByTestId("resolve-submit").click();

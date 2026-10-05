@@ -15,7 +15,7 @@ import {
 } from "./history-model";
 
 import { decodeCursor, encodeCursor } from "./history-cursor";
-import { CLASSIFICATION_LABEL, REFUNDED_CLASSIFICATION, RETAINED_CLASSIFICATION, canceledOf, deliveredOf, isOpenStatus, remainingOf, totalsOf } from "./fulfillment-model";
+import { CLASSIFICATION_LABEL, REFUNDED_CLASSIFICATION, RETAINED_CLASSIFICATION, canceledOf, deliveredOf, exchangedOf, isOpenStatus, remainingOf, totalsOf } from "./fulfillment-model";
 import type { OrderItem } from "./model";
 
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -31,6 +31,7 @@ const iso = (value: unknown): string | null => (value && typeof (value as Timest
 function toItem(raw: unknown): OrderItemView | null {
   const i = raw as Record<string, unknown> | null;
   if (!i || typeof i.name !== "string") return null;
+  const progress = { quantity: Number(i.quantity), deliveredQty: Number(i.deliveredQty ?? 0), canceledQty: Number(i.canceledQty ?? 0), exchangedQty: Number(i.exchangedQty ?? 0) };
   return {
     lineNo: Number(i.lineNo),
     productId: String(i.productId ?? ""),
@@ -40,9 +41,11 @@ function toItem(raw: unknown): OrderItemView | null {
     unitPriceCents: Number(i.unitPriceCents),
     discountCents: Number(i.discountCents ?? 0),
     subtotalCents: Number(i.subtotalCents),
-    deliveredQty: deliveredOf({ quantity: Number(i.quantity), deliveredQty: Number(i.deliveredQty ?? 0) }),
-    canceledQty: canceledOf({ quantity: Number(i.quantity), canceledQty: Number(i.canceledQty ?? 0) }),
-    remainingQty: remainingOf({ quantity: Number(i.quantity), deliveredQty: Number(i.deliveredQty ?? 0), canceledQty: Number(i.canceledQty ?? 0) }),
+    deliveredQty: deliveredOf(progress),
+    canceledQty: canceledOf(progress),
+    exchangedQty: exchangedOf(progress),
+    remainingQty: remainingOf(progress),
+    fromExchange: Boolean(i.exchange),
   };
 }
 
@@ -183,13 +186,31 @@ export async function getOrderDetail(db: Firestore, actor: Actor, orderId: strin
   await authorizeStudent(db, actor, d.studentId, "orders.read");
 
   const entryId = typeof d.walletEntryId === "string" && ID.test(d.walletEntryId) ? d.walletEntryId : null;
-  const [names, entry, deliveriesSnap, cancellationsSnap] = await Promise.all([
-    shiftNamesOf(db, [String(d.shiftId ?? "")]),
+  const [entry, deliveriesSnap, cancellationsSnap, reschedulesSnap, exchangesSnap] = await Promise.all([
     entryId ? db.doc(`wallets/${d.studentId}/entries/${entryId}`).get() : Promise.resolve(null),
     db.collection(`orders/${snap.id}/deliveries`).orderBy("seq").limit(100).get(),
     db.collection(`orders/${snap.id}/cancellations`).orderBy("seq").limit(100).get(),
+    db.collection(`orders/${snap.id}/reschedules`).orderBy("seq").limit(100).get(),
+    db.collection(`orders/${snap.id}/exchanges`).orderBy("seq").limit(100).get(),
   ]);
+  const shiftOf = (x: FirebaseFirestore.QueryDocumentSnapshot, side: "from" | "to") => String((x.get(side) as { shiftId?: unknown } | undefined)?.shiftId ?? "");
+  const names = await shiftNamesOf(db, [String(d.shiftId ?? ""), ...reschedulesSnap.docs.flatMap((x) => [shiftOf(x, "from"), shiftOf(x, "to")])]);
   const view = toOrderView(snap.id, d, names);
+  const reschedules = reschedulesSnap.docs.map((x) => ({
+    at: iso(x.get("createdAt")),
+    fromDate: String((x.get("from") as { date?: unknown } | undefined)?.date ?? ""),
+    toDate: String((x.get("to") as { date?: unknown } | undefined)?.date ?? ""),
+    fromShiftName: names.get(shiftOf(x, "from")) ?? null,
+    toShiftName: names.get(shiftOf(x, "to")) ?? null,
+  }));
+  const exchanges = exchangesSnap.docs.map((x) => ({
+    at: iso(x.get("createdAt")),
+    removed: ((x.get("removed") as { name?: unknown; quantity?: unknown; creditCents?: unknown }[] | undefined) ?? []).map((l) => ({ name: String(l.name ?? ""), quantity: Number(l.quantity ?? 0), creditCents: Number(l.creditCents ?? 0) })),
+    added: ((x.get("added") as { name?: unknown; quantity?: unknown; subtotalCents?: unknown }[] | undefined) ?? []).map((l) => ({ name: String(l.name ?? ""), quantity: Number(l.quantity ?? 0), subtotalCents: Number(l.subtotalCents ?? 0) })),
+    differenceCents: Number(x.get("differenceCents") ?? 0),
+    walletSeq: typeof x.get("walletSeq") === "number" ? Number(x.get("walletSeq")) : null,
+    balanceAfterCents: typeof x.get("balanceAfterCents") === "number" ? Number(x.get("balanceAfterCents")) : null,
+  }));
   const role = d.createdByRole;
   const policy = (d.policy ?? {}) as { cancelCutoffAt?: unknown };
   const createdAt = view.createdAt;
@@ -217,10 +238,10 @@ export async function getOrderDetail(db: Firestore, actor: Actor, orderId: strin
   const nonPickup = np
     ? {
         resolved,
-        kind: np.resolution?.kind === "cancel_refund" ? ("cancel_refund" as const) : np.resolution?.kind === "close_charged" ? ("close_charged" as const) : null,
+        kind: np.resolution?.kind === "cancel_refund" ? ("cancel_refund" as const) : np.resolution?.kind === "close_charged" ? ("close_charged" as const) : np.resolution?.kind === "reschedule" ? ("reschedule" as const) : null,
         markedAt: iso(np.markedAt),
         resolvedAt: iso(np.resolution?.resolvedAt),
-        retainedCents: resolved ? (np.resolution?.kind === "cancel_refund" ? 0 : Number(np.resolution?.amountCents ?? 0)) : Number(np.remainingCents ?? 0),
+        retainedCents: resolved ? (np.resolution?.kind === "close_charged" ? Number(np.resolution?.amountCents ?? 0) : 0) : Number(np.remainingCents ?? 0),
         refundCents: resolved && np.resolution?.kind === "cancel_refund" ? Number(np.resolution?.amountCents ?? 0) : null,
         classification: np.resolution?.classification === RETAINED_CLASSIFICATION ? CLASSIFICATION_LABEL[RETAINED_CLASSIFICATION] : np.resolution?.classification === REFUNDED_CLASSIFICATION ? CLASSIFICATION_LABEL[REFUNDED_CLASSIFICATION] : null,
       }
@@ -237,8 +258,16 @@ export async function getOrderDetail(db: Firestore, actor: Actor, orderId: strin
       ...deliveries.map((x) => ({ kind: "delivery" as const, at: x.at, label: `Entrega: ${x.lines.map((l) => `${l.quantity}× ${l.name}`).join(", ")}` })),
       ...cancellations.map((c) => ({ kind: "cancellation" as const, at: c.at, label: `${c.by === "guardian" ? "Cancelado pelo responsável" : "Cancelado pela escola"}: ${c.lines.map((l) => `${l.quantity}× ${l.name}`).join(", ")}` })),
       ...(nonPickup ? [{ kind: "not_picked_up" as const, at: nonPickup.markedAt, label: "Marcado como não retirado" }] : []),
-      ...(nonPickup?.resolved ? [{ kind: "resolved" as const, at: nonPickup.resolvedAt, label: nonPickup.kind === "cancel_refund" ? "Encerrado: cancelado e reembolsado à carteira" : "Encerrado com cobrança mantida" }] : []),
+      ...(nonPickup?.resolved && nonPickup.kind !== "reschedule" ? [{ kind: "resolved" as const, at: nonPickup.resolvedAt, label: nonPickup.kind === "cancel_refund" ? "Encerrado: cancelado e reembolsado à carteira" : "Encerrado com cobrança mantida" }] : []),
+      ...reschedules.map((r) => ({ kind: "reschedule" as const, at: r.at, label: `Reagendado pela escola: de ${r.fromDate} para ${r.toDate}${r.toShiftName && r.toShiftName !== r.fromShiftName ? ` (${r.toShiftName})` : ""} — sem nova cobrança` })),
+      ...exchanges.map((x) => ({
+        kind: "exchange" as const,
+        at: x.at,
+        label: `Troca pela escola: ${x.removed.map((l) => `${l.quantity}× ${l.name}`).join(", ")} → ${x.added.map((l) => `${l.quantity}× ${l.name}`).join(", ")}`,
+      })),
     ]),
+    reschedules,
+    exchanges,
     cancellations,
     cancelable,
     deliveries,

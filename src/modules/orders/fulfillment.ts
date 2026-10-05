@@ -9,7 +9,6 @@ import { auditInTransaction } from "@/modules/audit/log";
 import { openStockSession } from "@/modules/inventory/session";
 import { statusInfo } from "./history-model";
 import {
-  PENDING_RESOLUTIONS,
   REFUNDED_CLASSIFICATION,
   RETAINED_CLASSIFICATION,
   aggregateStatus,
@@ -27,6 +26,7 @@ import {
   deliveryRevenueOf,
   remainingValueOf,
 } from "./fulfillment-model";
+import { planReschedule } from "./amend";
 import { planCancellation } from "./cancellation";
 import { itemsView, otherOrdersCovering, readOrder, sessionActor, type OrderState } from "./order-state";
 
@@ -199,6 +199,8 @@ export async function markNotPickedUp(db: Firestore, actor: Actor, raw: unknown,
     const stamp = FieldValue.serverTimestamp();
     tx.update(order.ref, {
       status,
+      // Pedido reagendado depois de uma não retirada e de novo não retirado: o registro anterior (já resolvido) vai para o histórico.
+      ...(order.data.nonPickup ? { nonPickupHistory: FieldValue.arrayUnion(order.data.nonPickup) } : {}),
       nonPickup: { markedAt: stamp, markedByUid: current.uid, markedByRole: current.role ?? null, reason: input.reason, remainingUnits: totals.remaining, remainingCents, resolution: null },
       version: order.version + 1,
       updatedAt: stamp,
@@ -221,8 +223,9 @@ export type ResolveResult = {
   status: string;
   statusLabel: string;
   version: number;
-  resolution: "close_charged" | "cancel_refund";
-  classification: typeof RETAINED_CLASSIFICATION | typeof REFUNDED_CLASSIFICATION;
+  resolution: "close_charged" | "cancel_refund" | "reschedule";
+  /** `reschedule` não é encerramento financeiro: sem classificação (o pedido volta a "pago · aguardando entrega" no destino). */
+  classification: typeof RETAINED_CLASSIFICATION | typeof REFUNDED_CLASSIFICATION | null;
   /** Valor já pago e MANTIDO pela escola (`close_charged`); 0 em `cancel_refund`. */
   retainedCents: number;
   /** Valor devolvido à carteira ORIGINAL do aluno (`cancel_refund`); 0 em `close_charged`. */
@@ -233,6 +236,8 @@ export type ResolveResult = {
   /** Unidades de OUTROS pedidos que ficaram sem lastro físico por causa do descarte (0 = nenhuma) e os pedidos a tratar. */
   shortfallUnits: number;
   affectedOrders: string[];
+  /** Só em `reschedule`: novo destino do pedido. */
+  rescheduledTo?: { date: string; shiftId: string; cutoffOverride: boolean };
 };
 
 /**
@@ -241,18 +246,16 @@ export type ResolveResult = {
  * reembolso, sem receita duplicada). As unidades restantes saem da reserva (voltam à disponibilidade, sem entrada
  * fictícia) e SÓ as listadas em `discards` viram perda, com movimento de perda explícito pelo estoque.
  * `cancel_refund` (F14) = cancelar e REEMBOLSAR o restante não retirado à carteira original (valor pago registrado, mesmo
- * ponto de liquidação do cancelamento: livro, reserva/cota, uso da F09 e auditoria na mesma transação). Reagendar (F16) ainda
- * não existe: é recusado com a pendência explícita, sem simular conclusão.
+ * ponto de liquidação do cancelamento: livro, reserva/cota, uso da F09 e auditoria na mesma transação). `reschedule` (F16) =
+ * reagendar o restante não retirado para outra data/turno do aluno pelo MESMO planejamento do reagendamento da equipe
+ * (`planReschedule`: libera a origem, revalida destino/cardápio/cota/limites, mantém pagamento e preços, sem lançamento).
  */
-export async function resolveNotPickedUp(db: Firestore, actor: Actor, raw: unknown): Promise<ResolveResult & { replayed: boolean }> {
+export async function resolveNotPickedUp(db: Firestore, actor: Actor, raw: unknown, clock: () => Date = () => new Date()): Promise<ResolveResult & { replayed: boolean }> {
   authorize(actor, "orders.resolve");
   const input = resolveSchema.parse(raw);
-  if (input.resolution === "reschedule") {
-    const pending = PENDING_RESOLUTIONS[input.resolution];
-    throw conflict("resolution_unavailable", `${pending.label}: ainda não disponível.`, { resolution: input.resolution, availableIn: pending.task });
-  }
   return runIdempotentCommand(db, actor, { scope: "orders.resolve", key: input.key, payload: input, allow: allowResolve }, async ({ tx, actor: current, auditId }) => {
-    const today = localDateOf(new Date());
+    const now = clock();
+    const today = localDateOf(now);
     const order = await readOrder(tx, db, input.orderId);
     if (order.status === "not_picked_up_closed" || order.data.nonPickup?.resolution) throw conflict("already_resolved", "Este pedido já foi resolvido.");
     if (order.status !== "not_picked_up") throw conflict("invalid_transition", "Só pedidos marcados como não retirados podem ser resolvidos.", { status: order.status });
@@ -266,6 +269,7 @@ export async function resolveNotPickedUp(db: Firestore, actor: Actor, raw: unkno
     }
 
     if (input.resolution === "cancel_refund") return refundNotPickedUp(db, tx, { order, current, auditId, input, today });
+    if (input.resolution === "reschedule") return rescheduleNotPickedUp(db, tx, { order, current, auditId, input, today, now });
 
     const stock = openStockSession(db, tx, { today, actor: sessionActor(current) });
     const losses: { lineNo: number; productId: string; quantity: number; movementId: string }[] = [];
@@ -412,5 +416,76 @@ async function refundNotPickedUp(
     discardedUnits: plan.discardedUnits,
     shortfallUnits: plan.shortfallUnits,
     affectedOrders: plan.affectedOrders,
+  };
+}
+
+/**
+ * `reschedule` (F16): o restante não retirado vai para outra data/turno pelo MESMO `planReschedule` do comando da equipe. O pedido
+ * volta a "pago · aguardando entrega" no destino (sem cobrança nova, preços preservados); a resolução fica em
+ * `nonPickup.resolution` (kind `reschedule`) e o evento em `orders/{id}/reschedules`. Pedido com parte entregue é recusado.
+ */
+async function rescheduleNotPickedUp(
+  db: Firestore,
+  tx: FirebaseFirestore.Transaction,
+  p: { order: OrderState; current: Actor; auditId: string; input: ResolveInput; today: string; now: Date },
+): Promise<ResolveResult> {
+  const { order, current, input } = p;
+  const rescheduleId = deterministicId("rsc", current.uid, input.key);
+  const plan = await planReschedule(db, tx, {
+    order,
+    actor: current,
+    now: p.now,
+    today: p.today,
+    rescheduleId,
+    kind: "not_picked_up",
+    reason: input.reason,
+    toDate: input.toDate!,
+    toShiftId: input.toShiftId!,
+    overrideCutoff: input.overrideCutoff,
+    exceptionId: input.exceptionId,
+  });
+  plan.commit();
+  tx.update(order.ref, {
+    ...plan.orderPatch(),
+    nonPickup: {
+      ...((order.data.nonPickup ?? {}) as Record<string, unknown>),
+      resolution: {
+        kind: "reschedule",
+        classification: null,
+        amountCents: 0,
+        rescheduleId,
+        to: plan.to,
+        cutoffOverride: plan.cutoffOverride,
+        reason: input.reason,
+        resolvedByUid: current.uid,
+        resolvedByRole: current.role ?? null,
+        resolvedAt: FieldValue.serverTimestamp(),
+      },
+    },
+  });
+  auditInTransaction(db, tx, p.auditId, {
+    action: "orders.resolve_not_picked_up",
+    actorUid: current.uid,
+    actorRole: current.role ?? null,
+    target: { type: "order", id: input.orderId },
+    reason: input.reason,
+    before: { status: order.status, consumptionDate: plan.from.date, shiftId: plan.from.shiftId },
+    after: { status: plan.status, resolution: "reschedule", rescheduleId, consumptionDate: plan.to.date, shiftId: plan.to.shiftId, movedUnits: plan.movedUnits, cutoffOverride: plan.cutoffOverride, override: plan.override, charged: 0 },
+  });
+  return {
+    orderId: input.orderId,
+    status: plan.status,
+    statusLabel: statusInfo(plan.status).label,
+    version: order.version + 1,
+    resolution: "reschedule",
+    classification: null,
+    retainedCents: 0,
+    refundCents: 0,
+    wallet: null,
+    returnedUnits: 0,
+    discardedUnits: 0,
+    shortfallUnits: 0,
+    affectedOrders: [],
+    rescheduledTo: { ...plan.to, cutoffOverride: plan.cutoffOverride },
   };
 }

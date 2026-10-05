@@ -26,12 +26,18 @@ export const CANCELLED = "cancelled";
 export const isOpenStatus = (status: string): boolean => (OPEN_STATUSES as readonly string[]).includes(status);
 export const isNotPickedUp = (status: string): boolean => status === NOT_PICKED_UP || status === NOT_PICKED_UP_CLOSED;
 
-/** Progresso de uma linha. Pedidos anteriores à F13 não têm os campos: contam como zero. */
-export type ItemProgress = { quantity: number; deliveredQty?: number; canceledQty?: number };
+/**
+ * Progresso de uma linha. Pedidos anteriores à F13 não têm os campos: contam como zero. `exchangedQty` (F16) = unidades
+ * TROCADAS por outro produto: saíram desta linha (o valor pago delas foi aproveitado na troca) e nunca voltam a ser restantes.
+ */
+export type ItemProgress = { quantity: number; deliveredQty?: number; canceledQty?: number; exchangedQty?: number };
 export const deliveredOf = (i: ItemProgress): number => i.deliveredQty ?? 0;
 export const canceledOf = (i: ItemProgress): number => i.canceledQty ?? 0;
+export const exchangedOf = (i: ItemProgress): number => i.exchangedQty ?? 0;
+/** Unidades já liquidadas (entregues, canceladas ou trocadas). */
+export const settledOf = (i: ItemProgress): number => deliveredOf(i) + canceledOf(i) + exchangedOf(i);
 /** Unidades ainda por entregar: nunca negativo. */
-export const remainingOf = (i: ItemProgress): number => Math.max(0, i.quantity - deliveredOf(i) - canceledOf(i));
+export const remainingOf = (i: ItemProgress): number => Math.max(0, i.quantity - settledOf(i));
 
 /**
  * Valor (centavos) de `units` unidades de uma linha, proporcional ao subtotal PAGO. `subtotalCents` é o que de fato foi
@@ -47,23 +53,25 @@ export const valueOfUnits = (item: { quantity: number; subtotalCents: number }, 
  * pago, sem deriva de centavos e em qualquer ordem entre entregas e cancelamentos (o acumulado é o de entregues + canceladas e
  * cada operação recebe a diferença do acumulado antes/depois).
  */
-export const remainingValueOf = (item: { quantity: number; subtotalCents: number; deliveredQty?: number; canceledQty?: number }): number =>
-  Math.max(0, item.subtotalCents - valueOfUnits(item, (item.deliveredQty ?? 0) + (item.canceledQty ?? 0)));
-type Settling = { quantity: number; subtotalCents: number; deliveredQty?: number; canceledQty?: number };
-/** Valor (centavos) que sai do saldo "a liquidar" da linha ao liquidar mais `units` unidades (entregar OU cancelar). */
+type Settling = { quantity: number; subtotalCents: number; deliveredQty?: number; canceledQty?: number; exchangedQty?: number };
+export const remainingValueOf = (item: Settling): number => Math.max(0, item.subtotalCents - valueOfUnits(item, settledOf(item)));
+/** Valor (centavos) que sai do saldo "a liquidar" da linha ao liquidar mais `units` unidades (entregar, cancelar OU trocar). */
 const settledDelta = (item: Settling, units: number): number => {
-  const settled = (item.deliveredQty ?? 0) + (item.canceledQty ?? 0);
+  const settled = settledOf(item);
   return valueOfUnits(item, settled + units) - valueOfUnits(item, settled);
 };
 /** Receita da entrega de `units` unidades: diferença do acumulado (entregues + canceladas); Σ entregas + Σ reembolsos = subtotal da linha. */
 export const deliveryRevenueOf = (item: Settling, units: number): number => settledDelta(item, units);
 /** Reembolso (centavos) de `units` unidades ainda não entregues da linha: o valor PAGO registrado no pedido, rateado por acumulado. */
 export const refundValueOf = (item: Settling, units: number): number => settledDelta(item, units);
+/** Crédito da troca (F16) por `units` unidades ainda não entregues: o valor PAGO delas, pelo mesmo rateio por acumulado. */
+export const exchangeCreditOf = (item: Settling, units: number): number => settledDelta(item, units);
 
 export const totalsOf = (items: readonly ItemProgress[]) => ({
   scheduled: items.reduce((n, i) => n + i.quantity, 0),
   delivered: items.reduce((n, i) => n + deliveredOf(i), 0),
   canceled: items.reduce((n, i) => n + canceledOf(i), 0),
+  exchanged: items.reduce((n, i) => n + exchangedOf(i), 0),
   remaining: items.reduce((n, i) => n + remainingOf(i), 0),
 });
 
@@ -137,11 +145,18 @@ export const cancelSchema = z
   .transform((v) => ({ ...v, lines: v.lines ? sortedLines(v.lines) : undefined, discards: sortedLines(v.discards) }));
 export type CancelInput = z.infer<typeof cancelSchema>;
 
-/** Resoluções previstas pelo produto. `close_charged` (F13) e `cancel_refund` (F14) existem; `reschedule` é da F16 e é recusada explicitamente. */
+/** Resoluções previstas pelo produto: `close_charged` (F13), `cancel_refund` (F14) e `reschedule` (F16, mesmo planejamento do reagendamento). */
 export const RESOLUTIONS = ["close_charged", "cancel_refund", "reschedule"] as const;
 export type Resolution = (typeof RESOLUTIONS)[number];
-export const PENDING_RESOLUTIONS: Record<Exclude<Resolution, "close_charged" | "cancel_refund">, { task: "F16"; label: string }> = {
-  reschedule: { task: "F16", label: "Reagendar para outra data (chega com a F16)" },
+
+/** Destino de um reagendamento (F16): data e turno, exceção opcional de limite e a exceção OPERACIONAL de horário, explícita. */
+export const destinationShape = {
+  toDate: z.string().refine(isLocalDate, "Data inválida."),
+  toShiftId: z.string().regex(ID),
+  /** A equipe confirma conscientemente que o horário de compra do destino já fechou (exceção operacional auditada). */
+  overrideCutoff: z.boolean().default(false),
+  /** Exceção de uso único (autorização do responsável ou administrativa) para cobrir limite do destino. */
+  exceptionId: z.string().regex(ID).optional(),
 };
 
 export const resolveSchema = z
@@ -152,9 +167,14 @@ export const resolveSchema = z
     reason,
     /** Unidades que serão DESCARTADAS (perda explícita). O que não for listado volta à disponibilidade sem perda. */
     discards: z.array(qtyLine).max(MAX_LINES_PER_DATE).default([]),
+    toDate: destinationShape.toDate.optional(),
+    toShiftId: destinationShape.toShiftId.optional(),
+    overrideCutoff: destinationShape.overrideCutoff,
+    exceptionId: destinationShape.exceptionId,
   })
   .strict()
   .refine((v) => new Set(v.discards.map((l) => l.lineNo)).size === v.discards.length, "Linha repetida.")
+  .refine((v) => (v.resolution === "reschedule" ? Boolean(v.toDate && v.toShiftId) && v.discards.length === 0 : !v.toDate && !v.toShiftId && !v.overrideCutoff && !v.exceptionId), "Destino só no reagendamento (e sem descarte).")
   .transform((v) => ({ ...v, discards: [...v.discards].sort((a, b) => a.lineNo - b.lineNo) }));
 export type ResolveInput = z.infer<typeof resolveSchema>;
 
@@ -186,7 +206,7 @@ export const dayQuerySchema = z
   .strict();
 export type DayQuery = z.infer<typeof dayQuerySchema>;
 
-export type DayItemView = { lineNo: number; productId: string; name: string; quantity: number; deliveredQty: number; canceledQty: number; remainingQty: number };
+export type DayItemView = { lineNo: number; productId: string; name: string; quantity: number; deliveredQty: number; canceledQty: number; exchangedQty: number; remainingQty: number };
 export type DayOrderView = {
   orderId: string;
   studentId: string;
@@ -233,7 +253,7 @@ export function aggregatePreparation(orders: readonly PrepOrder[]): PrepRow[] {
     for (const item of o.items) {
       const key = `${o.consumptionDate}|${o.shiftId}|${item.productId}`;
       const row = rows.get(key) ?? { productId: item.productId, name: item.name, consumptionDate: o.consumptionDate, shiftId: o.shiftId, scheduled: 0, canceled: 0, delivered: 0, remaining: 0, notPickedUp: 0 };
-      row.scheduled += item.quantity;
+      row.scheduled += item.quantity - exchangedOf(item); // unidades trocadas saíram do pedido (a linha nova as substitui)
       row.canceled += canceledOf(item);
       row.delivered += deliveredOf(item);
       if (isNotPickedUp(o.status)) row.notPickedUp += remainingOf(item);

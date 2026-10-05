@@ -10,7 +10,7 @@ import { conflict } from "@/lib/domain-error";
 export const MAX_TRANSFER_CENTS = 500_000; // R$ 5.000,00 por operação
 export const MAX_BALANCE_CENTS = 100_000_000; // R$ 1.000.000,00: teto de sanidade do saldo (inteiro seguro com folga)
 
-export const ENTRY_TYPES = ["topup", "advance_purchase", "counter_purchase", "order_refund", "transfer_out", "transfer_in", "adjustment"] as const;
+export const ENTRY_TYPES = ["topup", "advance_purchase", "counter_purchase", "order_refund", "order_exchange", "transfer_out", "transfer_in", "adjustment"] as const;
 export type EntryType = (typeof ENTRY_TYPES)[number];
 
 const ID = /^[A-Za-z0-9_-]{1,128}$/;

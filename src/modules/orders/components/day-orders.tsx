@@ -6,8 +6,9 @@ import type { User } from "firebase/auth";
 import { localDateOf } from "@/lib/dates/school-time";
 import { formatBRL } from "@/lib/money/format";
 import { longDayLabel } from "@/modules/menu/format";
-import { PENDING_RESOLUTIONS, isOpenStatus, type DayOrderView, type DayOrders, type Preparation } from "../fulfillment-model";
+import { isOpenStatus, type DayOrderView, type DayOrders, type Preparation } from "../fulfillment-model";
 import { useOrderCommand, useServerQuery, type CommandMessage } from "../use-operations";
+import { ExchangeForm, RescheduleForm } from "./amend-order";
 import { toQty } from "./qty";
 
 type Filters = { date: string; shiftId: string; classId: string; status: string; q: string };
@@ -42,9 +43,11 @@ function Notice({ message, testId }: { message: CommandMessage | null; testId: s
 }
 
 /** Ações de UM pedido: entregar tudo, entrega parcial por quantidade, preparo, não retirado e (administração) resolução. */
-function OrderActions({ user, order, canDeliver, canResolve, canCancel, canDiscard, onDone }: { user: User; order: DayOrderView; canDeliver: boolean; canResolve: boolean; canCancel: boolean; canDiscard: boolean; onDone: () => void }) {
+function OrderActions({ user, order, canDeliver, canResolve, canCancel, canDiscard, canAmend, onDone, onNotice }: { user: User; order: DayOrderView; canDeliver: boolean; canResolve: boolean; canCancel: boolean; canDiscard: boolean; canAmend: boolean; onDone: () => void; onNotice: (message: CommandMessage) => void }) {
   const cmd = useOrderCommand(user, onDone);
-  const [panel, setPanel] = useState<"partial" | "notpicked" | "resolve" | "cancel" | null>(null);
+  const [panel, setPanel] = useState<"partial" | "notpicked" | "resolve" | "cancel" | "reschedule" | "exchange" | null>(null);
+  const today = localDateOf(new Date());
+  const nothingDelivered = order.items.every((i) => i.deliveredQty === 0);
   const [qty, setQty] = useState<Record<number, string>>({});
   const [reason, setReason] = useState("");
   const base = `/api/operations/orders/${encodeURIComponent(order.orderId)}`;
@@ -87,6 +90,16 @@ function OrderActions({ user, order, canDeliver, canResolve, canCancel, canDisca
       {open && canCancel && remaining.length > 0 && (
         <button type="button" className="secondary" aria-expanded={panel === "cancel"} disabled={cmd.busy} onClick={() => setPanel(panel === "cancel" ? null : "cancel")} data-testid="cancel-toggle">
           Cancelar / reembolsar
+        </button>
+      )}
+      {open && canAmend && nothingDelivered && remaining.length > 0 && (order.consumptionDate >= today || canResolve) && (
+        <button type="button" className="secondary" aria-expanded={panel === "reschedule"} disabled={cmd.busy} onClick={() => setPanel(panel === "reschedule" ? null : "reschedule")} data-testid="reschedule-toggle">
+          {order.consumptionDate > today ? "Antecipar / reagendar" : "Reagendar"}
+        </button>
+      )}
+      {open && canAmend && remaining.length > 0 && order.consumptionDate >= today && (
+        <button type="button" className="secondary" aria-expanded={panel === "exchange"} disabled={cmd.busy} onClick={() => setPanel(panel === "exchange" ? null : "exchange")} data-testid="exchange-toggle">
+          Trocar produto
         </button>
       )}
       {order.status === "not_picked_up" && canResolve && (
@@ -142,27 +155,21 @@ function OrderActions({ user, order, canDeliver, canResolve, canCancel, canDisca
       )}
 
       {panel === "cancel" && <CancelForm order={order} busy={cmd.busy} run={cmd.run} canDiscard={canDiscard} onClose={() => setPanel(null)} />}
-      {panel === "resolve" && <ResolveForm order={order} busy={cmd.busy} run={cmd.run} base={base} onClose={() => setPanel(null)} />}
+      {panel === "resolve" && <ResolveForm user={user} order={order} busy={cmd.busy} run={cmd.run} base={base} onClose={() => setPanel(null)} onNotice={onNotice} />}
+      {panel === "reschedule" && <RescheduleForm user={user} order={order} busy={cmd.busy} run={cmd.run} onClose={() => setPanel(null)} onNotice={onNotice} />}
+      {panel === "exchange" && <ExchangeForm user={user} order={order} busy={cmd.busy} run={cmd.run} onClose={() => setPanel(null)} />}
       <Notice message={cmd.message} testId="order-command-message" />
     </div>
   );
 }
 
-function ResolveForm({ order, busy, run, base, onClose }: { order: DayOrderView; busy: boolean; run: ReturnType<typeof useOrderCommand>["run"]; base: string; onClose: () => void }) {
+function ResolveForm({ user, order, busy, run, base, onClose, onNotice }: { user: User; order: DayOrderView; busy: boolean; run: ReturnType<typeof useOrderCommand>["run"]; base: string; onClose: () => void; onNotice: (message: CommandMessage) => void }) {
   const [reason, setReason] = useState("");
-  const [resolution, setResolution] = useState<"close_charged" | "cancel_refund">("close_charged");
+  const [resolution, setResolution] = useState<"close_charged" | "cancel_refund" | "reschedule">("close_charged");
   const [discard, setDiscard] = useState<Record<number, string>>({});
   const items = order.items.filter((i) => i.remainingQty > 0);
   return (
-    <form
-      className="day-panel"
-      data-testid="resolve-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        const discards = items.map((i) => ({ lineNo: i.lineNo, quantity: toQty(discard[i.lineNo] ?? "", i.remainingQty) })).filter((d) => d.quantity > 0);
-        void run(`${base}/resolve`, { resolution, reason, discards }, (d) => (d.resolution === "cancel_refund" ? `Cancelado e reembolsado: ${formatBRL(Number(d.refundCents ?? 0))} devolvido(s) à carteira de ${order.studentName} (saldo atual ${formatBRL(Number((d.wallet as { balanceCents: number } | null)?.balanceCents ?? 0))}). ` : `Encerrado com cobrança mantida (${formatBRL(Number(d.retainedCents ?? 0))}). `) + `${d.discardedUnits ? `${d.discardedUnits} unidade(s) descartada(s) como perda.` : "Nenhuma perda registrada."}${Number(d.shortfallUnits ?? 0) > 0 ? ` ATENÇÃO: o descarte deixou ${d.shortfallUnits} unidade(s) de outros pedidos sem estoque físico — trate esses pedidos (Estoque).` : ""}`).then((ok) => ok && onClose());
-      }}
-    >
+    <div className="day-panel" data-testid="resolve-panel">
       <h3>Resolver não retirado — {order.studentName}</h3>
       <fieldset className="field field-wide">
         <legend>Como resolver</legend>
@@ -171,43 +178,49 @@ function ResolveForm({ order, busy, run, base, onClose }: { order: DayOrderView;
         </label>{" "}
         <label>
           <input type="radio" name={`res-${order.orderId}`} checked={resolution === "cancel_refund"} onChange={() => setResolution("cancel_refund")} data-testid="resolution-refund" /> Cancelar e reembolsar a carteira
+        </label>{" "}
+        <label>
+          <input type="radio" name={`res-${order.orderId}`} checked={resolution === "reschedule"} onChange={() => setResolution("reschedule")} data-testid="resolution-reschedule" /> Reagendar para outra data
         </label>
       </fieldset>
-      {resolution === "close_charged" ? (
-        <p>
-          <strong>Encerrar com cobrança mantida:</strong> o valor já pago (das unidades não retiradas) fica com a escola, classificado como <em>cobrança mantida por não retirada</em> — não é venda entregue, não gera novo lançamento na carteira e não é reembolso. As unidades voltam à disponibilidade, exceto as que você marcar como descarte (perda explícita).
-        </p>
+      {resolution === "reschedule" ? (
+        <RescheduleForm user={user} order={order} busy={busy} run={run} onClose={onClose} onNotice={onNotice} resolution />
       ) : (
-        <p>
-          <strong>Cancelar e reembolsar:</strong> o valor pago das unidades não retiradas volta <strong>somente à carteira de {order.studentName}</strong> (preço da compra; sem Pix/cartão), com lançamento no extrato. A reserva e o consumo do limite são liberados; as unidades voltam à disponibilidade, exceto as que você marcar como descarte (perda explícita, separada do reembolso).
-        </p>
+        <form
+          data-testid="resolve-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const discards = items.map((i) => ({ lineNo: i.lineNo, quantity: toQty(discard[i.lineNo] ?? "", i.remainingQty) })).filter((d) => d.quantity > 0);
+            void run(`${base}/resolve`, { resolution, reason, discards }, (d) => (d.resolution === "cancel_refund" ? `Cancelado e reembolsado: ${formatBRL(Number(d.refundCents ?? 0))} devolvido(s) à carteira de ${order.studentName} (saldo atual ${formatBRL(Number((d.wallet as { balanceCents: number } | null)?.balanceCents ?? 0))}). ` : `Encerrado com cobrança mantida (${formatBRL(Number(d.retainedCents ?? 0))}). `) + `${d.discardedUnits ? `${d.discardedUnits} unidade(s) descartada(s) como perda.` : "Nenhuma perda registrada."}${Number(d.shortfallUnits ?? 0) > 0 ? ` ATENÇÃO: o descarte deixou ${d.shortfallUnits} unidade(s) de outros pedidos sem estoque físico — trate esses pedidos (Estoque).` : ""}`).then((ok) => ok && onClose());
+          }}
+        >
+          {resolution === "close_charged" ? (
+            <p>
+              <strong>Encerrar com cobrança mantida:</strong> o valor já pago (das unidades não retiradas) fica com a escola, classificado como <em>cobrança mantida por não retirada</em> — não é venda entregue, não gera novo lançamento na carteira e não é reembolso. As unidades voltam à disponibilidade, exceto as que você marcar como descarte (perda explícita).
+            </p>
+          ) : (
+            <p>
+              <strong>Cancelar e reembolsar:</strong> o valor pago das unidades não retiradas volta <strong>somente à carteira de {order.studentName}</strong> (preço da compra; sem Pix/cartão), com lançamento no extrato. A reserva e o consumo do limite são liberados; as unidades voltam à disponibilidade, exceto as que você marcar como descarte (perda explícita, separada do reembolso).
+            </p>
+          )}
+          {items.map((i) => (
+            <div className="field" key={i.lineNo}>
+              <label htmlFor={`d-${order.orderId}-${i.lineNo}`}>
+                Descartar de {i.name} (até {i.remainingQty}; vazio = voltam ao estoque)
+              </label>
+              <input id={`d-${order.orderId}-${i.lineNo}`} inputMode="numeric" value={discard[i.lineNo] ?? ""} onChange={(e) => setDiscard({ ...discard, [i.lineNo]: e.target.value })} placeholder="0" />
+            </div>
+          ))}
+          <div className="field field-wide">
+            <label htmlFor={`rs-${order.orderId}`}>Motivo / política aplicada (obrigatório)</label>
+            <input id={`rs-${order.orderId}`} value={reason} onChange={(e) => setReason(e.target.value)} minLength={5} maxLength={300} required />
+          </div>
+          <button type="submit" disabled={busy || reason.trim().length < 5} data-testid="resolve-submit">
+            {resolution === "cancel_refund" ? "Cancelar e reembolsar" : "Encerrar com cobrança mantida"}
+          </button>
+        </form>
       )}
-      {items.map((i) => (
-        <div className="field" key={i.lineNo}>
-          <label htmlFor={`d-${order.orderId}-${i.lineNo}`}>
-            Descartar de {i.name} (até {i.remainingQty}; vazio = voltam ao estoque)
-          </label>
-          <input id={`d-${order.orderId}-${i.lineNo}`} inputMode="numeric" value={discard[i.lineNo] ?? ""} onChange={(e) => setDiscard({ ...discard, [i.lineNo]: e.target.value })} placeholder="0" />
-        </div>
-      ))}
-      <div className="field field-wide">
-        <label htmlFor={`rs-${order.orderId}`}>Motivo / política aplicada (obrigatório)</label>
-        <input id={`rs-${order.orderId}`} value={reason} onChange={(e) => setReason(e.target.value)} minLength={5} maxLength={300} required />
-      </div>
-      <button type="submit" disabled={busy || reason.trim().length < 5} data-testid="resolve-submit">
-        {resolution === "cancel_refund" ? "Cancelar e reembolsar" : "Encerrar com cobrança mantida"}
-      </button>
-      <ul className="plain-list" data-testid="resolve-pending">
-        {(Object.entries(PENDING_RESOLUTIONS) as [string, { task: string; label: string }][]).map(([key, p]) => (
-          <li key={key}>
-            <button type="button" className="secondary" disabled aria-disabled="true">
-              {p.label.split(" (")[0]}
-            </button>{" "}
-            <span className="muted">Indisponível: depende da {p.task}. O pedido continua pendente de resolução.</span>
-          </li>
-        ))}
-      </ul>
-    </form>
+    </div>
   );
 }
 
@@ -266,8 +279,10 @@ function CancelForm({ order, busy, run, canDiscard, onClose }: { order: DayOrder
 }
 
 /** Pedidos do dia da cantina: data/turno, filtros por turma/situação, busca por aluno e ações de preparo/entrega. */
-export function DayOrdersBoard({ user, canResolve, canCancel, canDiscard }: { user: User; canResolve: boolean; canCancel: boolean; canDiscard: boolean }) {
+export function DayOrdersBoard({ user, canResolve, canCancel, canDiscard, canAmend }: { user: User; canResolve: boolean; canCancel: boolean; canDiscard: boolean; canAmend: boolean }) {
   const [filters, setFilters] = useState<Filters>(initialFilters);
+  /** Aviso de comandos que tiram o pedido desta lista (reagendamento): fica no topo, não na linha que some. */
+  const [notice, setNotice] = useState<CommandMessage | null>(null);
   const [q, setQ] = useState(filters.q);
   useEffect(() => {
     const t = setTimeout(() => setFilters((f) => (f.q === q ? f : { ...f, q })), 300);
@@ -364,6 +379,7 @@ export function DayOrdersBoard({ user, canResolve, canCancel, canDiscard }: { us
         </div>
       )}
 
+      <Notice message={notice} testId="board-message" />
       {list.status === "loading" && <p role="status">Carregando os pedidos…</p>}
       {list.status === "error" && (
         <p role="alert" className="notice notice-error" data-testid="day-error">
@@ -402,12 +418,13 @@ export function DayOrdersBoard({ user, canResolve, canCancel, canDiscard }: { us
                       {i.quantity}× {i.name}
                       {i.deliveredQty > 0 && <span className="muted"> — entregues {i.deliveredQty}</span>}
                       {i.canceledQty > 0 && <span className="muted" data-testid="day-canceled"> — canceladas {i.canceledQty}</span>}
-                      {i.remainingQty > 0 && (i.deliveredQty > 0 || i.canceledQty > 0) && <span className="muted">, faltam {i.remainingQty}</span>}
+                      {i.exchangedQty > 0 && <span className="muted" data-testid="day-exchanged"> — trocadas {i.exchangedQty}</span>}
+                      {i.remainingQty > 0 && (i.deliveredQty > 0 || i.canceledQty > 0 || i.exchangedQty > 0) && <span className="muted">, faltam {i.remainingQty}</span>}
                     </li>
                   ))}
                 </ul>
                 <div className="no-print">
-                  <OrderActions user={user} order={o} canDeliver={data.canDeliver} canResolve={canResolve} canCancel={canCancel} canDiscard={canDiscard} onDone={reloadAll} />
+                  <OrderActions user={user} order={o} canDeliver={data.canDeliver} canResolve={canResolve} canCancel={canCancel} canDiscard={canDiscard} canAmend={canAmend} onDone={reloadAll} onNotice={setNotice} />
                 </div>
               </li>
             ))}

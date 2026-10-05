@@ -12,10 +12,12 @@ import {
   evaluatePurchase,
   isOperatingDay,
   resolveCutoffs,
+  snapshotPolicy,
   windowDates,
   type CalendarConfig,
   type CalendarDayKind,
   type PurchaseDecision,
+  type PolicySnapshot,
   type PurchaseDenial,
   type ShiftCutoffs,
 } from "./calendar";
@@ -164,6 +166,15 @@ export async function checkPurchase(
   tx?: Transaction,
 ): Promise<PurchaseCheck> {
   const now = input.now ?? new Date();
+  const context = await purchaseContext(db, input, tx);
+  if ("reason" in context) return context;
+  return evaluatePurchase({ now, date: input.date, shiftId: input.shiftId, ...context });
+}
+
+type PurchaseContext = { cutoffs: ShiftCutoffs; calendar: CalendarConfig; settingsVersion: number } | { allowed: false; reason: "shift_unavailable" | "shift_not_configured" };
+
+/** Leituras comuns da compra antecipada e do destino de reagendamento: turno, horários e calendário da data. */
+async function purchaseContext(db: Firestore, input: { shiftId: string; date: string }, tx?: Transaction): Promise<PurchaseContext> {
   const read = readerFor(tx);
   const dateOk = isLocalDate(input.date);
   const [shiftSnap, settingsSnap, daySnap] = await Promise.all([
@@ -178,7 +189,23 @@ export async function checkPurchase(
   if (!resolved) return { allowed: false, reason: "shift_not_configured" };
   const kind = (daySnap?.data() as { kind?: string } | undefined)?.kind;
   const days: Record<LocalDate, CalendarDayKind> = dateOk && (kind === "extra" || kind === "closed") ? { [input.date]: kind } : {};
-  return evaluatePurchase({ now, date: input.date, shiftId: input.shiftId, cutoffs: resolved.cutoffs, calendar: { weekdays: settings.weekdays, days }, settingsVersion: settings.version });
+  return { cutoffs: resolved.cutoffs, calendar: { weekdays: settings.weekdays, days }, settingsVersion: settings.version };
+}
+
+export type DestinationCheck = { allowed: true; snapshot: PolicySnapshot; cutoffPassed: boolean } | { allowed: false; reason: PurchaseDenial | "shift_unavailable" | "shift_not_configured" };
+
+/**
+ * Destino de reagendamento/troca (F16): as MESMAS regras da compra antecipada (turno ativo e configurado, hoje…hoje+7, dia de
+ * funcionamento). A única diferença: horário de compra já encerrado não é recusado aqui — volta `cutoffPassed` com o snapshot
+ * para o comando da EQUIPE exigir a exceção operacional explícita e auditada (nunca disponível ao responsável).
+ */
+export async function checkDestination(db: Firestore, input: { shiftId: string; date: string; now: Date }, tx?: Transaction): Promise<DestinationCheck> {
+  const context = await purchaseContext(db, input, tx);
+  if ("reason" in context) return context;
+  const decision = evaluatePurchase({ now: input.now, date: input.date, shiftId: input.shiftId, ...context });
+  if (decision.allowed) return { allowed: true, snapshot: decision.snapshot, cutoffPassed: false };
+  if (decision.reason !== "after_cutoff") return decision;
+  return { allowed: true, snapshot: snapshotPolicy({ shiftId: input.shiftId, date: input.date, cutoffs: context.cutoffs, settingsVersion: context.settingsVersion }), cutoffPassed: true };
 }
 
 export type CounterCheck = { allowed: true } | { allowed: false; reason: "shift_unavailable" | "non_operating_day" };

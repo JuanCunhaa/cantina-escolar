@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  PENDING_RESOLUTIONS,
   aggregatePreparation,
   aggregateStatus,
   canPrepare,
@@ -66,7 +65,7 @@ describe("quantidades e preparo", () => {
     expect(remainingOf({ quantity: 3 })).toBe(3);
     expect(remainingOf({ quantity: 3, deliveredQty: 1, canceledQty: 1 })).toBe(1);
     expect(remainingOf({ quantity: 1, deliveredQty: 1, canceledQty: 1 })).toBe(0);
-    expect(totalsOf([{ quantity: 3, deliveredQty: 1 }, { quantity: 2 }])).toEqual({ scheduled: 5, delivered: 1, canceled: 0, remaining: 4 });
+    expect(totalsOf([{ quantity: 3, deliveredQty: 1 }, { quantity: 2 }])).toEqual({ scheduled: 5, delivered: 1, canceled: 0, exchanged: 0, remaining: 4 });
   });
 
   it("preparo só avança e só antes da entrega", () => {
@@ -118,15 +117,20 @@ describe("esquemas dos comandos", () => {
     expect(deliverSchema.safeParse({ ...ok, key: "curta" }).success).toBe(false);
   });
 
-  it("não retirado e resolução exigem motivo; só o reagendamento segue como pendência nomeada", () => {
+  it("não retirado e resolução exigem motivo; reagendar (F16) exige destino e não aceita descarte", () => {
     expect(notPickedUpSchema.safeParse({ key: KEY, orderId: "ord_1", reason: "ok" }).success).toBe(false);
     expect(notPickedUpSchema.safeParse({ key: KEY, orderId: "ord_1", reason: "Família avisou que não virá" }).success).toBe(true);
     expect(resolveSchema.safeParse({ key: KEY, orderId: "ord_1", resolution: "close_charged" }).success).toBe(false);
     const parsed = resolveSchema.parse({ key: KEY, orderId: "ord_1", resolution: "close_charged", reason: "Política da escola: cobrança mantida" });
     expect(parsed.discards).toEqual([]);
     expect(resolveSchema.safeParse({ key: KEY, orderId: "ord_1", resolution: "invented", reason: "motivo válido" }).success).toBe(false);
-    expect(Object.keys(PENDING_RESOLUTIONS)).toEqual(["reschedule"]); // cancel_refund passou a existir (F14)
-    expect(PENDING_RESOLUTIONS.reschedule.task).toBe("F16");
+    const base = { key: KEY, orderId: "ord_1", resolution: "reschedule", reason: "Aluno faltou; reagendar" };
+    expect(resolveSchema.safeParse(base).success).toBe(false); // sem destino
+    expect(resolveSchema.safeParse({ ...base, toDate: "2026-10-07", toShiftId: "sh_m" }).success).toBe(true);
+    expect(resolveSchema.safeParse({ ...base, toDate: "2026-10-07", toShiftId: "sh_m", discards: [{ lineNo: 1, quantity: 1 }] }).success).toBe(false);
+    // Destino/exceção de horário só existem no reagendamento.
+    expect(resolveSchema.safeParse({ key: KEY, orderId: "ord_1", resolution: "close_charged", reason: "Política da escola", toDate: "2026-10-07", toShiftId: "sh_m" }).success).toBe(false);
+    expect(resolveSchema.safeParse({ key: KEY, orderId: "ord_1", resolution: "cancel_refund", reason: "Política da escola", overrideCutoff: true }).success).toBe(false);
   });
 });
 

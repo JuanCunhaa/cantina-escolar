@@ -76,7 +76,11 @@ export type OrderItemView = Pick<OrderItem, "lineNo" | "productId" | "name" | "u
   deliveredQty: number;
   /** Unidades canceladas e reembolsadas (F14); pedidos anteriores = 0. */
   canceledQty: number;
+  /** Unidades trocadas por outro produto (F16); a linha nova aparece à parte. */
+  exchangedQty: number;
   remainingQty: number;
+  /** Linha criada por uma troca (F16). */
+  fromExchange: boolean;
 };
 
 export type OrderView = {
@@ -113,7 +117,21 @@ export type OrderDetail = OrderView & {
   /** Papel de quem comprou (o responsável/aluno que fez a compra; nunca UID ou dado interno). */
   purchasedBy: "guardian" | "student" | "staff" | null;
   cancelDeadlineAt: string | null;
-  timeline: { kind: "created" | "paid" | "preparing" | "ready" | "delivery" | "cancellation" | "not_picked_up" | "resolved"; at: string | null; label: string }[];
+  timeline: { kind: "created" | "paid" | "preparing" | "ready" | "delivery" | "cancellation" | "not_picked_up" | "resolved" | "reschedule" | "exchange"; at: string | null; label: string }[];
+  /**
+   * Reagendamentos (F16), do mais antigo ao mais novo: de/para (data e turno). Sem cobrança nova: o pagamento original continua o
+   * único. Motivo, ator e reservas são internos da escola.
+   */
+  reschedules: { at: string | null; fromDate: string; toDate: string; fromShiftName: string | null; toShiftName: string | null }[];
+  /** Trocas de produto (F16): o que saiu, o que entrou e a DIFERENÇA na carteira (+ cobrada, − devolvida, 0 sem lançamento). */
+  exchanges: {
+    at: string | null;
+    removed: { name: string; quantity: number; creditCents: number }[];
+    added: { name: string; quantity: number; subtotalCents: number }[];
+    differenceCents: number;
+    walletSeq: number | null;
+    balanceAfterCents: number | null;
+  }[];
   /**
    * Cancelamentos/reembolsos (F14), do mais antigo ao mais novo: quando, quem pediu (responsável ou escola), o que foi cancelado,
    * quanto voltou e o lançamento no livro. O motivo só sai quando foi do PRÓPRIO responsável; o da equipe é interno, e nem o
@@ -133,7 +151,7 @@ export type OrderDetail = OrderView & {
   /** Entregas registradas (F13): só nome/quantidade/instante; nunca ator, movimento de estoque ou custo. */
   deliveries: { at: string | null; lines: { name: string; quantity: number }[] }[];
   /** Não retirada (F13): situação e classificação em linguagem de família; motivo interno e ator não saem do servidor. */
-  nonPickup: { resolved: boolean; kind: "close_charged" | "cancel_refund" | null; markedAt: string | null; resolvedAt: string | null; retainedCents: number | null; refundCents: number | null; classification: string | null } | null;
+  nonPickup: { resolved: boolean; kind: "close_charged" | "cancel_refund" | "reschedule" | null; markedAt: string | null; resolvedAt: string | null; retainedCents: number | null; refundCents: number | null; classification: string | null } | null;
   receipt: OrderReceipt;
 };
 

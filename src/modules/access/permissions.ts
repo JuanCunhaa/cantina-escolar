@@ -7,12 +7,15 @@ import { EXTRA_PERMISSIONS, type ExtraPermission, type Role } from "./roles";
  * Pedidos (F13): `orders.operate` = pedidos do dia, preparo, entrega e marcar não retirado (cantina e administração);
  * `orders.resolve` = resolver não retirado (só administração). Cancelamento (F14): `orders.cancel` = cancelamento OPERACIONAL com motivo, mesmo depois do prazo da família (cantina e administração);
  * o cancelamento da FAMÍLIA vem do vínculo ativo (ação `orders.cancel` sobre o aluno), não de capacidade.
+ * Reagendamento/antecipação e troca de produtos (F16): `orders.amend` (cantina e administração), sempre com motivo e auditoria;
+ * a exceção operacional de horário só existe nesse comando da equipe. O responsável NÃO reagenda nem troca (cancela e compra de novo).
  */
 export const CAPABILITIES = [
   "students.search",
   "orders.operate",
   "orders.resolve",
   "orders.cancel",
+  "orders.amend",
   "pos.operate",
   "catalog.photos.manage",
   "catalog.manage",
@@ -34,7 +37,7 @@ export type Capability = (typeof CAPABILITIES)[number];
 const BY_ROLE: Record<Role, readonly Capability[]> = {
   guardian: [],
   student: [],
-  cantina: ["students.search", "orders.operate", "orders.cancel", "pos.operate", "catalog.photos.manage", "inventory.read", "inventory.loss"],
+  cantina: ["students.search", "orders.operate", "orders.cancel", "orders.amend", "pos.operate", "catalog.photos.manage", "inventory.read", "inventory.loss"],
   secretaria: ["students.search", "topup.register"],
   admin: CAPABILITIES,
 };

@@ -67,7 +67,8 @@ export function useOrderCommand(user: User, onDone: () => void) {
   const pending = useRef<{ json: string; key: string } | null>(null);
   const inFlight = useRef(false);
 
-  async function run(url: string, body: Record<string, unknown>, success: (data: Record<string, unknown>) => string): Promise<boolean> {
+  /** `onError` informa o código e se o resultado é INCERTO (resposta perdida: repetir o mesmo envio reaproveita a chave). */
+  async function run(url: string, body: Record<string, unknown>, success: (data: Record<string, unknown>) => string, onError?: (error: string, uncertain: boolean) => void): Promise<boolean> {
     if (inFlight.current) return false;
     inFlight.current = true;
     setBusy(true);
@@ -78,7 +79,9 @@ export function useOrderCommand(user: User, onDone: () => void) {
     inFlight.current = false;
     setBusy(false);
     if (!result.ok) {
-      pending.current = isUncertain(result) ? { json, key } : null;
+      const uncertain = isUncertain(result);
+      pending.current = uncertain ? { json, key } : null;
+      onError?.(result.error, uncertain);
       const missing = typeof result.details?.missingUnits === "number" ? ` Registre a entrada de ${result.details.missingUnits} unidade(s) em Estoque.` : "";
       setMessage({ kind: "error", text: errorText(result.error) + missing });
       onDone(); // a lista pode ter mudado (outra pessoa entregou): relê para mostrar o restante real
