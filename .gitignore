@@ -24,3 +24,4 @@ next-env.d.ts
 !.env.staging.example
 .secrets/
 .staging-fixtures*.json
+ci-diagnostics/

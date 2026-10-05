@@ -14,8 +14,11 @@ export default defineConfig({
   timeout: 60000,
   fullyParallel: false,
   workers: 1,
-  reporter: [["list"]],
-  use: { baseURL: "http://127.0.0.1:3100" },
+  globalTeardown: "./tests/helpers/ci-resource-teardown.ts",
+  reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
+  // Evidência barata das falhas (captura de tela só quando falha). Traces NÃO ficam ligados por padrão: medidos no CI (2 CPUs) o
+  // e2e passou de ~6,5–7 min para ~12 min e houve falhas por tempo; instrumento não pode perturbar o que mede.
+  use: { baseURL: "http://127.0.0.1:3100", screenshot: "only-on-failure" },
   webServer: {
     command: "npx next dev --webpack -p 3100",
     url: "http://127.0.0.1:3100",
