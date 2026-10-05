@@ -16,10 +16,11 @@ export function authorize(actor: Actor, capability: Capability): void {
  * - purchase.counter: PDV (cantina/administração) somente com `allowCounterPurchase` do aluno.
  * - wallet.read: responsável vinculado ativo, o próprio aluno ou administração (saldo/extrato);
  * - orders.read: histórico, detalhe e recibo de pedidos (F12), mesma regra de wallet.read; o vínculo é lido na hora da consulta;
- * - wallet.transfer: somente responsável vinculado ativo (a atividade do aluno é conferida pelo comando).
+ * - wallet.transfer: somente responsável vinculado ativo (a atividade do aluno é conferida pelo comando);
+ * - orders.cancel: cancelamento FAMILIAR (F14): só o responsável vinculado ativo; o aluno não cancela sozinho. Vale também para aluno arquivado (o reembolso vai à carteira original). O prazo é do pedido, conferido pelo comando.
  * Compra exige aluno ativo. Permissão revogada não apaga pedidos existentes (isso é de checkout/pedidos).
  */
-export type StudentAction = "view" | "manage" | "purchase.site" | "purchase.counter" | "wallet.read" | "wallet.transfer" | "orders.read";
+export type StudentAction = "view" | "manage" | "purchase.site" | "purchase.counter" | "wallet.read" | "wallet.transfer" | "orders.read" | "orders.cancel";
 
 type StudentData = { status?: unknown; userUid?: unknown } | undefined;
 type LinkData = { guardianUid?: unknown; studentId?: unknown; status?: unknown } | undefined;
@@ -50,6 +51,7 @@ export function decideStudentAction(input: {
     case "wallet.read":
     case "orders.read":
       return role === "admin" || linkedGuardian || self;
+    case "orders.cancel":
     case "wallet.transfer":
       return linkedGuardian;
     case "purchase.counter":

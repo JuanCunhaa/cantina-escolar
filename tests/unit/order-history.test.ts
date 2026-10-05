@@ -17,6 +17,7 @@ const order = (id: string, date: string, version = 1, status = "paid"): OrderVie
   orderId: id,
   studentId: "s1",
   studentName: "Ana",
+  refundedCents: 0,
   consumptionDate: date,
   shiftId: "m",
   shiftName: "Manhã",

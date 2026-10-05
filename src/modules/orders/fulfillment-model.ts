@@ -20,6 +20,8 @@ export type PrepStage = (typeof PREP_STAGES)[number];
 export const OPEN_STATUSES = ["paid", "preparing", "ready", "partially_delivered"] as const;
 export const NOT_PICKED_UP = "not_picked_up";
 export const NOT_PICKED_UP_CLOSED = "not_picked_up_closed";
+/** Todas as unidades canceladas e reembolsadas (nada entregue). Grafia herdada da F12 (`STATUS_INFO`). */
+export const CANCELLED = "cancelled";
 
 export const isOpenStatus = (status: string): boolean => (OPEN_STATUSES as readonly string[]).includes(status);
 export const isNotPickedUp = (status: string): boolean => status === NOT_PICKED_UP || status === NOT_PICKED_UP_CLOSED;
@@ -31,18 +33,32 @@ export const canceledOf = (i: ItemProgress): number => i.canceledQty ?? 0;
 /** Unidades ainda por entregar: nunca negativo. */
 export const remainingOf = (i: ItemProgress): number => Math.max(0, i.quantity - deliveredOf(i) - canceledOf(i));
 
-/** Valor (centavos) de `units` unidades de uma linha, proporcional ao subtotal pago (exato enquanto não houver desconto). */
+/**
+ * Valor (centavos) de `units` unidades de uma linha, proporcional ao subtotal PAGO. `subtotalCents` é o que de fato foi
+ * debitado da carteira (o total do pedido é a soma dos subtotais; qualquer desconto por linha já está embutido nele) e é a
+ * ÚNICA base de entrega, retenção e reembolso: nunca o preço atual do produto. Com desconto o valor por unidade pode ser
+ * fracionário: o arredondamento acontece UMA vez sobre o acumulado (ver `remainingValueOf`).
+ */
 export const valueOfUnits = (item: { quantity: number; subtotalCents: number }, units: number): number => (item.quantity === 0 ? 0 : Math.round((item.subtotalCents * units) / item.quantity));
 
 /**
  * Valor ainda não entregue/cancelado da linha = subtotal pago − valor (arredondado UMA vez) das unidades já entregues/canceladas.
- * Calculado pelo acumulado, nunca por fatias arredondadas separadamente: Σ das entregas + restante = subtotal pago, sem deriva de centavos.
+ * Calculado pelo acumulado, nunca por fatias arredondadas separadamente: Σ das entregas + Σ dos reembolsos + restante = subtotal
+ * pago, sem deriva de centavos e em qualquer ordem entre entregas e cancelamentos (o acumulado é o de entregues + canceladas e
+ * cada operação recebe a diferença do acumulado antes/depois).
  */
 export const remainingValueOf = (item: { quantity: number; subtotalCents: number; deliveredQty?: number; canceledQty?: number }): number =>
   Math.max(0, item.subtotalCents - valueOfUnits(item, (item.deliveredQty ?? 0) + (item.canceledQty ?? 0)));
-/** Receita da entrega de `units` unidades: diferença do acumulado (a soma de todas as entregas = subtotal da linha). */
-export const deliveryRevenueOf = (item: { quantity: number; subtotalCents: number; deliveredQty?: number }, units: number): number =>
-  valueOfUnits(item, (item.deliveredQty ?? 0) + units) - valueOfUnits(item, item.deliveredQty ?? 0);
+type Settling = { quantity: number; subtotalCents: number; deliveredQty?: number; canceledQty?: number };
+/** Valor (centavos) que sai do saldo "a liquidar" da linha ao liquidar mais `units` unidades (entregar OU cancelar). */
+const settledDelta = (item: Settling, units: number): number => {
+  const settled = (item.deliveredQty ?? 0) + (item.canceledQty ?? 0);
+  return valueOfUnits(item, settled + units) - valueOfUnits(item, settled);
+};
+/** Receita da entrega de `units` unidades: diferença do acumulado (entregues + canceladas); Σ entregas + Σ reembolsos = subtotal da linha. */
+export const deliveryRevenueOf = (item: Settling, units: number): number => settledDelta(item, units);
+/** Reembolso (centavos) de `units` unidades ainda não entregues da linha: o valor PAGO registrado no pedido, rateado por acumulado. */
+export const refundValueOf = (item: Settling, units: number): number => settledDelta(item, units);
 
 export const totalsOf = (items: readonly ItemProgress[]) => ({
   scheduled: items.reduce((n, i) => n + i.quantity, 0),
@@ -59,13 +75,15 @@ export type NonPickupState = { resolved: boolean } | null;
  *  - tudo entregue (ou entregue + cancelado) e algo entregue → `delivered`;
  *  - algo entregue e algo restante → `partially_delivered`;
  *  - nada entregue → estágio de preparo (`paid` = agendado, `preparing`, `ready`).
- * Pedido sem nenhuma unidade restante nem entregue (tudo cancelado) é de F14 e fica fora desta função.
+ *  - nada entregue e nada restante (tudo cancelado/reembolsado) → `cancelled` (F14).
+ * Cancelamento parcial NÃO muda a situação: o que sobrou segue o fluxo normal (as quantidades canceladas ficam em `canceledQty`).
  */
 export function aggregateStatus(input: { items: readonly ItemProgress[]; prep: PrepStage; nonPickup: NonPickupState }): string {
   if (input.nonPickup) return input.nonPickup.resolved ? NOT_PICKED_UP_CLOSED : NOT_PICKED_UP;
   const t = totalsOf(input.items);
   if (t.delivered > 0 && t.remaining === 0) return "delivered";
   if (t.delivered > 0) return "partially_delivered";
+  if (t.remaining === 0 && t.canceled > 0) return CANCELLED;
   return input.prep === "preparing" ? "preparing" : input.prep === "ready" ? "ready" : "paid";
 }
 
@@ -97,11 +115,32 @@ export type DeliverInput = z.infer<typeof deliverSchema>;
 export const notPickedUpSchema = z.object({ key: z.string().regex(KEY), orderId: z.string().regex(ID), reason }).strict();
 export type NotPickedUpInput = z.infer<typeof notPickedUpSchema>;
 
-/** Resoluções previstas pelo produto. Só `close_charged` existe nesta tarefa; as outras são recusadas explicitamente. */
+const sortedLines = (lines: { lineNo: number; quantity: number }[]) => [...lines].sort((a, b) => a.lineNo - b.lineNo);
+const uniqueLines = (lines: { lineNo: number }[]) => new Set(lines.map((l) => l.lineNo)).size === lines.length;
+
+/**
+ * Cancelamento (F14, docs/domains/cancellations.md §14). `lines` ausente = cancelar TODO o restante (total); informado =
+ * cancelamento parcial por quantidade de item. `discards` (só equipe com permissão de perda) = unidades canceladas que serão
+ * DESCARTADAS como perda explícita; o que não for listado só libera a reserva (sem entrada física). O motivo é obrigatório
+ * para todos (família e equipe) e a auditoria o guarda.
+ */
+export const cancelSchema = z
+  .object({
+    key: z.string().regex(KEY),
+    orderId: z.string().regex(ID),
+    reason,
+    lines: z.array(qtyLine).min(1).max(MAX_LINES_PER_DATE).optional(),
+    discards: z.array(qtyLine).max(MAX_LINES_PER_DATE).default([]),
+  })
+  .strict()
+  .refine((v) => uniqueLines(v.lines ?? []) && uniqueLines(v.discards), "Linha repetida.")
+  .transform((v) => ({ ...v, lines: v.lines ? sortedLines(v.lines) : undefined, discards: sortedLines(v.discards) }));
+export type CancelInput = z.infer<typeof cancelSchema>;
+
+/** Resoluções previstas pelo produto. `close_charged` (F13) e `cancel_refund` (F14) existem; `reschedule` é da F16 e é recusada explicitamente. */
 export const RESOLUTIONS = ["close_charged", "cancel_refund", "reschedule"] as const;
 export type Resolution = (typeof RESOLUTIONS)[number];
-export const PENDING_RESOLUTIONS: Record<Exclude<Resolution, "close_charged">, { task: "F14" | "F16"; label: string }> = {
-  cancel_refund: { task: "F14", label: "Cancelar e reembolsar a carteira (chega com a F14)" },
+export const PENDING_RESOLUTIONS: Record<Exclude<Resolution, "close_charged" | "cancel_refund">, { task: "F16"; label: string }> = {
   reschedule: { task: "F16", label: "Reagendar para outra data (chega com a F16)" },
 };
 
@@ -127,8 +166,11 @@ export type ResolveInput = z.infer<typeof resolveSchema>;
  * em linha separada da receita de entregas.
  */
 export const RETAINED_CLASSIFICATION = "retained_charge_not_picked_up" as const;
-export const CLASSIFICATION_LABEL: Record<typeof RETAINED_CLASSIFICATION, string> = {
+/** `refunded_not_picked_up` (F14, `cancel_refund`): restante não retirado cancelado e devolvido à carteira ORIGINAL; não é cobrança retida. */
+export const REFUNDED_CLASSIFICATION = "refunded_not_picked_up" as const;
+export const CLASSIFICATION_LABEL: Record<typeof RETAINED_CLASSIFICATION | typeof REFUNDED_CLASSIFICATION, string> = {
   retained_charge_not_picked_up: "Cobrança mantida por não retirada (não é venda entregue)",
+  refunded_not_picked_up: "Não retirado cancelado e reembolsado à carteira do aluno",
 };
 
 /* ----------------------------------------------------------------------------------------- consultas do dia */

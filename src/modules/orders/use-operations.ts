@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { User } from "firebase/auth";
 import { api, errorText, newKey } from "@/lib/api-client";
+import { isUncertain } from "@/modules/wallet/operation";
 import { toCsv } from "./fulfillment-model";
 
 type Loaded<T> = { status: "loading" | "ready" | "error"; data: T | null; errorCode: string | null; refreshing: boolean; reload: () => void };
@@ -53,8 +54,9 @@ export function useServerQuery<T>(user: User, path: string, query: string): Load
 export type CommandMessage = { kind: "ok" | "error"; text: string };
 
 /**
- * Comando de operação (preparo, entrega, não retirado, resolução). Chave de idempotência por tentativa: reaproveitada só
- * quando a resposta se perdeu (rede) com o MESMO conteúdo, então clique duplo/reenvio não baixa estoque duas vezes. O botão
+ * Comando de operação (preparo, entrega, não retirado, resolução, cancelamento). Chave de idempotência por tentativa:
+ * reaproveitada só quando a resposta se perdeu (rede, tempo esgotado, 429/5xx: o comando pode ter sido aplicado) com o MESMO
+ * conteúdo, então clique duplo/reenvio não baixa estoque nem credita a carteira duas vezes. O botão
  * fica desabilitado enquanto há envio em andamento; o resultado exibido é o da RESPOSTA do servidor.
  */
 export function useOrderCommand(user: User, onDone: () => void) {
@@ -74,7 +76,7 @@ export function useOrderCommand(user: User, onDone: () => void) {
     inFlight.current = false;
     setBusy(false);
     if (!result.ok) {
-      pending.current = result.status === 0 ? { json, key } : null;
+      pending.current = isUncertain(result) ? { json, key } : null;
       const missing = typeof result.details?.missingUnits === "number" ? ` Registre a entrada de ${result.details.missingUnits} unidade(s) em Estoque.` : "";
       setMessage({ kind: "error", text: errorText(result.error) + missing });
       onDone(); // a lista pode ter mudado (outra pessoa entregou): relê para mostrar o restante real

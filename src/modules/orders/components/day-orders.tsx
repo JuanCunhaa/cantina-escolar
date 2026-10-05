@@ -8,6 +8,7 @@ import { formatBRL } from "@/lib/money/format";
 import { longDayLabel } from "@/modules/menu/format";
 import { PENDING_RESOLUTIONS, isOpenStatus, type DayOrderView, type DayOrders, type Preparation } from "../fulfillment-model";
 import { useOrderCommand, useServerQuery, type CommandMessage } from "../use-operations";
+import { toQty } from "./qty";
 
 type Filters = { date: string; shiftId: string; classId: string; status: string; q: string };
 
@@ -19,11 +20,12 @@ const STATUS_FILTERS: [string, string][] = [
   ["ready", "Pronto"],
   ["partially_delivered", "Entregue em parte"],
   ["delivered", "Entregue"],
+  ["cancelled", "Cancelado"],
   ["not_picked_up", "Não retirado (a resolver)"],
   ["not_picked_up_closed", "Não retirado (encerrado)"],
 ];
 
-const badgeClass = (status: string) => (status === "delivered" || status === "not_picked_up_closed" ? "badge-completed" : status === "not_picked_up" ? "badge-warn" : "badge-pending");
+const badgeClass = (status: string) => (status === "delivered" || status === "not_picked_up_closed" ? "badge-completed" : status === "cancelled" ? "badge-cancelled" : status === "not_picked_up" ? "badge-warn" : "badge-pending");
 
 function initialFilters(): Filters {
   const params = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
@@ -39,15 +41,10 @@ function Notice({ message, testId }: { message: CommandMessage | null; testId: s
   );
 }
 
-const toQty = (text: string, max: number): number => {
-  const n = /^\d+$/.test(text.trim()) ? Number(text.trim()) : 0;
-  return Math.min(Math.max(n, 0), max);
-};
-
 /** Ações de UM pedido: entregar tudo, entrega parcial por quantidade, preparo, não retirado e (administração) resolução. */
-function OrderActions({ user, order, canDeliver, canResolve, onDone }: { user: User; order: DayOrderView; canDeliver: boolean; canResolve: boolean; onDone: () => void }) {
+function OrderActions({ user, order, canDeliver, canResolve, canCancel, canDiscard, onDone }: { user: User; order: DayOrderView; canDeliver: boolean; canResolve: boolean; canCancel: boolean; canDiscard: boolean; onDone: () => void }) {
   const cmd = useOrderCommand(user, onDone);
-  const [panel, setPanel] = useState<"partial" | "notpicked" | "resolve" | null>(null);
+  const [panel, setPanel] = useState<"partial" | "notpicked" | "resolve" | "cancel" | null>(null);
   const [qty, setQty] = useState<Record<number, string>>({});
   const [reason, setReason] = useState("");
   const base = `/api/operations/orders/${encodeURIComponent(order.orderId)}`;
@@ -87,6 +84,11 @@ function OrderActions({ user, order, canDeliver, canResolve, onDone }: { user: U
           Não retirado
         </button>
       )}
+      {open && canCancel && remaining.length > 0 && (
+        <button type="button" className="secondary" aria-expanded={panel === "cancel"} disabled={cmd.busy} onClick={() => setPanel(panel === "cancel" ? null : "cancel")} data-testid="cancel-toggle">
+          Cancelar / reembolsar
+        </button>
+      )}
       {order.status === "not_picked_up" && canResolve && (
         <button type="button" aria-expanded={panel === "resolve"} disabled={cmd.busy} onClick={() => setPanel(panel === "resolve" ? null : "resolve")} data-testid="resolve-toggle">
           Resolver
@@ -104,7 +106,7 @@ function OrderActions({ user, order, canDeliver, canResolve, onDone }: { user: U
             if (lines.length > 0) void deliver(lines).then((ok) => ok && setPanel(null));
           }}
         >
-          <p className="muted">Informe quanto de cada item está sendo entregue agora. O que ficar sem entregar continua pendente (reembolso parcial chega com a F14).</p>
+          <p className="muted">Informe quanto de cada item está sendo entregue agora. O que ficar sem entregar continua pendente (para devolver o dinheiro do que não for entregue, use “Cancelar / reembolsar”).</p>
           {remaining.map((i) => (
             <div className="field" key={i.lineNo}>
               <label htmlFor={`q-${order.orderId}-${i.lineNo}`}>
@@ -139,6 +141,7 @@ function OrderActions({ user, order, canDeliver, canResolve, onDone }: { user: U
         </form>
       )}
 
+      {panel === "cancel" && <CancelForm order={order} busy={cmd.busy} run={cmd.run} canDiscard={canDiscard} onClose={() => setPanel(null)} />}
       {panel === "resolve" && <ResolveForm order={order} busy={cmd.busy} run={cmd.run} base={base} onClose={() => setPanel(null)} />}
       <Notice message={cmd.message} testId="order-command-message" />
     </div>
@@ -147,6 +150,7 @@ function OrderActions({ user, order, canDeliver, canResolve, onDone }: { user: U
 
 function ResolveForm({ order, busy, run, base, onClose }: { order: DayOrderView; busy: boolean; run: ReturnType<typeof useOrderCommand>["run"]; base: string; onClose: () => void }) {
   const [reason, setReason] = useState("");
+  const [resolution, setResolution] = useState<"close_charged" | "cancel_refund">("close_charged");
   const [discard, setDiscard] = useState<Record<number, string>>({});
   const items = order.items.filter((i) => i.remainingQty > 0);
   return (
@@ -156,13 +160,28 @@ function ResolveForm({ order, busy, run, base, onClose }: { order: DayOrderView;
       onSubmit={(e) => {
         e.preventDefault();
         const discards = items.map((i) => ({ lineNo: i.lineNo, quantity: toQty(discard[i.lineNo] ?? "", i.remainingQty) })).filter((d) => d.quantity > 0);
-        void run(`${base}/resolve`, { resolution: "close_charged", reason, discards }, (d) => `Encerrado com cobrança mantida (${formatBRL(Number(d.retainedCents ?? 0))}). ${d.discardedUnits ? `${d.discardedUnits} unidade(s) descartada(s) como perda.` : "Nenhuma perda registrada."}${Number(d.shortfallUnits ?? 0) > 0 ? ` ATENÇÃO: o descarte deixou ${d.shortfallUnits} unidade(s) de outros pedidos sem estoque físico — trate esses pedidos (Estoque).` : ""}`).then((ok) => ok && onClose());
+        void run(`${base}/resolve`, { resolution, reason, discards }, (d) => (d.resolution === "cancel_refund" ? `Cancelado e reembolsado: ${formatBRL(Number(d.refundCents ?? 0))} devolvido(s) à carteira de ${order.studentName} (saldo atual ${formatBRL(Number((d.wallet as { balanceCents: number } | null)?.balanceCents ?? 0))}). ` : `Encerrado com cobrança mantida (${formatBRL(Number(d.retainedCents ?? 0))}). `) + `${d.discardedUnits ? `${d.discardedUnits} unidade(s) descartada(s) como perda.` : "Nenhuma perda registrada."}${Number(d.shortfallUnits ?? 0) > 0 ? ` ATENÇÃO: o descarte deixou ${d.shortfallUnits} unidade(s) de outros pedidos sem estoque físico — trate esses pedidos (Estoque).` : ""}`).then((ok) => ok && onClose());
       }}
     >
       <h3>Resolver não retirado — {order.studentName}</h3>
-      <p>
-        <strong>Encerrar com cobrança mantida:</strong> o valor já pago (das unidades não retiradas) fica com a escola, classificado como <em>cobrança mantida por não retirada</em> — não é venda entregue, não gera novo lançamento na carteira e não é reembolso. As unidades voltam à disponibilidade, exceto as que você marcar como descarte (perda explícita).
-      </p>
+      <fieldset className="field field-wide">
+        <legend>Como resolver</legend>
+        <label>
+          <input type="radio" name={`res-${order.orderId}`} checked={resolution === "close_charged"} onChange={() => setResolution("close_charged")} data-testid="resolution-close" /> Encerrar com cobrança mantida
+        </label>{" "}
+        <label>
+          <input type="radio" name={`res-${order.orderId}`} checked={resolution === "cancel_refund"} onChange={() => setResolution("cancel_refund")} data-testid="resolution-refund" /> Cancelar e reembolsar a carteira
+        </label>
+      </fieldset>
+      {resolution === "close_charged" ? (
+        <p>
+          <strong>Encerrar com cobrança mantida:</strong> o valor já pago (das unidades não retiradas) fica com a escola, classificado como <em>cobrança mantida por não retirada</em> — não é venda entregue, não gera novo lançamento na carteira e não é reembolso. As unidades voltam à disponibilidade, exceto as que você marcar como descarte (perda explícita).
+        </p>
+      ) : (
+        <p>
+          <strong>Cancelar e reembolsar:</strong> o valor pago das unidades não retiradas volta <strong>somente à carteira de {order.studentName}</strong> (preço da compra; sem Pix/cartão), com lançamento no extrato. A reserva e o consumo do limite são liberados; as unidades voltam à disponibilidade, exceto as que você marcar como descarte (perda explícita, separada do reembolso).
+        </p>
+      )}
       {items.map((i) => (
         <div className="field" key={i.lineNo}>
           <label htmlFor={`d-${order.orderId}-${i.lineNo}`}>
@@ -176,7 +195,7 @@ function ResolveForm({ order, busy, run, base, onClose }: { order: DayOrderView;
         <input id={`rs-${order.orderId}`} value={reason} onChange={(e) => setReason(e.target.value)} minLength={5} maxLength={300} required />
       </div>
       <button type="submit" disabled={busy || reason.trim().length < 5} data-testid="resolve-submit">
-        Encerrar com cobrança mantida
+        {resolution === "cancel_refund" ? "Cancelar e reembolsar" : "Encerrar com cobrança mantida"}
       </button>
       <ul className="plain-list" data-testid="resolve-pending">
         {(Object.entries(PENDING_RESOLUTIONS) as [string, { task: string; label: string }][]).map(([key, p]) => (
@@ -192,8 +211,62 @@ function ResolveForm({ order, busy, run, base, onClose }: { order: DayOrderView;
   );
 }
 
+/**
+ * Cancelamento operacional (F14): excepcional, também depois do prazo da família, SEMPRE com motivo. Cancela o que ainda não
+ * foi entregue (total ou por quantidade), devolve o valor PAGO à carteira original do aluno e libera reserva/cota. Descarte é
+ * perda explícita, com motivo, separada do reembolso (só com permissão de perda); sem descarte a unidade apenas volta à disponibilidade.
+ */
+function CancelForm({ order, busy, run, canDiscard, onClose }: { order: DayOrderView; busy: boolean; run: ReturnType<typeof useOrderCommand>["run"]; canDiscard: boolean; onClose: () => void }) {
+  const [reason, setReason] = useState("");
+  const [qty, setQty] = useState<Record<number, string>>({});
+  const [discard, setDiscard] = useState<Record<number, string>>({});
+  const items = order.items.filter((i) => i.remainingQty > 0);
+  const chosen = items.map((i) => ({ i, quantity: toQty(qty[i.lineNo] ?? String(i.remainingQty), i.remainingQty) })).filter((l) => l.quantity > 0);
+  const total = chosen.length === items.length && chosen.every((l) => l.quantity === l.i.remainingQty);
+  return (
+    <form
+      className="day-panel"
+      data-testid="cancel-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const discards = canDiscard ? chosen.map((l) => ({ lineNo: l.i.lineNo, quantity: Math.min(toQty(discard[l.i.lineNo] ?? "", l.quantity), l.quantity) })).filter((d) => d.quantity > 0) : [];
+        const lines = total ? undefined : chosen.map((l) => ({ lineNo: l.i.lineNo, quantity: l.quantity }));
+        void run(
+          `/api/orders/${encodeURIComponent(order.orderId)}/cancel`,
+          { reason, ...(lines ? { lines } : {}), ...(discards.length > 0 ? { discards } : {}) },
+          (d) => `Cancelado: ${formatBRL(Number(d.refundCents))} devolvido(s) à carteira de ${order.studentName} (saldo atual ${formatBRL(Number((d.wallet as { balanceCents: number }).balanceCents))}). ${d.discardedUnits ? `${d.discardedUnits} unidade(s) descartada(s) como perda.` : "Nenhuma perda registrada."}${Number(d.shortfallUnits ?? 0) > 0 ? ` ATENÇÃO: o descarte deixou ${d.shortfallUnits} unidade(s) de outros pedidos sem estoque físico — trate esses pedidos (Estoque).` : ""}`,
+        ).then((ok) => ok && onClose());
+      }}
+    >
+      <h3>Cancelar e reembolsar — {order.studentName}</h3>
+      <p className="muted">O valor pago das unidades canceladas volta somente à carteira do aluno, com lançamento no extrato. O que já foi entregue não entra. Liberar a reserva não cria entrada física no estoque.</p>
+      {items.map((i) => (
+        <div className="field" key={i.lineNo}>
+          <label htmlFor={`cq-${order.orderId}-${i.lineNo}`}>
+            {i.name} — cancelar (restam {i.remainingQty})
+          </label>
+          <input id={`cq-${order.orderId}-${i.lineNo}`} inputMode="numeric" value={qty[i.lineNo] ?? String(i.remainingQty)} onChange={(e) => setQty({ ...qty, [i.lineNo]: e.target.value })} />
+          {canDiscard && (
+            <>
+              <label htmlFor={`cd-${order.orderId}-${i.lineNo}`}>Descartar como perda (vazio = só libera a reserva)</label>
+              <input id={`cd-${order.orderId}-${i.lineNo}`} inputMode="numeric" value={discard[i.lineNo] ?? ""} onChange={(e) => setDiscard({ ...discard, [i.lineNo]: e.target.value })} placeholder="0" />
+            </>
+          )}
+        </div>
+      ))}
+      <div className="field field-wide">
+        <label htmlFor={`cm-${order.orderId}`}>Motivo (obrigatório; fica na auditoria)</label>
+        <input id={`cm-${order.orderId}`} value={reason} onChange={(e) => setReason(e.target.value)} minLength={5} maxLength={300} required data-testid="cancel-reason-input" />
+      </div>
+      <button type="submit" disabled={busy || reason.trim().length < 5 || chosen.length === 0} data-testid="cancel-submit">
+        {total ? "Cancelar tudo e reembolsar" : "Cancelar quantidades e reembolsar"}
+      </button>
+    </form>
+  );
+}
+
 /** Pedidos do dia da cantina: data/turno, filtros por turma/situação, busca por aluno e ações de preparo/entrega. */
-export function DayOrdersBoard({ user, canResolve }: { user: User; canResolve: boolean }) {
+export function DayOrdersBoard({ user, canResolve, canCancel, canDiscard }: { user: User; canResolve: boolean; canCancel: boolean; canDiscard: boolean }) {
   const [filters, setFilters] = useState<Filters>(initialFilters);
   const [q, setQ] = useState(filters.q);
   useEffect(() => {
@@ -328,12 +401,13 @@ export function DayOrdersBoard({ user, canResolve }: { user: User; canResolve: b
                     <li key={i.lineNo}>
                       {i.quantity}× {i.name}
                       {i.deliveredQty > 0 && <span className="muted"> — entregues {i.deliveredQty}</span>}
-                      {i.remainingQty > 0 && i.deliveredQty > 0 && <span className="muted">, faltam {i.remainingQty}</span>}
+                      {i.canceledQty > 0 && <span className="muted" data-testid="day-canceled"> — canceladas {i.canceledQty}</span>}
+                      {i.remainingQty > 0 && (i.deliveredQty > 0 || i.canceledQty > 0) && <span className="muted">, faltam {i.remainingQty}</span>}
                     </li>
                   ))}
                 </ul>
                 <div className="no-print">
-                  <OrderActions user={user} order={o} canDeliver={data.canDeliver} canResolve={canResolve} onDone={reloadAll} />
+                  <OrderActions user={user} order={o} canDeliver={data.canDeliver} canResolve={canResolve} canCancel={canCancel} canDiscard={canDiscard} onDone={reloadAll} />
                 </div>
               </li>
             ))}

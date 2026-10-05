@@ -88,3 +88,35 @@ describe("Firestore rules — F13: entregas e progresso do pedido são só do se
     }
   });
 });
+
+/**
+ * F14 grava cancelamentos em `orders/{id}/cancellations` (valor, motivo, ator, descartes) e o reembolso em
+ * `wallets/{aluno}/entries` só pelo servidor: sem regra nova, o default-deny cobre a subcoleção, e o crédito/saldo da carteira
+ * segue sem escrita do cliente (responsável dono incluso).
+ */
+describe("Firestore rules — F14: cancelamento e reembolso são só do servidor", () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "orders/ord_1/cancellations/can_1"), { orderId: "ord_1", studentId: "stu_a", seq: 1, kind: "family", refundCents: 500, reason: "Mudança de planos", actorUid: "famA" });
+    });
+  });
+
+  it("nenhum cliente lê, lista, cria, altera ou apaga cancelamento, nem se cancela/reembolsa direto no pedido", async () => {
+    const contexts = [await as("famA", "guardian"), await as("famB", "guardian"), await as("aluA", "student"), await as("cant", "cantina"), await as("sec", "secretaria"), await as("adm", "admin"), env.unauthenticatedContext()];
+    for (const ctx of contexts) {
+      const db = ctx.firestore();
+      await assertFails(getDoc(doc(db, "orders/ord_1/cancellations/can_1")));
+      await assertFails(getDocs(collection(db, "orders/ord_1/cancellations")));
+      await assertFails(setDoc(doc(db, "orders/ord_1/cancellations/can_2"), { orderId: "ord_1", seq: 2, refundCents: 99999 }));
+      await assertFails(updateDoc(doc(db, "orders/ord_1/cancellations/can_1"), { refundCents: 99999 }));
+      await assertFails(deleteDoc(doc(db, "orders/ord_1/cancellations/can_1")));
+      await assertFails(updateDoc(doc(db, "orders/ord_1"), { status: "cancelled", canceledQty: 1, refundedCents: 500 }));
+    }
+  });
+
+  it("a família dona não credita a própria carteira: lançamento de reembolso e saldo seguem fechados à escrita do cliente", async () => {
+    const db = (await as("famA", "guardian")).firestore();
+    await assertFails(setDoc(doc(db, "wallets/stu_a/entries/can_x_refund"), { type: "order_refund", seq: 1, amountCents: 500, balanceAfterCents: 500 }));
+    await assertFails(setDoc(doc(db, "wallets/stu_a"), { studentId: "stu_a", balanceCents: 99999, version: 1 }));
+  });
+});

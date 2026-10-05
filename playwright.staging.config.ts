@@ -14,7 +14,8 @@ export default defineConfig({
   // Meus pedidos (F12): e2e compra pelo checkout com saldo de fixture (emulador); o equivalente publicado é staging/orders-history-smoke.spec.ts.
   // Políticas (F09): e2e usa fixtures de uso por data (emulador); o equivalente publicado é staging/policies-smoke.spec.ts.
   // Entrega (F13): e2e usa pedidos reais do checkout com saldo e data movida por fixture (emulador); o equivalente publicado é staging/fulfillment-smoke.spec.ts.
-  testIgnore: ["e2e/wallet*.spec.ts", "e2e/policies*.spec.ts", "e2e/checkout*.spec.ts", "e2e/my-orders*.spec.ts", "e2e/fulfillment*.spec.ts"],
+  // Cancelamento (F14): e2e usa pedidos reais do checkout com saldo de fixture (emulador); o equivalente publicado é staging/cancellation-smoke.spec.ts.
+  testIgnore: ["e2e/wallet*.spec.ts", "e2e/policies*.spec.ts", "e2e/checkout*.spec.ts", "e2e/my-orders*.spec.ts", "e2e/fulfillment*.spec.ts", "e2e/cancellation*.spec.ts"],
   timeout: 120000,
   fullyParallel: false,
   workers: 1,

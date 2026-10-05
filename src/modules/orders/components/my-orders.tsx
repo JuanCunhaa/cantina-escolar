@@ -174,10 +174,23 @@ function OrdersView({ user, role, family }: { user: User; role: Role; family: { 
               <p className="muted">
                 {names.get(o.studentId) ?? o.studentName} · {CHANNEL_LABEL[o.channel as keyof typeof CHANNEL_LABEL] ?? "Compra"}
               </p>
-              <p>{o.items.map((i) => (i.deliveredQty > 0 && i.deliveredQty < i.quantity ? `${i.quantity}× ${i.name} (${i.deliveredQty} entregue${i.deliveredQty > 1 ? "s" : ""})` : `${i.quantity}× ${i.name}`)).join(", ")}</p>
+              <p>
+                {o.items
+                  .map((i) => {
+                    const notes = [i.deliveredQty > 0 && i.deliveredQty < i.quantity ? `${i.deliveredQty} entregue${i.deliveredQty > 1 ? "s" : ""}` : null, i.canceledQty > 0 ? `${i.canceledQty} cancelada${i.canceledQty > 1 ? "s" : ""}` : null].filter(Boolean);
+                    return notes.length > 0 ? `${i.quantity}× ${i.name} (${notes.join(", ")})` : `${i.quantity}× ${i.name}`;
+                  })
+                  .join(", ")}
+              </p>
               <p className="order-foot">
                 <span>
                   Total <strong>{formatBRL(o.totalCents)}</strong>
+                  {o.refundedCents > 0 && (
+                    <span className="muted" data-testid="order-refunded">
+                      {" "}
+                      · devolvido à carteira {formatBRL(o.refundedCents)}
+                    </span>
+                  )}
                 </span>
                 <Link href={`/portal/pedidos/${o.orderId}`}>Detalhes e recibo</Link>
               </p>

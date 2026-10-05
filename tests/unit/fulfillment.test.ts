@@ -118,14 +118,14 @@ describe("esquemas dos comandos", () => {
     expect(deliverSchema.safeParse({ ...ok, key: "curta" }).success).toBe(false);
   });
 
-  it("não retirado e resolução exigem motivo; reembolso e reagendamento são pendências nomeadas", () => {
+  it("não retirado e resolução exigem motivo; só o reagendamento segue como pendência nomeada", () => {
     expect(notPickedUpSchema.safeParse({ key: KEY, orderId: "ord_1", reason: "ok" }).success).toBe(false);
     expect(notPickedUpSchema.safeParse({ key: KEY, orderId: "ord_1", reason: "Família avisou que não virá" }).success).toBe(true);
     expect(resolveSchema.safeParse({ key: KEY, orderId: "ord_1", resolution: "close_charged" }).success).toBe(false);
     const parsed = resolveSchema.parse({ key: KEY, orderId: "ord_1", resolution: "close_charged", reason: "Política da escola: cobrança mantida" });
     expect(parsed.discards).toEqual([]);
     expect(resolveSchema.safeParse({ key: KEY, orderId: "ord_1", resolution: "invented", reason: "motivo válido" }).success).toBe(false);
-    expect(PENDING_RESOLUTIONS.cancel_refund.task).toBe("F14");
+    expect(Object.keys(PENDING_RESOLUTIONS)).toEqual(["reschedule"]); // cancel_refund passou a existir (F14)
     expect(PENDING_RESOLUTIONS.reschedule.task).toBe("F16");
   });
 });

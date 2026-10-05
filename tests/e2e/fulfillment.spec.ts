@@ -203,9 +203,8 @@ test.describe("Não retirado e resolução (A27)", () => {
     await expect(rowOf(page, davi.name)).toBeVisible({ timeout: 30000 });
     await rowOf(page, davi.name).getByTestId("resolve-toggle").click();
     const form = rowOf(page, davi.name).getByTestId("resolve-form");
-    await expect(form.getByTestId("resolve-pending")).toContainText("depende da F14");
     await expect(form.getByTestId("resolve-pending")).toContainText("depende da F16");
-    await expect(form.getByRole("button", { name: "Cancelar e reembolsar a carteira" })).toBeDisabled();
+    await expect(form.getByTestId("resolution-refund")).toBeEnabled(); // cancelar e reembolsar existe desde a F14 (provado em e2e/cancellation.spec.ts)
     await expect(form.getByRole("button", { name: "Reagendar para outra data" })).toBeDisabled();
     await expect(form.getByTestId("resolve-submit")).toBeDisabled(); // motivo obrigatório
     await form.getByLabel(/Motivo \/ política aplicada/).fill("Política da escola: cobrança mantida");
