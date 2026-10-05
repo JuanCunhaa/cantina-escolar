@@ -124,6 +124,7 @@ const MESSAGES: Record<string, string> = {
   discard_exceeds_canceled: "O descarte não pode superar a quantidade cancelada do item.",
   order_not_found: "Pedido não encontrado.",
   channel_not_supported: "Este comando atende pedidos antecipados.",
+  invalid_fee: "A taxa informada é inválida para esta venda (não pode superar o total, e dinheiro não tem taxa de meio de pagamento).",
   internal: "Não foi possível concluir agora. Tente novamente.",
 };
 

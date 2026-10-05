@@ -100,9 +100,13 @@ export async function planCancellation(
 
   // Leituras (nenhuma escrita antes do fim delas): carteira ORIGINAL do pedido, cadastro do aluno, estoque e uso.
   const walletRef = db.doc(`wallets/${studentId}`);
-  const snaps = await tx.getAll(walletRef, db.doc(`students/${studentId}`));
+  // `deliveredAt` = instante da ÚLTIMA entrega física. Se o cancelamento do restante fechar o pedido como "entregue", o carimbo
+  // vem da entrega registrada (nunca do cancelamento); pedido sem entrega vira `cancelled` e não ganha `deliveredAt`.
+  const lastDeliveryId = typeof order.data.lastDeliveryId === "string" && !order.data.deliveredAt ? order.data.lastDeliveryId : null;
+  const snaps = await tx.getAll(walletRef, db.doc(`students/${studentId}`), ...(lastDeliveryId ? [db.doc(`orders/${order.ref.id}/deliveries/${lastDeliveryId}`)] : []));
   const walletSnap = snaps[0]!;
   const studentSnap = snaps[1]!;
+  const lastDeliveryAt = snaps[2]?.exists ? (snaps[2].get("createdAt") ?? null) : null;
   const stock = openStockSession(db, tx, { today: p.today, actor: sessionActor(actor) });
   for (const l of lines) {
     const item = byLine.get(l.lineNo)!;
@@ -162,8 +166,8 @@ export async function planCancellation(
       version: order.version + 1,
       updatedAt: FieldValue.serverTimestamp(),
       ...(status === CANCELLED ? { canceledAt: FieldValue.serverTimestamp() } : {}),
-      // Restante cancelado depois de entrega parcial: o pedido passa a "entregue" e precisa do mesmo carimbo da entrega completa.
-      ...(status === "delivered" && !order.data.deliveredAt ? { deliveredAt: FieldValue.serverTimestamp() } : {}),
+      // Restante cancelado depois de entrega parcial: o pedido passa a "entregue" com o instante da última entrega física.
+      ...(status === "delivered" && !order.data.deliveredAt ? { deliveredAt: lastDeliveryAt ?? FieldValue.serverTimestamp() } : {}),
     }),
     commit() {
       const stamp = FieldValue.serverTimestamp();

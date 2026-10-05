@@ -20,7 +20,8 @@
       "npm run audit:prod 0 vulnerabilidades",
       "gitleaks git --redact: sem vazamentos; gitleaks dir em src/tests/scripts/docs/firebase: sem vazamentos (Semgrep só no CI: não executado localmente)",
       "Aplicação publicada (Vercel HML + Firebase HML, 03/10/2026, smoke dirigido sem crédito, tests/staging/wallet-smoke.spec.ts 5/5): carteiras novas independentes (saldo 0/versão 0 por aluno), leitura só do responsável vinculado e da administração",
-      "F11 (04/10/2026) tests/integration/checkout-api.test.ts (emulador, saldo só por fixture): a compra de um aluno debita só a carteira dele (outro aluno do mesmo responsável permanece com saldo e versão originais); família sem vínculo, vínculo revogado, equipe e aluno sem permissão negados (403)."
+      "F11 (04/10/2026) tests/integration/checkout-api.test.ts (emulador, saldo só por fixture): a compra de um aluno debita só a carteira dele (outro aluno do mesmo responsável permanece com saldo e versão originais); família sem vínculo, vínculo revogado, equipe e aluno sem permissão negados (403).",
+      "F15 (04/10/2026, emulador): homônimos no PDV — vender para A não altera a carteira, o livro nem o uso de B (tests/integration/pos-api.test.ts, tests/e2e/pos.spec.ts)."
     ],
     "notes": "Parcial: carteiras individuais independentes e total consolidado provados em emulador (API, Admin e interface). \"Gasto de A não debita B\" por COMPRA depende do checkout/PDV (F11/F15); permanece not_run. Sem homologação real da carteira."
   },
@@ -106,9 +107,10 @@
       "npm run test:integration 163/163",
       "npm run test:e2e 30/30",
       "npm run build:webpack exit 0",
-      "F11 (04/10/2026) tests/integration/checkout-api.test.ts (emulador, saldo só por fixture): o checkout aplica o guard da F09 com a política ATUAL (permissão de compra pelo site separada do balcão, bloqueios de produto/categoria, limites); permissão revogada, vínculo revogado e perfil desativado negam, inclusive no replay; pedido existente é preservado (snapshot)."
+      "F11 (04/10/2026) tests/integration/checkout-api.test.ts (emulador, saldo só por fixture): o checkout aplica o guard da F09 com a política ATUAL (permissão de compra pelo site separada do balcão, bloqueios de produto/categoria, limites); permissão revogada, vínculo revogado e perfil desativado negam, inclusive no replay; pedido existente é preservado (snapshot).",
+      "F15 (04/10/2026, emulador): tests/integration/pos-api.test.ts — permissão de balcão revogada: PDV 403 sem nenhum efeito (carteira, estoque, uso, pedidos) e pedido já entregue permanece; site e balcão independentes nos dois sentidos com aluno com login (checkout do aluno 403 com site revogado, PDV vende; balcão revogado, checkout do aluno passa e PDV 403); responsável vinculado segue comprando pelo site; operador rebaixado/desativado negado pelo perfil atual; replay após revogação devolve só o fato anterior."
     ],
-    "notes": "Parcial: a decisão compartilhada (checkout/PDV) está provada com política atual e transação real, mas por um comando de TESTE; checkout (F11) e PDV (F15) ainda não existem e 'pedidos existentes mantidos' só é provado como uso/pedidos de teste. Manter not_run."
+    "notes": "Parcial: a decisão compartilhada (checkout/PDV) está provada com política atual e transação real, mas por um comando de TESTE; checkout (F11) e PDV (F15) ainda não existem e 'pedidos existentes mantidos' só é provado como uso/pedidos de teste. Manter not_run. F15: balcão provado no emulador; o Firestore real não tem saldo (HML sem crédito artificial) — só as recusas e os papéis foram vistos na nuvem."
   },
   "A09": {
     "status": "not_run",
@@ -124,9 +126,10 @@
       "npm run test:e2e 30/30",
       "npm run build:webpack exit 0",
       "Homologação publicada 03/10/2026 (tests/staging/policies-smoke.spec.ts, 5/5, sem dinheiro/compra): política/bloqueios/exceção de uso único por rota, papéis e outra família negados, Rules publicadas de política/exceções, tela",
-      "F11 (04/10/2026) tests/integration/checkout-api.test.ts (emulador, saldo só por fixture): bloqueio de produto no carrinho pede confirmação do responsável com o motivo; aluno com login não supera (policy_denied); exceção de uso único cobre só a data/valor autorizados e é consumida na transação (segunda tentativa negada)."
+      "F11 (04/10/2026) tests/integration/checkout-api.test.ts (emulador, saldo só por fixture): bloqueio de produto no carrinho pede confirmação do responsável com o motivo; aluno com login não supera (policy_denied); exceção de uso único cobre só a data/valor autorizados e é consumida na transação (segunda tentativa negada).",
+      "F15 (04/10/2026, emulador): bloqueio de produto e de categoria valem no PDV (policy_denied com violations; o funcionário e a administração não superam); exceção de uso único (administrativa) libera UMA venda, vira used com o pedido e não vale de novo nem para outro aluno; tests/integration/pos-api.test.ts."
     ],
-    "notes": "Parcial: política e exceção provadas no guard compartilhado e na interface de configuração; confirmação 'mostrando o efeito' é devolvida pela API (needsConfirmation + efeito por dia/semana) mas a tela de confirmação do checkout/PDV é de F11/F15. Manter not_run."
+    "notes": "Parcial: política e exceção provadas no guard compartilhado e na interface de configuração; confirmação 'mostrando o efeito' é devolvida pela API (needsConfirmation + efeito por dia/semana) mas a tela de confirmação do checkout/PDV é de F11/F15. Manter not_run. F15: efeito no balcão provado no emulador."
   },
   "A10": {
     "status": "not_run",
@@ -159,9 +162,10 @@
       "npm run test:integration 163/163",
       "npm run test:e2e 30/30",
       "npm run build:webpack exit 0",
-      "F11 (04/10/2026) tests/integration/checkout-api.test.ts (emulador, saldo só por fixture): R$ 8 agendados deixam R$ 2 (R$ 3 pede confirmação, exatamente R$ 2 cabem; uso do dia = R$ 10); 6 compras simultâneas de R$ 4 com teto R$ 10 → 2 passam. \"Balcão\" (R$ 3 rejeitado no PDV) e reembolso liberando valor dependem de F15/F14: seguem pendentes."
+      "F11 (04/10/2026) tests/integration/checkout-api.test.ts (emulador, saldo só por fixture): R$ 8 agendados deixam R$ 2 (R$ 3 pede confirmação, exatamente R$ 2 cabem; uso do dia = R$ 10); 6 compras simultâneas de R$ 4 com teto R$ 10 → 2 passam. \"Balcão\" (R$ 3 rejeitado no PDV) e reembolso liberando valor dependem de F15/F14: seguem pendentes.",
+      "F15 (04/10/2026, emulador): R$ 8 agendados (checkout) + teto diário R$ 10 → balcão R$ 3 recusado (daily_limit_exceeded 800+300>1000), R$ 2 exatos passam, depois nada cabe; cancelar o pedido antecipado (reembolso) devolve R$ 6 do comprometimento e a venda de R$ 3 passa; limite semanal vale no balcão (tests/integration/pos-api.test.ts)."
     ],
-    "notes": "Parcial: reembolso/cancelamento reais (F14) e pedidos/balcão reais (F11/F15) ainda não existem; o reembolso é exercitado pela primitiva `releaseUsage`. Manter not_run."
+    "notes": "Parcial: reembolso/cancelamento reais (F14) e pedidos/balcão reais (F11/F15) ainda não existem; o reembolso é exercitado pela primitiva `releaseUsage`. Manter not_run. F15: balcão real provado no emulador; reagendamento (F16) e Firestore real pendentes."
   },
   "A12": {
     "status": "not_run",
@@ -291,9 +295,10 @@
       "npm run test:e2e 32/32 (inclui tests/e2e/inventory.spec.ts)",
       "npm run build:webpack exit 0; npm run audit:prod 0 vulnerabilidades",
       "gitleaks git --redact: sem vazamentos; gitleaks dir por pasta (src, tests, scripts, docs, firebase): sem vazamentos (Semgrep só no CI)",
-      "F11 (04/10/2026) tests/integration/checkout-api.test.ts (emulador, saldo só por fixture): 8 compras simultâneas de R$ 3 com R$ 10 → exatamente 3 passam (saldo R$ 1); 8 alunos disputam 3 vagas planejadas → 3 reservas; 6 alunos disputam 1 unidade física → 1 reserva e o físico não é baixado; 6 compras simultâneas respeitam o limite diário; estoque reconcilia depois. \"Balcão não vende reserva de outro pedido\": F10 (exit) + F15."
+      "F11 (04/10/2026) tests/integration/checkout-api.test.ts (emulador, saldo só por fixture): 8 compras simultâneas de R$ 3 com R$ 10 → exatamente 3 passam (saldo R$ 1); 8 alunos disputam 3 vagas planejadas → 3 reservas; 6 alunos disputam 1 unidade física → 1 reserva e o físico não é baixado; 6 compras simultâneas respeitam o limite diário; estoque reconcilia depois. \"Balcão não vende reserva de outro pedido\": F10 (exit) + F15.",
+      "F15 (04/10/2026, emulador): disputas reais — 6 vendas simultâneas com saldo para UMA (1 passa, saldo ≥ 0, livro reconciliado); 4 vendas de R$ 4 com teto R$ 10 (no máximo 2); último estoque PDV × PDV; PDV × venda direta × checkout antecipado pelo último item (nada vende além do físico nem a reserva paga); entrega do pedido reservado × PDV (a entrega vence a reserva, o PDV só vende o livre); balcão não vende reserva de outro pedido (tests/integration/pos-api.test.ts)."
     ],
-    "notes": "Parcial: saldo (F08), cota e último item de estoque, e balcão não vendendo reserva de outro pedido (F10) provados no emulador pelos contratos (reserve/release/exit). 'Duas compras simultâneas' de um checkout real e o PDV real dependem de F11/F15; concorrência não medida no Firestore real (≤ 8 escritores por documento testados; limite documentado de 12). Permanece not_run."
+    "notes": "Parcial: saldo (F08), cota e último item de estoque, e balcão não vendendo reserva de outro pedido (F10) provados no emulador pelos contratos (reserve/release/exit). 'Duas compras simultâneas' de um checkout real e o PDV real dependem de F11/F15; concorrência não medida no Firestore real (≤ 8 escritores por documento testados; limite documentado de 12). Permanece not_run. F15: cota planejada do checkout já em F11; balcão não consome cota/limite do cardápio (decisão registrada). Firestore real: só emulador."
   },
   "A19": {
     "status": "not_run",
@@ -378,15 +383,18 @@
   },
   "A25": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "F15 (04/10/2026, emulador): PDV vende 10 balas pelo preço do servidor — 1 débito (livro counter_purchase), 1 baixa (sale_exit com custo médio histórico), pedido entregue, uso comprometido, auditoria; valores do cliente recusados e preço desatualizado exige nova revisão; homônimos listados com turma/turno e só a carteira escolhida é debitada (tests/integration/pos-api.test.ts, tests/unit/pos.test.ts, tests/e2e/pos.spec.ts: busca nominal, \"10 bala\", revisão, clique duplo, Meus pedidos)."
+    ],
+    "notes": "F15: enunciado comprovado no emulador (API e interface); não homologado no Firestore real por falta de saldo fixture na HML (sem recarga real até F17–F19)."
   },
   "A26": {
     "status": "not_run",
     "evidence": [
-      "F12 (04/10/2026) tests/integration/orders-history-api.test.ts (emulador, 9 testes): abas Pendentes/Concluídos/Cancelados, situação detalhada, canal (incl. balcão por fixture), turno, período, um filho ou todos; paginação por cursor em 2 alunos com datas repetidas sem duplicar/omitir e com pedido novo entre páginas; snapshot x produto alterado; sem vazamento de campos internos; isolamento, vínculo revogado, aluno com login, equipe sem escopo; extrato paginado (tipo, período, empate de instante). tests/unit/order-history.test.ts (9). tests/e2e/my-orders.spec.ts (7): pedidos do checkout real na tela, filtros, paginação 20+4, troca de conta/vínculo revogado, tempo real, estados, celular."
+      "F12 (04/10/2026) tests/integration/orders-history-api.test.ts (emulador, 9 testes): abas Pendentes/Concluídos/Cancelados, situação detalhada, canal (incl. balcão por fixture), turno, período, um filho ou todos; paginação por cursor em 2 alunos com datas repetidas sem duplicar/omitir e com pedido novo entre páginas; snapshot x produto alterado; sem vazamento de campos internos; isolamento, vínculo revogado, aluno com login, equipe sem escopo; extrato paginado (tipo, período, empate de instante). tests/unit/order-history.test.ts (9). tests/e2e/my-orders.spec.ts (7): pedidos do checkout real na tela, filtros, paginação 20+4, troca de conta/vínculo revogado, tempo real, estados, celular.",
+      "F15 (04/10/2026, emulador): canal balcão real (não mais fixture) na lista (filtro channel=counter e aba Concluídos), no detalhe/recibo (linha do tempo \"Venda registrada no balcão\" + \"Entrega\", sem custo nem UID do operador) e no extrato (counter_purchase); outra família 403; o responsável não cancela venda entregue (tests/integration/pos-api.test.ts)."
     ],
-    "notes": "Parcial: entrega, cancelamento e balcão REAIS (F13/F14/F15) ainda não existem — os grupos Concluídos/Cancelados e o canal balcão foram provados com pedidos de fixture no formato do documento, e 'parcial' (cancelamento parcial) não tem dado nem tela. Firestore real: índices compostos novos NÃO validados na nuvem (emulador não exige índice)."
+    "notes": "Parcial: entrega, cancelamento e balcão REAIS (F13/F14/F15) ainda não existem — os grupos Concluídos/Cancelados e o canal balcão foram provados com pedidos de fixture no formato do documento, e 'parcial' (cancelamento parcial) não tem dado nem tela. Firestore real: índices compostos novos NÃO validados na nuvem (emulador não exige índice). F15: balcão agora é dado real do PDV; 'parcial' de cancelamento segue conforme a F14. Índices compostos da F12 seguem validados na HML pelos smokes anteriores."
   },
   "A27": {
     "status": "not_run",

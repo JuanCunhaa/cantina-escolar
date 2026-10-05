@@ -485,8 +485,11 @@ describe("política do responsável aplicada no checkout (A10/A11)", () => {
       const split = await buy(guardianA, cart(student, SM, { [sameWeek]: [{ productId: p }], [other]: [{ productId: p }] }));
       expect(split.status, "semanas diferentes consomem tetos próprios").toBe(200);
     }
-    await db().doc(`studentPolicies/${student}`).update({ blockedProductIds: [p] });
-    expect((await buy(guardianA, cart(student, SM, { [d(1)]: [{ productId: p }] }))).body).toMatchObject({ error: "confirmation_required", details: { violations: [{ kind: "product_blocked", productId: p }] } });
+    // Aluno SEM consumo comprometido: o bloqueio é isolado do teto semanal (com o mesmo aluno, numa segunda-feira d(1) cai na semana já
+    // comprometida pelo `split` acima e a lista de violações ganha o limite semanal — o teste dependia do dia da semana).
+    const blocked = await newStudent({ cents: 50000 });
+    await db().doc(`studentPolicies/${blocked}`).update({ blockedProductIds: [p] });
+    expect((await buy(guardianA, cart(blocked, SM, { [d(1)]: [{ productId: p }] }))).body).toMatchObject({ error: "confirmation_required", details: { violations: [{ kind: "product_blocked", productId: p }] } });
   });
 
   it("exceção de uso único de aluno: cobre só a data e o valor autorizados e é consumida na mesma transação", async () => {

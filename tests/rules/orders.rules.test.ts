@@ -120,3 +120,48 @@ describe("Firestore rules — F14: cancelamento e reembolso são só do servidor
     await assertFails(setDoc(doc(db, "wallets/stu_a"), { studentId: "stu_a", balanceCents: 99999, version: 1 }));
   });
 });
+
+/**
+ * F15: pedido de balcão (`channel: "counter"`, entregue na hora), a entrega que o acompanha, a venda direta (`directSales`,
+ * recebimento local sem aluno) e o lançamento `counter_purchase` são escritos só pelo servidor. Sem regra nova: o default-deny
+ * cobre tudo — nem a cantina que opera o PDV, nem a administração, nem a família dona leem ou escrevem direto.
+ */
+describe("Firestore rules — F15: balcão e venda direta são só do servidor", () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "orders/cnt_1"), { orderId: "cnt_1", channel: "counter", studentId: "stu_a", status: "delivered", totalCents: 1000, consumptionDate: "2026-10-05", createdByUid: "cant" });
+      await setDoc(doc(db, "orders/cnt_1/deliveries/dlv_1"), { deliveryId: "dlv_1", orderId: "cnt_1", studentId: "stu_a", lines: [{ movementId: "m000000001" }] });
+      await setDoc(doc(db, "directSales/dsl_1"), { saleId: "dsl_1", channel: "counter_direct", totalCents: 500, payment: { method: "cash" }, createdByUid: "cant" });
+    });
+  });
+
+  it("nenhum cliente lê, lista, cria, altera ou apaga venda de balcão, entrega ou venda direta", async () => {
+    const contexts = [await as("famA", "guardian"), await as("famB", "guardian"), await as("aluA", "student"), await as("cant", "cantina"), await as("sec", "secretaria"), await as("adm", "admin"), env.unauthenticatedContext()];
+    for (const ctx of contexts) {
+      const db = ctx.firestore();
+      await assertFails(getDoc(doc(db, "orders/cnt_1")));
+      await assertFails(getDoc(doc(db, "orders/cnt_1/deliveries/dlv_1")));
+      await assertFails(getDocs(collection(db, "orders/cnt_1/deliveries")));
+      await assertFails(getDoc(doc(db, "directSales/dsl_1")));
+      await assertFails(getDocs(collection(db, "directSales")));
+      await assertFails(setDoc(doc(db, "directSales/dsl_2"), { saleId: "dsl_2", totalCents: 1 }));
+      await assertFails(updateDoc(doc(db, "directSales/dsl_1"), { totalCents: 1 }));
+      await assertFails(deleteDoc(doc(db, "directSales/dsl_1")));
+      await assertFails(setDoc(doc(db, "orders/cnt_2"), { channel: "counter", studentId: "stu_a", status: "delivered", totalCents: 1 }));
+      await assertFails(updateDoc(doc(db, "orders/cnt_1"), { totalCents: 1 }));
+    }
+  });
+
+  it("o cliente não grava lançamento de balcão nem altera o saldo (a cantina não tem leitura de saldo pelo cliente)", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "wallets/stu_a"), { studentId: "stu_a", balanceCents: 5000, version: 1 });
+    });
+    for (const ctx of [await as("cant", "cantina"), await as("adm", "admin"), await as("famA", "guardian")]) {
+      const db = ctx.firestore();
+      await assertFails(setDoc(doc(db, "wallets/stu_a/entries/cnt_1_pay"), { type: "counter_purchase", seq: 2, amountCents: -1000, balanceAfterCents: 4000 }));
+      await assertFails(updateDoc(doc(db, "wallets/stu_a"), { balanceCents: 0 }));
+    }
+    await assertFails(getDoc(doc(((await as("cant", "cantina")).firestore()), "wallets/stu_a")));
+  });
+});

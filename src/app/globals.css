@@ -356,3 +356,29 @@ fieldset { min-width: 0; }
 .day-actions .notice, .day-panel { flex-basis: 100%; }
 .day-panel { padding: var(--space-2) 0; }
 @media print { .day-row { break-inside: avoid; } }
+
+/* PDV de balcão (F15): busca em destaque, produtos e carrinho lado a lado no tablet/computador; coluna única no celular. Sem cards nem animação. */
+.pos .order-tabs button[role="tab"] { min-height: var(--touch-target); }
+.pos-student-picker #pos-student-search, .pos-products #pos-product-search { font-size: 1.125rem; min-height: var(--touch-target); width: 100%; }
+.pos-student-picker .field, .pos-products .field { max-width: none; }
+.pos-student-list { margin-bottom: var(--space-2); }
+.pos-student-list > li[data-active="true"] { background: var(--color-accent-soft); }
+.pos-option { all: unset; box-sizing: border-box; display: grid; gap: 0.125rem; width: 100%; padding: var(--space-2); cursor: pointer; min-height: var(--touch-target); }
+.pos-option:focus-visible { outline: 3px solid var(--color-focus); outline-offset: -3px; }
+.pos-option > span { color: var(--color-muted); font-size: 0.9375rem; }
+.pos-selected, .pos-receipt { border-top: 1px solid var(--color-line); padding: var(--space-3) 0; }
+.pos-balance strong { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.pos-restrictions { margin: var(--space-2) 0; }
+.pos-restrictions > li { padding: var(--space-1) 0; }
+.pos-layout { display: grid; gap: var(--space-4); margin-top: var(--space-3); }
+@media (min-width: 56rem) { .pos-layout { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); align-items: start; } .pos-cart { position: sticky; top: var(--space-3); } }
+.pos-shortcuts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: var(--space-2) 0; }
+.pos-product { grid-template-columns: 5.5rem minmax(0, 1fr); }
+.pos-photo { width: 5.5rem; }
+.pos-product-list .day-actions button { min-width: var(--touch-target); min-height: var(--touch-target); }
+.pos-qty-input { width: 4.5rem; text-align: center; min-height: var(--touch-target); }
+.pos-lines th[scope="row"] { font-weight: 600; }
+.pos-who { margin: 0 0 var(--space-2); }
+.pos-direct { border: 0; border-top: 1px solid var(--color-line); padding: var(--space-2) 0; margin: var(--space-2) 0; }
+.check-line { display: flex; align-items: flex-start; gap: var(--space-2); min-height: var(--touch-target); }
+.pos kbd { border: 1px solid var(--color-line); border-radius: 0.25rem; padding: 0 0.3rem; font-size: 0.875rem; background: var(--color-surface); }

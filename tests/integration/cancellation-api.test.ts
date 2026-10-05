@@ -476,6 +476,42 @@ describe("não cancela o que já foi entregue, cancelado ou resolvido", () => {
     expect((await doc(`orders/${part.orderId}`))!.deliveredAt).toBeTruthy(); // virou "entregue" por cancelamento do restante: mesmo carimbo da entrega completa
   });
 
+  it("semântica de `deliveredAt` (F15): cancelamento SEM entrega física nunca vira entrega (pedido, recibo, linha do tempo); cancelar o restante usa o instante da última entrega", async () => {
+    const p = await newProduct({ price: 500, stock: 30 });
+    // 1. Cancelamento total, nada entregue: situação "cancelled", sem `deliveredAt`, sem entrega no recibo.
+    const none = await placeOrder([{ productId: p, quantity: 2 }]);
+    expect((await cancelAs(guardianA, "guardian", none.orderId)).body).toMatchObject({ status: "cancelled", refundCents: 1000 });
+    const cancelled = (await doc(`orders/${none.orderId}`))!;
+    expect(cancelled.status).toBe("cancelled");
+    expect(cancelled.deliveredAt).toBeUndefined();
+    expect(Number(cancelled.deliveredQty ?? 0)).toBe(0);
+    expect((await db().collection(`orders/${none.orderId}/deliveries`).get()).size).toBe(0);
+    const receipt = await call(detailRoute, guardianA, "GET", `/api/orders/${none.orderId}`, undefined, none.orderId);
+    expect(receipt.body).toMatchObject({ status: "cancelled", group: "cancelled", deliveries: [] });
+    expect((receipt.body.timeline as { kind: string }[]).some((t) => t.kind === "delivery")).toBe(false);
+    expect((receipt.body.items as { deliveredQty: number }[]).every((i) => i.deliveredQty === 0)).toBe(true);
+    const completed = await call(listRoute, guardianA, "GET", `/api/orders?studentId=${none.student}&group=completed`);
+    expect((completed.body.orders as unknown[]).length).toBe(0);
+
+    // 2. Cancelamento parcial sem entrega e depois do restante: continua sem entrega.
+    const split = await placeOrder([{ productId: p, quantity: 3 }]);
+    await cancelAs(guardianA, "guardian", split.orderId, { lines: [{ lineNo: 1, quantity: 1 }] });
+    expect((await doc(`orders/${split.orderId}`))!.deliveredAt).toBeUndefined();
+    await cancelAs(guardianA, "guardian", split.orderId);
+    expect(await doc(`orders/${split.orderId}`)).toMatchObject({ status: "cancelled" });
+    expect((await doc(`orders/${split.orderId}`))!.deliveredAt).toBeUndefined();
+
+    // 3. Entrega parcial + cancelamento do restante: ENTREGUE, com o instante da última entrega (não o do cancelamento).
+    const part = await placeOrder([{ productId: p, quantity: 3 }]);
+    const d = await deliver(cantina, part.orderId, part.student, [{ lineNo: 1, quantity: 1 }]);
+    expect(d.status).toBe(200);
+    await new Promise((resolve) => setTimeout(resolve, 25)); // instantes de servidor distintos
+    expect((await cancelAs(guardianA, "guardian", part.orderId)).body).toMatchObject({ status: "delivered" });
+    const delivery = (await db().collection(`orders/${part.orderId}/deliveries`).get()).docs[0]!;
+    const stamped = (await doc(`orders/${part.orderId}`))!.deliveredAt as { toMillis(): number };
+    expect(stamped.toMillis()).toBe((delivery.get("createdAt") as { toMillis(): number }).toMillis());
+  });
+
   it("pedido de data PASSADA e sem entrega: a cantina não cancela direto (marca não retirado); a administração cancela e a família também fica de fora", async () => {
     const p = await newProduct({ price: 500, stock: 20 });
     const { student, orderId } = await placeOrder([{ productId: p }]);
