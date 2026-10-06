@@ -66,12 +66,20 @@ Brick (parcelas e meios). Mapeamento implementado:
 - Sandbox: pagador Pix `test_user_br@testuser.com` com nome `APRO` (a order volta `action_required` com QR e é aprovada
   depois pelo sandbox); cartão com `test@testuser.com` e cartões de teste. O pagador de teste só é usado com
   `MERCADOPAGO_ENV=sandbox`.
+- Medido no sandbox (06/10/2026): 402 traz `{ errors, data: order }` (cartão recusado → `data.status = "failed"`); a busca
+  por `external_reference` tem atraso de indexação (vazia no instante 0, presente em ≤ 5 s; `GET /v1/orders/{id}` é
+  imediato) — "não encontrada" logo depois de um timeout não encerra nada (desistência só após 30 min; reenvio usa a
+  mesma chave → 409 → incerto); cartões de teste da API Orders são outros que os da API Payments (Mastercard
+  `5480 8328 0103 3311`, titular `APRO`/`OTHE`); no Brick, só crédito via `types.included: ["credit_card"]` (o SDK grafa
+  `prepaid-card`) e os campos seguros (`secure-fields.mercadopago.com`) exigem digitação, não preenchimento.
 - Variáveis: `PAYMENTS_PIX_PROVIDER`/`PAYMENTS_CARD_PROVIDER=mercadopago`, `MERCADOPAGO_ENV` (`sandbox` fora de
   `APP_ENV=production`; `production` só nela), `MERCADOPAGO_ACCESS_TOKEN` (segredo do servidor), `MERCADOPAGO_PUBLIC_KEY`
   (cartão). Falta/combinação proibida = canal indisponível.
 
 ## Fontes (consultadas em 06/10/2026)
 - Mercado Pago — teste de Pix (Orders): https://www.mercadopago.com.br/developers/en/docs/checkout-api-orders/integration-test/pix.md
+- Mercado Pago — teste de cartões (Orders): https://www.mercadopago.com.br/developers/en/docs/checkout-api-orders/integration-test/cards.md
+- Card Payment Brick (SDK JS): https://github.com/mercadopago/sdk-js/blob/main/docs/bricks/card-payment.md · textos: https://www.mercadopago.com.br/developers/en/docs/checkout-bricks/card-payment-brick/visual-customizations/change-texts.md
 
 - Mercado Pago — Pix (Orders): https://www.mercadopago.com.br/developers/en/docs/checkout-api-orders/payment-integration/pix.md
 - Mercado Pago — Pix (Payments): https://www.mercadopago.com.br/developers/pt/docs/checkout-api-payments/integration-configuration/integrate-pix
