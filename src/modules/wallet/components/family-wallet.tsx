@@ -9,6 +9,7 @@ import { TransferForm } from "./transfer-form";
 
 const TYPE_LABEL: Record<LedgerEntryView["type"], string> = {
   topup: "Recarga",
+  topup_reversal: "Estorno de recarga",
   advance_purchase: "Compra antecipada",
   counter_purchase: "Compra no balcão",
   order_refund: "Reembolso de pedido",

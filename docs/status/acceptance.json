@@ -75,8 +75,13 @@
   },
   "A04": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/integration/topups-api.test.ts (F17): recarga manual Pix R$ 50 com taxa R$ 1,50 credita R$ 50 (lançamento topup +5000), registra líquido R$ 48,50 e taxa informada só no recebimento; compra de R$ 5,00 no balcão debita exatamente R$ 5,00 (sem taxa) e o livro reconcilia; cartão com taxa pendente credita o bruto",
+      "tests/unit/topups.test.ts: amountsOf (crédito = bruto; líquido = bruto − taxa; dinheiro sem taxa)",
+      "tests/e2e/topups.spec.ts: revisão mostra crédito R$ 50,00 e líquido R$ 48,50; carteira R$ 50,00; comprovante creditado R$ 50,00 / líquido R$ 48,50",
+      "tests/staging/topups-hml.spec.ts: mesmo caso com recebimento SIMULADO pelo fluxo normal (ensaio no emulador 8/8; resultado publicado em docs/status/firebase-homologation.md)"
+    ],
+    "notes": "F17 cobre a recarga MANUAL (secretaria). Recarga online (Pix/cartão pelo site, F18/F19) e cadastro/regras de taxa (F20) não existem: o enunciado vale para o canal manual; segue not_run globalmente. Na homologação só há recebimentos SIMULADOS (nenhum pagamento real homologado)."
   },
   "A05": {
     "status": "not_run",
@@ -90,8 +95,14 @@
   },
   "A07": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/integration/topups-api.test.ts (F17): responsável/aluno/cantina/sem perfil 403 e anônimo 401; secretaria SEM topup.reverse não estorna, com a permissão extra e administração estornam; perfil rebaixado/desativado/permissão retirada = 403 inclusive no replay e com ator desatualizado (releitura na transação); receivedConfirmed obrigatório; operador/data/referência/taxa/liquidação no registro e auditoria topup.manual.register/reverse na mesma transação; estorno = NOVO lançamento topup_reversal com o original intacto, motivo ≥ 10, ≤ restante, ≤ saldo (crédito gasto), stale_topup; referência duplicada (normalizada, outro aluno, débito×crédito) 409; liberação só por estorno total de lançamento incorreto; replay, clique duplo ×6, resposta perdida, falha intermediária e no último passo; disputas: 8 recargas, mesma referência ×3, 4 estornos, estorno × venda no balcão, mistura 3 recargas + 3 vendas + 2 estornos com reconciliação carteira × livro",
+      "tests/rules/wallet.rules.test.ts: topups, reversals e uniquenessKeys fechados ao cliente (família, secretaria, cantina, administração, anônimo); lançamentos de recarga só leitura da família vinculada",
+      "tests/e2e/topups.spec.ts: busca nominal com homônimos, revisão + confirmação da conferência, clique duplo, resposta perdida com a MESMA chave, referência repetida recusada, comprovante sem botão de estorno para a secretaria comum, estorno com permissão separada (novo movimento, histórico) e celular sem rolagem lateral",
+      "Mutação dirigida: sem checagem da referência (3 testes caem), sem expectedReversedCents (3), allow do estorno trocado para topup.register (1)",
+      "F17 (05/10/2026, emulador): npm test 239/239, test:rules 55/55, test:integration 400 (1ª execução 399/400: timeout em policies-api A35 sob carga paralela; arquivo reexecutado 17/17), test:e2e 68/68, lint/typecheck 0, build:webpack 0, audit:prod 0, gitleaks sem vazamentos nos arquivos novos"
+    ],
+    "notes": "Enunciado provado no Emulator Suite para a recarga manual (F17). Homologação: recebimentos SIMULADOS pelo fluxo normal (sem dinheiro/provedor), resultado em docs/status/firebase-homologation.md. Segue not_run globalmente até a revisão F23."
   },
   "A08": {
     "status": "not_run",
@@ -428,6 +439,7 @@
     "evidence": [
       "tests/integration/access-api.test.ts: POST /api/admin/users — aluno, responsável, cantina, secretaria e conta sem perfil recebem 403 (nada muda); 401 sem token; claim forjada role=admin não concede nada",
       "tests/unit/access.test.ts: matriz de capacidades — secretaria só students.search/topup.register (sem costs.read/profit.read/audit.read/users.manage); estorno manual só com permissão extra explícita",
+      "tests/integration/topups-api.test.ts (F17): secretaria (com e sem topup.reverse) recebe 403 em estoque/custos (/api/inventory), reconciliação/auditoria (/api/wallets/reconcile) e gestão de usuários (/api/admin/users); respostas de recarga/aluno/lista sem custo, lucro, UID, e-mail ou dados de responsável",
       "tests/rules: nenhum papel (inclusive admin) lê custos/lucro/relatórios/auditoria pelo cliente; secretaria não lê studentPolicies",
       "tests/e2e/access.spec.ts: aluno não alcança a operação; conta sem perfil não recebe navegação nem produtos",
       "npm run typecheck exit 0",

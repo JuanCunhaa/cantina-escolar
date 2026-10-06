@@ -61,3 +61,11 @@ Busca por nome: `students` por intervalo de prefixo em `nameNormalized` (custo =
 
 - `GET /api/operations/orders/{id}/amend-options` (`orders.amend`): pedido e aluno por ID; janela hoje…hoje+7 do turno ATUAL do aluno (`purchaseWindow`, mesma leitura do cardápio da família; horário encerrado vira `cutoffPassed`); produtos do canal antecipado na data/turno DO PEDIDO (exceção da data por ID + `defaultMenuRules where shiftIds array-contains` + `products where status ==` + categorias, iguais ao cardápio da F07). Sem índice novo.
 - Comandos leem por ID dentro da transação: pedido, aluno, política, exceção, carteira, cardápio da data, uso dia/semana (origem e destino), saldo/lotes/reservas/cotas pelo `StockSession`. Detalhe da família: `orders/{id}/reschedules` e `orders/{id}/exchanges` ordenados por `seq` (campo único, sem composto). Extrato com `type == "order_exchange"` usa a mesma consulta/índice do filtro por tipo da F12.
+
+### Recargas manuais (F17)
+
+- Conferência do dia (`GET /api/topups?date=&mine=`): `topups where createdAt >= início local and createdAt < fim local orderBy createdAt desc limit 301` (campo único; dia local de São Paulo); `mine=1` filtra o operador em memória sobre o resultado (até 300 por dia; acima disso a resposta diz `truncated`). Totais por meio, creditado, estornado, taxa informada e quantidade de taxas pendentes (nunca soma estimativa com real: só existe taxa informada nesta etapa).
+- Histórico do aluno (`GET /api/topups?studentId=` e `GET /api/topups/students?id=`): `topups where studentId == orderBy createdAt desc limit 50|10` — índice composto `topups (studentId ASC, createdAt DESC)`.
+- Comprovante (`GET /api/topups/{id}`): documento por ID + `reversals orderBy seq limit 50`.
+- Busca nominal (`GET /api/topups/students`): mesma lista de alunos ativos do PDV (`readActiveRoster`), filtrada no navegador.
+- Extrato da família: os tipos novos `topup_reversal` (e `topup`) usam os índices de `entries` já existentes (`type` + `seq`/`createdAt`).
