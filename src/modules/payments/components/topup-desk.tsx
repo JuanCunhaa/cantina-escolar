@@ -41,7 +41,7 @@ function validate(f: Fields): { amountCents: number | null; feeCents: number | u
   const feeCents = feeOf(f);
   const problems: string[] = [];
   if (amountCents === null || amountCents < MIN_TOPUP_CENTS || amountCents > MAX_TOPUP_CENTS) problems.push(`Informe o valor recebido entre ${formatBRL(MIN_TOPUP_CENTS)} e ${formatBRL(MAX_TOPUP_CENTS)}.`);
-  if (referenceRequired(f.method) && normalizeReference(f.reference).length < 4) problems.push("Informe a referência do comprovante (pelo menos 4 letras ou números).");
+  if ((referenceRequired(f.method) || f.reference.trim() !== "") && normalizeReference(f.reference).length < 4) problems.push("Informe a referência do comprovante (pelo menos 4 letras ou números).");
   if (feeCents === null || (typeof feeCents === "number" && amountCents !== null && feeCents > amountCents)) problems.push("Taxa inválida: use um valor como 1,50, que não passe do valor recebido.");
   return { amountCents, feeCents, problems };
 }
