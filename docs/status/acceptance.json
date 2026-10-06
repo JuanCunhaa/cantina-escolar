@@ -79,7 +79,7 @@
       "tests/integration/topups-api.test.ts (F17): recarga manual Pix R$ 50 com taxa R$ 1,50 credita R$ 50 (lançamento topup +5000), registra líquido R$ 48,50 e taxa informada só no recebimento; compra de R$ 5,00 no balcão debita exatamente R$ 5,00 (sem taxa) e o livro reconcilia; cartão com taxa pendente credita o bruto",
       "tests/unit/topups.test.ts: amountsOf (crédito = bruto; líquido = bruto − taxa; dinheiro sem taxa)",
       "tests/e2e/topups.spec.ts: revisão mostra crédito R$ 50,00 e líquido R$ 48,50; carteira R$ 50,00; comprovante creditado R$ 50,00 / líquido R$ 48,50",
-      "tests/staging/topups-hml.spec.ts: mesmo caso com recebimento SIMULADO pelo fluxo normal (ensaio no emulador 8/8; resultado publicado em docs/status/firebase-homologation.md)"
+      "tests/staging/topups-hml.spec.ts: mesmo caso com recebimento SIMULADO pelo fluxo normal: ensaio no emulador 8/8 e URL publicada (Vercel + Firebase cantina-escolar-hml, 05/10/2026) 8/8 — crédito R$ 50, líquido R$ 48,50 e compra/troca/reembolso posteriores sem taxa, reconciliação OK e releitura independente dos registros"
     ],
     "notes": "F17 cobre a recarga MANUAL (secretaria). Recarga online (Pix/cartão pelo site, F18/F19) e cadastro/regras de taxa (F20) não existem: o enunciado vale para o canal manual; segue not_run globalmente. Na homologação só há recebimentos SIMULADOS (nenhum pagamento real homologado)."
   },
@@ -102,7 +102,7 @@
       "Mutação dirigida: sem checagem da referência (3 testes caem), sem expectedReversedCents (3), allow do estorno trocado para topup.register (1)",
       "F17 (05/10/2026, emulador): npm test 239/239, test:rules 55/55, test:integration 400 (1ª execução 399/400: timeout em policies-api A35 sob carga paralela; arquivo reexecutado 17/17), test:e2e 68/68, lint/typecheck 0, build:webpack 0, audit:prod 0, gitleaks sem vazamentos nos arquivos novos"
     ],
-    "notes": "Enunciado provado no Emulator Suite para a recarga manual (F17). Homologação: recebimentos SIMULADOS pelo fluxo normal (sem dinheiro/provedor), resultado em docs/status/firebase-homologation.md. Segue not_run globalmente até a revisão F23."
+    "notes": "Enunciado provado no Emulator Suite para a recarga manual (F17). Homologação (05/10/2026, URL publicada, 8/8): recebimentos SIMULADOS pelo fluxo normal (sem dinheiro/provedor) — autorização e permissão separada na nuvem, Rules publicadas, estorno como novo movimento, stale_topup e recusa acima do saldo, reconciliação; detalhes em docs/status/firebase-homologation.md. Não é pagamento real homologado. Segue not_run globalmente até a revisão F23."
   },
   "A08": {
     "status": "not_run",
