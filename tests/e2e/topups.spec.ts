@@ -73,7 +73,11 @@ test.beforeAll(async ({ request }) => {
   await track(`shifts/${SHIFT}`, { name: `Manhã Rec ${tag}`, nameSlug: "manha", status: "active" });
   await track(`classes/${CLS_A}`, { name: `Turma Rec A ${tag}`, nameSlug: "turma-rec-a", status: "active" });
   await track(`classes/${CLS_B}`, { name: `Turma Rec B ${tag}`, nameSlug: "turma-rec-b", status: "active" });
-  await warmRoutes(request, { post: ["/api/topups"], get: ["/operacao/recebimentos", "/operacao/recebimentos/tpm_x", "/api/topups", "/api/topups/students"] });
+  // Todas as rotas que o fluxo toca (inclusive as usadas só pelas asserções): compilar uma delas no meio do teste recarrega a página.
+  await warmRoutes(request, {
+    post: ["/api/topups", "/api/topups/tpm_x/reverse"],
+    get: ["/operacao/recebimentos", "/operacao/recebimentos/tpm_x", "/api/topups", "/api/topups/students", "/api/topups/tpm_x", "/api/wallets/reconcile"],
+  });
 });
 test.afterAll(removeCreated);
 
