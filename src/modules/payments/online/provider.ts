@@ -19,7 +19,8 @@ export type PixData = { copyPaste: string; qrImagePngBase64: string | null; expi
 /**
  * Cobrança conhecida pelo provedor. `outcome`:
  * - `awaiting_payment`: Pix gerado, aguardando o pagador;
- * - `processing`: cartão enviado (aprovado ou em análise no provedor) — ainda NÃO é recebimento confirmado;
+ * - `processing`: cartão enviado (aprovado ou em análise no provedor) ou Pix já informado como pago pelo provedor — ainda NÃO é
+ *   recebimento confirmado (a confirmação confiável é da F19);
  * - `declined`: o provedor recusou definitivamente (cartão negado, dados inválidos).
  */
 export type ProviderCharge = {
@@ -37,7 +38,8 @@ export type ChargeRequest = {
   amountCents: number;
   currency: "BRL";
   description: string;
-  payer: { name: string; email: string };
+  /** Pagador informado ao provedor. Documento (CPF) só no cartão, vindo do formulário do provedor; nunca persistido. */
+  payer: { name: string; email: string; identification?: { type: "CPF" | "CNPJ"; number: string } };
 };
 
 /**
@@ -59,8 +61,11 @@ export class ProviderError extends Error {
 type ProviderBase = {
   id: string;
   mode: ProviderMode;
-  /** Consulta pela referência externa (= ID da intenção). `null` = o provedor afirma não conhecer a cobrança. */
-  findCharge(externalReference: string): Promise<ProviderCharge | null>;
+  /**
+   * Consulta pela referência externa (= ID da intenção), a partir do instante de criação local (provedores exigem janela de
+   * datas na busca). `null` = o provedor afirma não conhecer a cobrança.
+   */
+  findCharge(externalReference: string, createdAt: Date): Promise<ProviderCharge | null>;
 };
 
 export type PixProvider = ProviderBase & {
@@ -75,7 +80,8 @@ export type PixProvider = ProviderBase & {
 export type CardProvider = ProviderBase & {
   /** Configuração pública do componente de tokenização (ex.: chave pública); nunca segredo. */
   publicConfig: Record<string, string>;
-  createCardCharge(request: ChargeRequest & { cardToken: string; installments: 1 }): Promise<ProviderCharge>;
+  /** `paymentMethodId` = bandeira devolvida pelo componente do provedor (ex.: "visa"); só crédito, 1 parcela. */
+  createCardCharge(request: ChargeRequest & { cardToken: string; installments: 1; paymentMethodId: string }): Promise<ProviderCharge>;
 };
 
 export type OnlineProviders = { pix: PixProvider | null; card: CardProvider | null };

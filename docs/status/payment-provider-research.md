@@ -1,8 +1,9 @@
 # Provedor de Pix e cartão 1x — pesquisa (F18)
 
 Consulta: 06/10/2026, só em páginas dos próprios provedores. Nenhuma conta aberta, plano contratado ou cobrança feita.
-**Não há escolha aprovada**: esta página é a recomendação e a lista do que falta confirmar. Até a aprovação, o código
-usa a fronteira `src/modules/payments/online/provider.ts` sem adapter real (canal indisponível fora do emulador).
+**Aprovado pelo dono em 06/10/2026: Mercado Pago para Pix e cartão 1x.** Adapter em
+`src/modules/payments/online/mercadopago.ts` (seção "Adapter" abaixo). Aceitação comercial por escrito e taxas da conta
+seguem pendentes (itens 2–3); sem elas não há produção.
 
 Legenda: **V** = lido na página oficial nesta consulta; **R** = obtido de resumo de busca sobre página do provedor (não
 lido por inteiro); **?** = não verificado. Preço/taxa é sempre "publicado em 06/10/2026", não contrato.
@@ -39,16 +40,38 @@ API e cartão sem PAN só por fatura hospedada (tokenização depende de libera�
 
 ## Pendências concretas (dono do produto)
 
-1. **Aprovar o provedor** (recomendado: Mercado Pago, um para os dois canais).
+1. ~~Aprovar o provedor~~ — **feito em 06/10/2026: Mercado Pago, um para os dois canais.**
 2. **Aceitação comercial por escrito** do provedor escolhido para "venda de crédito pré-pago em carteira fechada de cantina
    escolar, consumo só na cantina, sem saque nem reembolso em dinheiro": categoria/MCC, risco de bloqueio, retenção.
 3. **Confirmar na conta**: taxas e prazos de liquidação aplicáveis à conta da cantina (PF/PJ), chave Pix cadastrada.
 4. **Abrir o sandbox** (ação do dono) e entregar por canal seguro: access token de teste, chave pública de teste e chave
    secreta de webhook (para a F19). Nada disso vai para o repositório.
-5. Para o adapter (após 1–4): confirmar na documentação a busca por `external_reference` (conciliação depois de timeout)
-   e o parâmetro que fixa 1 parcela no Brick.
+5. ~~Para o adapter: busca por `external_reference` e 1 parcela no Brick~~ — confirmados na documentação (seção "Adapter").
+
+## Adapter (06/10/2026)
+
+Documentação consultada: API Orders (criar, buscar, obter), Pix (Orders) e teste de Pix, Cartões (Orders) e Card Payment
+Brick (parcelas e meios). Mapeamento implementado:
+
+- Criação `POST /v1/orders` com `X-Idempotency-Key` = ID da intenção e `external_reference` = mesmo ID; valor em string
+  exata a partir de centavos (`5000` → `"50.00"`).
+- Pix: `payment_method {id: "pix", type: "bank_transfer"}`, `expiration_time` ISO 8601 (mín. 30 min, máx. 30 dias);
+  resposta `action_required`/`waiting_transfer` com `qr_code` (copia e cola) e `qr_code_base64` (imagem), exibidos no
+  nosso site — sem `ticket_url`/redirecionamento.
+- Cartão: só o token do Card Payment Brick (SDK `sdk.mercadopago.com/js/v2`), crédito, `installments: 1`
+  (`minInstallments = maxInstallments = 1`; débito e pré-pago excluídos). Desafio 3DS (`action_required`) = recusado.
+- Respostas: 2xx/402 → order mapeada; 409/423/429/5xx/rede/timeout → **incerto** (só a consulta decide);
+  400/401/403/404/422 → recusa definitiva. `processed` (Pix ou cartão) = "em análise" — **não credita** (F19).
+- Conciliação: `GET /v1/orders?begin_date&end_date&external_reference` (datas obrigatórias) + `GET /v1/orders/{id}`.
+- Sandbox: pagador Pix `test_user_br@testuser.com` com nome `APRO` (a order volta `action_required` com QR e é aprovada
+  depois pelo sandbox); cartão com `test@testuser.com` e cartões de teste. O pagador de teste só é usado com
+  `MERCADOPAGO_ENV=sandbox`.
+- Variáveis: `PAYMENTS_PIX_PROVIDER`/`PAYMENTS_CARD_PROVIDER=mercadopago`, `MERCADOPAGO_ENV` (`sandbox` fora de
+  `APP_ENV=production`; `production` só nela), `MERCADOPAGO_ACCESS_TOKEN` (segredo do servidor), `MERCADOPAGO_PUBLIC_KEY`
+  (cartão). Falta/combinação proibida = canal indisponível.
 
 ## Fontes (consultadas em 06/10/2026)
+- Mercado Pago — teste de Pix (Orders): https://www.mercadopago.com.br/developers/en/docs/checkout-api-orders/integration-test/pix.md
 
 - Mercado Pago — Pix (Orders): https://www.mercadopago.com.br/developers/en/docs/checkout-api-orders/payment-integration/pix.md
 - Mercado Pago — Pix (Payments): https://www.mercadopago.com.br/developers/pt/docs/checkout-api-payments/integration-configuration/integrate-pix

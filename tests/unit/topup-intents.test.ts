@@ -19,16 +19,18 @@ const base = { key: "k".repeat(12), studentId: "stu_a", amountCents: 5000 };
 const now = new Date("2026-10-06T12:00:00Z");
 /** Token fictício do componente do provedor (montado em tempo de execução: não é segredo). */
 const tok = (suffix: string) => ["tok", suffix].join("_");
+/** Dados do componente do provedor além do token (bandeira e pagador fictícios). */
+const brick = { paymentMethodId: "visa", payer: { email: "familia@example.test", identification: { type: "CPF", number: "12345678909" } } };
 
 describe("entrada da intenção", () => {
   it("aceita Pix e cartão 1x com token; valores em centavos inteiros dentro dos limites", () => {
     expect(createIntentSchema.parse({ ...base, channel: "pix" })).toMatchObject({ channel: "pix", amountCents: 5000 });
-    expect(createIntentSchema.parse({ ...base, channel: "card", installments: 1, cardToken: tok("abcdef123") })).toMatchObject({ installments: 1 });
+    expect(createIntentSchema.parse({ ...base, channel: "card", installments: 1, ...brick, cardToken: tok("abcdef123") })).toMatchObject({ installments: 1 });
     for (const amountCents of [50.5, 0, 99, 200_001, -100]) expect(createIntentSchema.safeParse({ ...base, amountCents, channel: "pix" }).success).toBe(false);
   });
 
   it("recusa parcelamento, cartão sem token e QUALQUER dado de cartão em claro (número, CVV, validade)", () => {
-    const card = { ...base, channel: "card", installments: 1, cardToken: tok("abcdef123") };
+    const card = { ...base, channel: "card", installments: 1, ...brick, cardToken: tok("abcdef123") };
     expect(createIntentSchema.safeParse({ ...card, installments: 2 }).success).toBe(false);
     expect(createIntentSchema.safeParse({ ...card, cardToken: undefined }).success).toBe(false);
     for (const extra of [{ cardNumber: "4111111111111111" }, { cvv: "123" }, { expirationMonth: 12 }, { pan: "4111" }]) {
@@ -38,8 +40,8 @@ describe("entrada da intenção", () => {
   });
 
   it("a idempotência ignora o token (de uso único): repetir com token novo é a MESMA operação", () => {
-    const a = createIntentSchema.parse({ ...base, channel: "card", installments: 1, cardToken: tok("first_0001") });
-    const b = createIntentSchema.parse({ ...base, channel: "card", installments: 1, cardToken: tok("second_002") });
+    const a = createIntentSchema.parse({ ...base, channel: "card", installments: 1, ...brick, cardToken: tok("first_0001") });
+    const b = createIntentSchema.parse({ ...base, channel: "card", installments: 1, ...brick, cardToken: tok("second_002") });
     expect(idempotentPayload(a)).toEqual(idempotentPayload(b));
     expect(JSON.stringify(idempotentPayload(a))).not.toContain("tok_");
   });
@@ -62,8 +64,9 @@ describe("configuração por canal", () => {
     }
   });
 
-  it("provedor desconhecido (adapter real ainda inexistente) = indisponível, sem inventar integração", () => {
-    expect(onlinePaymentConfig({ APP_ENV: "production", PAYMENTS_PIX_PROVIDER: "mercadopago" }).pix).toMatchObject({ available: false, reason: "unknown_provider" });
+  it("provedor desconhecido = indisponível; Mercado Pago sem credenciais = indisponível (nunca integração inventada)", () => {
+    expect(onlinePaymentConfig({ APP_ENV: "production", PAYMENTS_PIX_PROVIDER: "outro_gateway" }).pix).toMatchObject({ available: false, reason: "unknown_provider" });
+    expect(onlinePaymentConfig({ APP_ENV: "production", PAYMENTS_PIX_PROVIDER: "mercadopago" }).pix).toMatchObject({ available: false, reason: "missing_credentials" });
     expect(onlineProviders({ APP_ENV: "production", PAYMENTS_PIX_PROVIDER: "mercadopago" }).pix).toBeNull();
   });
 });
