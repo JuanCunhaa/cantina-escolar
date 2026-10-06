@@ -69,3 +69,9 @@ Busca por nome: `students` por intervalo de prefixo em `nameNormalized` (custo =
 - Comprovante (`GET /api/topups/{id}`): documento por ID + `reversals orderBy seq limit 50`.
 - Busca nominal (`GET /api/topups/students`): mesma lista de alunos ativos do PDV (`readActiveRoster`), filtrada no navegador.
 - Extrato da família: os tipos novos `topup_reversal` (e `topup`) usam os índices de `entries` já existentes (`type` + `seq`/`createdAt`).
+
+### Recarga online (F18)
+
+- Histórico do aluno (`GET /api/topups/online?studentId=`): `topupIntents where studentId == orderBy createdAt desc limit 10` — índice `topupIntents (studentId ASC, createdAt DESC)`; autorização `wallet.read` (vínculo lido na hora).
+- Teto de abertas (na transação de criação): `topupIntents where studentId == and status in [creating, creation_uncertain, awaiting_payment]` — índice `topupIntents (studentId ASC, status ASC)`; Pix vencido é descontado em memória.
+- Detalhe/conciliação (`GET /api/topups/online/{id}`, `POST …/{id}/reconcile`): documento por ID. Sem listener: a tela lê pela API (o QR não muda; a confirmação é da F19).
