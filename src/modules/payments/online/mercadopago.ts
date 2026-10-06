@@ -103,9 +103,16 @@ export function mapOrder(channel: "pix" | "card", order: Json | null, fallbackEx
   throw new ProviderError("uncertain", "unknown_status");
 }
 
-/** Resposta da criação: 2xx/402 trazem a order; 409/423/429/5xx = incerto; demais 4xx = recusa definitiva. */
+/**
+ * Resposta da criação: 2xx traz a order; 402 traz `{ errors, data: order }` (formato observado no sandbox em 06/10/2026:
+ * cartão recusado → `data.status = "failed"`); 409/423/429/5xx = incerto; demais 4xx = recusa definitiva.
+ */
 function creationResult(channel: "pix" | "card", r: { status: number; body: Json | null }, fallbackExpiresAt: Date): ProviderCharge {
-  if (r.status === 200 || r.status === 201 || r.status === 402) return mapOrder(channel, r.body, fallbackExpiresAt);
+  if (r.status === 200 || r.status === 201) return mapOrder(channel, r.body, fallbackExpiresAt);
+  if (r.status === 402) {
+    const data = r.body?.data;
+    return mapOrder(channel, data && typeof data === "object" ? (data as Json) : r.body, fallbackExpiresAt);
+  }
   if (r.status === 409 || r.status === 423 || r.status === 429 || r.status >= 500) throw new ProviderError("uncertain", errorCode(r.body, r.status));
   if (r.status >= 400) throw new ProviderError("rejected", errorCode(r.body, r.status));
   throw new ProviderError("uncertain", `http_${r.status}`);

@@ -156,8 +156,11 @@ describe("cartão 1x (POST /v1/orders com token do Brick)", () => {
   });
 
   it("402 (order criada, pagamento recusado) e 'failed' = recusado; desafio 3DS = recusado (não suportado); pendente = em análise", async () => {
-    const declined = fakeHttp([{ status: 402, body: cardOrder("failed", "cc_rejected_other_reason") }]);
+    // Formato observado no sandbox (06/10/2026): 402 = { errors, data: order }.
+    const declined = fakeHttp([{ status: 402, body: { errors: [{ code: "failed", details: ["PAY01: rejected_by_issuer"] }], data: cardOrder("failed", "failed") } }]);
     expect(await mercadoPagoCard(cfg(declined.fetchFn)).createCardCharge(cardReq())).toMatchObject({ outcome: "declined", declineCode: "card_declined" });
+    const bare = fakeHttp([{ status: 402, body: cardOrder("failed", "cc_rejected_other_reason") }]);
+    expect(await mercadoPagoCard(cfg(bare.fetchFn)).createCardCharge(cardReq())).toMatchObject({ outcome: "declined" });
     expect(mapOrder("card", cardOrder("action_required", "pending_challenge"), expiresAt)).toMatchObject({ outcome: "declined", declineCode: "card_challenge_unsupported" });
     expect(mapOrder("card", cardOrder("processing", "in_process"), expiresAt).outcome).toBe("processing");
   });

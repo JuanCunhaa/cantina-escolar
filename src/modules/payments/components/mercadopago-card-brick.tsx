@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
  * em campos do próprio Mercado Pago e viram um token de uso único; nada disso passa pela nossa aplicação nem por logs. Só
  * crédito (débito e pré-pago excluídos) e exatamente 1 parcela. Ao enviar, a tela recebe token, bandeira e pagador e chama
  * a NOSSA API (que cobra com idempotência); o resultado mostrado vem da nossa resposta, nunca do componente.
- * Documentação: checkout-bricks/card-payment-brick (configure-installments, configure-payment-methods), consulta 06/10/2026.
+ * Documentação: checkout-bricks/card-payment-brick e github.com/mercadopago/sdk-js docs/bricks/card-payment.md, consulta 06/10/2026.
  */
 export type CardSubmission = {
   cardToken: string;
@@ -71,7 +71,11 @@ export function MercadoPagoCardBrick({ amountCents, publicKey, onSubmit }: { amo
         const mp = new window.MercadoPago(publicKey, { locale: "pt-BR" });
         const created = await mp.bricks().create("cardPayment", CONTAINER, {
           initialization: { amount: amountCents / 100 },
-          customization: { paymentMethods: { minInstallments: 1, maxInstallments: 1, types: { excluded: ["debit_card", "prepaid_card"] } } },
+          // Só crédito (lista de inclusão; o SDK grafa "prepaid-card"), 1 parcela; o servidor revalida tipo e parcelas.
+          customization: {
+            paymentMethods: { minInstallments: 1, maxInstallments: 1, types: { included: ["credit_card"] } },
+            visual: { texts: { formTitle: "Cartão de crédito" } },
+          },
           callbacks: {
             onReady: () => {
               if (!cancelled) setState("ready");

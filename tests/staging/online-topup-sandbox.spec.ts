@@ -36,20 +36,27 @@ function sandboxAccessToken(): string {
   return file.MERCADOPAGO_ACCESS_TOKEN?.trim() ?? "";
 }
 
-/** Orders do sandbox com esta referência (contagem direta, independente do adapter). */
+/**
+ * Orders do sandbox com esta referência (contagem direta, independente do adapter). A busca tem atraso de indexação
+ * (medido em 06/10/2026: vazia no instante 0, presente em ≤ 5 s; GET por ID é imediato): aguarda aparecer até 20 s.
+ */
 async function ordersWithReference(reference: string, createdAt: Date) {
-  const query = new URLSearchParams({ begin_date: new Date(createdAt.getTime() - 600_000).toISOString(), end_date: new Date(Date.now() + 60_000).toISOString(), external_reference: reference });
-  const r = await fetch(`${MP_API}/v1/orders?${query.toString()}`, { headers: { authorization: `Bearer ${sandboxAccessToken()}` } });
-  expect(r.status).toBe(200);
-  return (((await r.json()) as { data?: { external_reference?: string }[] }).data ?? []).filter((o) => o.external_reference === reference);
+  for (let waited = 0; ; waited += 2000) {
+    const query = new URLSearchParams({ begin_date: new Date(createdAt.getTime() - 600_000).toISOString(), end_date: new Date(Date.now() + 60_000).toISOString(), external_reference: reference });
+    const r = await fetch(`${MP_API}/v1/orders?${query.toString()}`, { headers: { authorization: `Bearer ${sandboxAccessToken()}` } });
+    expect(r.status).toBe(200);
+    const found = (((await r.json()) as { data?: { external_reference?: string }[] }).data ?? []).filter((o) => o.external_reference === reference);
+    if (found.length > 0 || waited >= 20_000) return found;
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
 }
 
-/** Token de cartão de TESTE (cartões e nomes documentados pelo Mercado Pago para o sandbox), criado só com a chave pública. */
+/** Token de cartão de TESTE (cartão e titulares documentados para a API Orders: Mastercard 5480…, APRO/OTHE), criado só com a chave pública. */
 async function testCardToken(holder: "APRO" | "OTHE"): Promise<string> {
   const r = await fetch(`${MP_API}/v1/card_tokens?public_key=${encodeURIComponent(publicKey)}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ card_number: "5031433215406351", security_code: "123", expiration_month: 11, expiration_year: 2030, cardholder: { name: holder, identification: { type: "CPF", number: "12345678909" } } }),
+    body: JSON.stringify({ card_number: "5480832801033311", security_code: "123", expiration_month: 11, expiration_year: 2030, cardholder: { name: holder, identification: { type: "CPF", number: "12345678909" } } }),
   });
   expect(r.status, "token de cartão de teste").toBe(201);
   return String(((await r.json()) as { id: string }).id);
@@ -105,14 +112,14 @@ test("sandbox cartão 1x: token de teste aprovado = em análise (sem crédito); 
     });
   const ok = await send("APRO");
   expect(ok.status, String(ok.body.error ?? "")).toBeLessThan(300);
-  expect(ok.body).toMatchObject({ channel: "card", status: "processing", providerMode: "live", credited: false, pix: null });
+  expect(ok.body, JSON.stringify(ok.body.failure ?? null)).toMatchObject({ channel: "card", status: "processing", providerMode: "live", credited: false, pix: null });
   expect(await ordersWithReference(String(ok.body.intentId), new Date(String(ok.body.createdAt)))).toHaveLength(1);
 
   const declined = await send("OTHE");
   expect(declined.body).toMatchObject({ channel: "card", status: "failed", credited: false });
 });
 
-test("tela: aviso de sandbox, Pix com QR e copia e cola no site; cartão abre o componente oficial do Mercado Pago", async ({ page }) => {
+test("tela: aviso de sandbox, Pix com QR e copia e cola no site; cartão pelo componente oficial, enviado = em análise, sem número/CVV na nossa API", async ({ page }) => {
   await page.goto("/portal/carteira/recarga");
   await page.getByLabel("Email").fill(fam.guardian.email);
   await page.getByLabel("Senha").fill(TEST_PASSWORD);
@@ -120,7 +127,7 @@ test("tela: aviso de sandbox, Pix com QR e copia e cola no site; cartão abre o 
   await expect(page.getByTestId("topup-sandbox")).toBeVisible({ timeout: 30000 });
 
   const start = async (amount: string, channel: "pix" | "card") => {
-    await page.getByLabel("Aluno").selectOption({ label: fam.studentName });
+    await page.getByTestId("online-topup-form").getByLabel("Aluno").selectOption({ label: fam.studentName });
     await page.getByLabel("Valor (R$)").fill(amount);
     await page.getByTestId(`topup-channel-${channel}`).check();
     await page.getByRole("button", { name: "Revisar" }).click();
@@ -141,5 +148,29 @@ test("tela: aviso de sandbox, Pix com QR e copia e cola no site; cartão abre o 
   await start("10", "card");
   await expect(page.getByTestId("mp-card-brick")).toHaveAttribute("data-state", "ready", { timeout: 45000 });
   await expect(page.locator("#mp-card-brick iframe").first()).toBeAttached();
+  await expect(page.locator("#mp-card-brick")).toContainText("Cartão de crédito");
+  await page.waitForTimeout(1000); // transição de opacidade do componente antes da captura
   await page.screenshot({ path: "test-results/f18-sandbox-card-brick.png", fullPage: true });
+
+  // Envio real pelo componente: número/validade/CVV só nos iframes seguros do Mercado Pago (secure-fields), digitados
+  // tecla a tecla (o componente ignora valor preenchido sem eventos de teclado).
+  const sent: string[] = [];
+  page.on("request", (r) => {
+    if (r.method() === "POST" && new URL(r.url()).pathname === "/api/topups/online") sent.push(r.postData() ?? "");
+  });
+  const brick = page.locator("#mp-card-brick");
+  await page.frameLocator('#mp-card-brick iframe[name="cardNumber"]').locator('input[name="cardNumber"]:not(.hide)').pressSequentially("5480832801033311", { delay: 40 });
+  await page.frameLocator('#mp-card-brick iframe[name="expirationDate"]').locator('input[name="expirationDate"]:not(.hide)').pressSequentially("11/30", { delay: 40 });
+  await page.frameLocator('#mp-card-brick iframe[name="securityCode"]').locator('input[name="securityCode"]:not(.hide)').pressSequentially("123", { delay: 40 });
+  await brick.locator('input[name="HOLDER_NAME"]').fill("APRO");
+  await brick.locator('input[name="DOCUMENT"]').fill("12345678909");
+  await brick.locator('input[name="EMAIL"]').fill("test@testuser.com");
+  await brick.getByRole("button", { name: /pagar/i }).click();
+  await expect(panel).toHaveAttribute("data-status", "processing", { timeout: 60000 });
+  await expect(page.getByTestId("topup-intent-status")).toContainText(/análise/i);
+  expect(sent).toHaveLength(1);
+  const body = JSON.parse(sent[0]!) as Record<string, unknown>;
+  expect(body).toMatchObject({ channel: "card", installments: 1, amountCents: 1000, paymentMethodId: "master" });
+  expect(sent[0]).not.toMatch(/5480832801033311|security_?code|cvv|card_?number|expiration/i);
+  await page.screenshot({ path: "test-results/f18-sandbox-card-submitted.png", fullPage: true });
 });
