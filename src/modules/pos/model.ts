@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PRICE_MAX_CENTS } from "@/modules/catalog/model";
+import { PAYMENT_METHODS } from "@/modules/payments/methods";
 import { isSafeLabel } from "@/modules/students/normalize";
 import type { OrderItem } from "@/modules/orders/model";
 
@@ -47,9 +48,7 @@ export const counterSaleSchema = z
   .strict();
 export type CounterSaleInput = z.infer<typeof counterSaleSchema>;
 
-export const PAYMENT_METHODS = ["cash", "pix", "card_debit", "card_credit"] as const;
-export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
-export const PAYMENT_LABEL: Record<PaymentMethod, string> = { cash: "Dinheiro", pix: "Pix", card_debit: "Cartão de débito", card_credit: "Cartão de crédito (1x)" };
+export { PAYMENT_LABEL, PAYMENT_METHODS, feeRecordOf, type FeeRecord, type PaymentMethod } from "@/modules/payments/methods";
 
 export const BUYER_KINDS = ["teacher", "staff", "other"] as const;
 export type BuyerKind = (typeof BUYER_KINDS)[number];
@@ -79,15 +78,6 @@ export const directSaleSchema = z
   })
   .strict();
 export type DirectSaleInput = z.infer<typeof directSaleSchema>;
-
-export type FeeRecord = { status: "none" | "informed" | "pending"; cents: number | null; source: "operator" | "not_applicable" };
-
-/** Taxa registrada: dinheiro não tem taxa de meio; Pix/cartão sem valor informado ficam pendentes de conferência. */
-export function feeRecordOf(method: PaymentMethod, feeCents: number | undefined): FeeRecord {
-  if (method === "cash") return { status: "none", cents: 0, source: "not_applicable" };
-  if (feeCents === undefined) return { status: "pending", cents: null, source: "operator" };
-  return { status: "informed", cents: feeCents, source: "operator" };
-}
 
 /** Item de venda de balcão: snapshot do item pago e entregue na hora (sem reserva). */
 export type CounterItem = Omit<OrderItem, "reservationId">;

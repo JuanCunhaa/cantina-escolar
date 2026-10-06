@@ -4,14 +4,22 @@ import { useId, useMemo, useRef, useState } from "react";
 import type { PosStudentRow } from "../queries";
 import { homonymIds, MAX_SHOWN_STUDENTS, searchStudents } from "../view";
 
-type Props = { rows: readonly PosStudentRow[]; truncated: boolean; disabled: boolean; onPick: (row: PosStudentRow) => void; inputRef: React.RefObject<HTMLInputElement | null> };
+type Props = {
+  rows: readonly PosStudentRow[];
+  truncated: boolean;
+  disabled: boolean;
+  onPick: (row: PosStudentRow) => void;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  /** Prefixo de IDs/test IDs (o PDV usa "pos"; a secretaria, "topup"). */
+  prefix?: string;
+};
 
 /**
  * Busca nominal em destaque: nome (qualquer ordem, sem acento) ou matrícula, com TURMA e TURNO em cada resultado, e destaque
  * para nomes repetidos. A lista é filtrada no navegador sobre os alunos ativos já carregados (nenhuma leitura por tecla).
  * Teclado: setas movem a seleção, Enter escolhe, Esc limpa.
  */
-export function StudentPicker({ rows, truncated, disabled, onPick, inputRef }: Props) {
+export function StudentPicker({ rows, truncated, disabled, onPick, inputRef, prefix = "pos" }: Props) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const listId = useId();
@@ -29,12 +37,12 @@ export function StudentPicker({ rows, truncated, disabled, onPick, inputRef }: P
   }
 
   return (
-    <section aria-labelledby="pos-student-title" className="pos-student-picker">
-      <h2 id="pos-student-title">Aluno</h2>
+    <section aria-labelledby={`${prefix}-student-title`} className="pos-student-picker">
+      <h2 id={`${prefix}-student-title`}>Aluno</h2>
       <div className="field">
-        <label htmlFor="pos-student-search">Buscar aluno por nome ou matrícula</label>
+        <label htmlFor={`${prefix}-student-search`}>Buscar aluno por nome ou matrícula</label>
         <input
-          id="pos-student-search"
+          id={`${prefix}-student-search`}
           ref={inputRef}
           type="search"
           autoComplete="off"
@@ -45,7 +53,7 @@ export function StudentPicker({ rows, truncated, disabled, onPick, inputRef }: P
           disabled={disabled}
           value={query}
           placeholder="Ex.: maria silva"
-          data-testid="pos-student-search"
+          data-testid={`${prefix}-student-search`}
           onChange={(e) => {
             setQuery(e.target.value);
             setActive(0);
@@ -73,7 +81,7 @@ export function StudentPicker({ rows, truncated, disabled, onPick, inputRef }: P
       {query.trim() && shown.length === 0 && <p className="muted">Nenhum aluno ativo encontrado. Confira a grafia ou use a matrícula.</p>}
       <ul id={listId} ref={optionsRef} role="listbox" aria-label="Alunos encontrados" className="plain-list pos-student-list" hidden={shown.length === 0}>
         {shown.map((row, index) => (
-          <li key={row.id} id={`${listId}-${row.id}`} role="option" aria-selected={index === current} data-active={index === current} data-testid="pos-student-option">
+          <li key={row.id} id={`${listId}-${row.id}`} role="option" aria-selected={index === current} data-active={index === current} data-testid={`${prefix}-student-option`}>
             <button type="button" className="pos-option" disabled={disabled} onClick={() => pick(row)} tabIndex={-1} aria-label={`Escolher ${row.name}, turma ${row.className ?? "sem turma"}, turno ${row.shiftName ?? "sem turno"}`}>
               <strong>{row.name}</strong>
               <span>

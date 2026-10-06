@@ -13,6 +13,7 @@ import type { StatementPage } from "../queries";
 
 const TYPE_LABEL: Record<EntryType, string> = {
   topup: "Recarga",
+  topup_reversal: "Estorno de recarga",
   advance_purchase: "Compra antecipada",
   counter_purchase: "Compra no balcão",
   order_refund: "Reembolso de pedido",

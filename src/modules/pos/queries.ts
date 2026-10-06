@@ -35,6 +35,11 @@ async function namesOf(db: Firestore, collection: "classes" | "shifts"): Promise
  */
 export async function posRoster(db: Firestore, actor: Actor, clock: () => Date = () => new Date()): Promise<PosRoster> {
   authorize(actor, "pos.operate");
+  return readActiveRoster(db, clock);
+}
+
+/** Leitura da lista de alunos ativos SEM autorização: o chamador (PDV, secretaria) autoriza antes. */
+export async function readActiveRoster(db: Firestore, clock: () => Date = () => new Date()): Promise<PosRoster> {
   const [snap, classes, shiftDocs] = await Promise.all([db.collection("students").where("status", "==", "active").limit(MAX_ROSTER + 1).get(), namesOf(db, "classes"), db.collection("shifts").where("status", "==", "active").get()]);
   const shifts = new Map(shiftDocs.docs.map((d) => [d.id, String(d.get("name") ?? d.id)] as const));
   const truncated = snap.size > MAX_ROSTER;

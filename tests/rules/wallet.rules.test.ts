@@ -95,3 +95,39 @@ describe("Firestore rules — F08: carteira e livro", () => {
     }
   });
 });
+
+describe("Firestore rules — F17: recargas manuais e estornos fechados ao cliente", () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "topups/tpm_1"), { studentId: "stu_a", amountCents: 5000, method: "pix", operator: { uid: "sec", name: "Sec" } });
+      await setDoc(doc(db, "topups/tpm_1/reversals/rvt_1"), { amountCents: 100, reason: "lançamento errado" });
+      await setDoc(doc(db, "uniquenessKeys/topupRef_x"), { topupId: "tpm_1", status: "active" });
+    });
+  });
+
+  it("nem a família do aluno, nem secretaria, cantina ou administração leem/escrevem recargas, estornos ou a unicidade da referência pelo cliente", async () => {
+    for (const [uid, role] of [["famA", "guardian"], ["aluA", "student"], ["sec", "secretaria"], ["cant", "cantina"], ["adm", "admin"]] as const) {
+      const db = (await as(uid, role)).firestore();
+      await assertFails(getDoc(doc(db, "topups/tpm_1")));
+      await assertFails(getDocs(query(collection(db, "topups"), limit(5))));
+      await assertFails(getDoc(doc(db, "topups/tpm_1/reversals/rvt_1")));
+      await assertFails(getDoc(doc(db, "uniquenessKeys/topupRef_x")));
+      await assertFails(setDoc(doc(db, "topups/tpm_2"), { studentId: "stu_a", amountCents: 5000 }));
+      await assertFails(updateDoc(doc(db, "topups/tpm_1"), { reversedCents: 5000 }));
+      await assertFails(setDoc(doc(db, "topups/tpm_1/reversals/rvt_2"), { amountCents: 1 }));
+      await assertFails(deleteDoc(doc(db, "uniquenessKeys/topupRef_x")));
+      await assertFails(setDoc(doc(db, "wallets/stu_a/entries/tpm_2_credit"), { seq: 3, type: "topup", amountCents: 5000, balanceAfterCents: 8750 }));
+    }
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "topups/tpm_1")));
+  });
+
+  it("o responsável vinculado lê o lançamento de recarga e de estorno no próprio extrato (somente leitura)", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "wallets/stu_a/entries/tpm_1_credit"), { seq: 2, type: "topup", amountCents: 5000, balanceAfterCents: 10000 });
+    });
+    const fam = (await as("famA", "guardian")).firestore();
+    await assertSucceeds(getDoc(doc(fam, "wallets/stu_a/entries/tpm_1_credit")));
+    await assertFails(getDoc(doc((await as("famB", "guardian")).firestore(), "wallets/stu_a/entries/tpm_1_credit")));
+  });
+});

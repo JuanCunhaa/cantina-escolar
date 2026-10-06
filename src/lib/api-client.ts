@@ -125,6 +125,13 @@ const MESSAGES: Record<string, string> = {
   order_not_found: "Pedido não encontrado.",
   channel_not_supported: "Este comando atende pedidos antecipados.",
   invalid_fee: "A taxa informada é inválida para esta venda (não pode superar o total, e dinheiro não tem taxa de meio de pagamento).",
+  duplicate_reference: "Este recebimento já foi lançado (mesma referência). Abra o comprovante existente antes de lançar de novo.",
+  invalid_settlement_date: "A data prevista de liquidação precisa ser de hoje até 90 dias.",
+  topup_not_found: "Recarga não encontrada.",
+  topup_not_manual: "Esta recarga não é manual.",
+  stale_topup: "Esta recarga foi estornada por outra operação agora. O comprovante foi atualizado: confira antes de estornar.",
+  already_reversed: "Esta recarga já foi estornada por completo.",
+  exceeds_reversible: "O valor passa do que ainda pode ser estornado desta recarga.",
   internal: "Não foi possível concluir agora. Tente novamente.",
 };
 

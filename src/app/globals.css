@@ -364,7 +364,7 @@ fieldset { min-width: 0; }
 
 /* PDV de balcão (F15): busca em destaque, produtos e carrinho lado a lado no tablet/computador; coluna única no celular. Sem cards nem animação. */
 .pos .order-tabs button[role="tab"] { min-height: var(--touch-target); }
-.pos-student-picker #pos-student-search, .pos-products #pos-product-search { font-size: 1.125rem; min-height: var(--touch-target); width: 100%; }
+.pos-student-picker input[type="search"], .pos-products #pos-product-search { font-size: 1.125rem; min-height: var(--touch-target); width: 100%; }
 .pos-student-picker .field, .pos-products .field { max-width: none; }
 .pos-student-list { margin-bottom: var(--space-2); }
 .pos-student-list > li[data-active="true"] { background: var(--color-accent-soft); }
