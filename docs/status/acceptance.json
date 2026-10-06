@@ -79,9 +79,10 @@
       "tests/integration/topups-api.test.ts (F17): recarga manual Pix R$ 50 com taxa R$ 1,50 credita R$ 50 (lançamento topup +5000), registra líquido R$ 48,50 e taxa informada só no recebimento; compra de R$ 5,00 no balcão debita exatamente R$ 5,00 (sem taxa) e o livro reconcilia; cartão com taxa pendente credita o bruto",
       "tests/unit/topups.test.ts: amountsOf (crédito = bruto; líquido = bruto − taxa; dinheiro sem taxa)",
       "tests/e2e/topups.spec.ts: revisão mostra crédito R$ 50,00 e líquido R$ 48,50; carteira R$ 50,00; comprovante creditado R$ 50,00 / líquido R$ 48,50",
-      "tests/staging/topups-hml.spec.ts: mesmo caso com recebimento SIMULADO pelo fluxo normal: ensaio no emulador 8/8 e URL publicada (Vercel + Firebase cantina-escolar-hml, 05/10/2026) 8/8 — crédito R$ 50, líquido R$ 48,50 e compra/troca/reembolso posteriores sem taxa, reconciliação OK e releitura independente dos registros"
+      "tests/staging/topups-hml.spec.ts: mesmo caso com recebimento SIMULADO pelo fluxo normal: ensaio no emulador 8/8 e URL publicada (Vercel + Firebase cantina-escolar-hml, 05/10/2026) 8/8 — crédito R$ 50, líquido R$ 48,50 e compra/troca/reembolso posteriores sem taxa, reconciliação OK e releitura independente dos registros",
+      "F18 (06/10/2026, emulador, provedor roteirizado): intenção online guarda o valor BRUTO em centavos (amountCents = valor pedido, sem taxa para a família) e NÃO credita — tests/integration/topup-intents-api.test.ts verifica carteira sem lançamento em todos os estados; crédito integral do pagamento online é da F19"
     ],
-    "notes": "F17 cobre a recarga MANUAL (secretaria). Recarga online (Pix/cartão pelo site, F18/F19) e cadastro/regras de taxa (F20) não existem: o enunciado vale para o canal manual; segue not_run globalmente. Na homologação só há recebimentos SIMULADOS (nenhum pagamento real homologado)."
+    "notes": "F17 cobre a recarga MANUAL (secretaria). Recarga online (Pix/cartão pelo site, F18/F19) e cadastro/regras de taxa (F20) não existem: o enunciado vale para o canal manual; segue not_run globalmente. Na homologação só há recebimentos SIMULADOS (nenhum pagamento real homologado). F18: recarga online cria só a intenção/cobrança (sem crédito); o enunciado para Pix/cartão online depende da confirmação (F19) e de provedor aprovado."
   },
   "A05": {
     "status": "not_run",
@@ -90,8 +91,13 @@
   },
   "A06": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/integration/topup-intents-api.test.ts (F18, emulador, provedor ROTEIRIZADO — não é provedor real): timeout depois de criar → creation_uncertain → conciliação por consulta encontra a cobrança, 1 única criação; timeout antes de criar → consulta não encontra e nada é recriado sozinho (3 conciliações, 1 criação); reenvio explícito usa a MESMA chave/referência; cartão incerto não é reenviado e encerra como not_created após 30 min; falha na consulta não muda nada; resposta original atrasada não regride o estado conciliado; replay e clique duplo ×6 = 1 chamada externa",
+      "tests/unit/topup-intents.test.ts: decideReconcile (nunca reenvio automático; só explícito, Pix, dentro da janela), needsReconcile, validade derivada",
+      "tests/e2e/online-topup.spec.ts (provedor de demonstração, só emulador): criação incerta conciliada pela tela; reenvio explícito do mesmo Pix; clique duplo = 1 cobrança",
+      "Mutação dirigida (F18): provedor chamado também no replay (1 teste cai), reenvio sem pedido explícito (1), desfecho sem guarda de estado (1)"
+    ],
+    "notes": "F18 cobre a metade da CRIAÇÃO (timeout de criação conciliado sem cobrança dupla). Pagamento confirmado depois da expiração local e crédito único são da F19 (webhook/consulta). Sem provedor aprovado nem sandbox: nada homologado com provedor real. Segue not_run."
   },
   "A07": {
     "status": "not_run",

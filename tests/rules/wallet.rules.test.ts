@@ -131,3 +131,23 @@ describe("Firestore rules — F17: recargas manuais e estornos fechados ao clien
     await assertFails(getDoc(doc((await as("famB", "guardian")).firestore(), "wallets/stu_a/entries/tpm_1_credit")));
   });
 });
+
+describe("Firestore rules — F18: intenções de recarga online fechadas ao cliente", () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "topupIntents/tpi_1"), { studentId: "stu_a", amountCents: 5000, channel: "pix", status: "awaiting_payment", payer: { email: "a@example.test" }, createdBy: { uid: "famA" } });
+    });
+  });
+
+  it("nem o responsável que criou, nem outra família, aluno, equipe ou anônimo leem/criam/alteram intenções (só pela API do servidor)", async () => {
+    for (const [uid, role] of [["famA", "guardian"], ["famB", "guardian"], ["aluA", "student"], ["sec", "secretaria"], ["cant", "cantina"], ["adm", "admin"]] as const) {
+      const db = (await as(uid, role)).firestore();
+      await assertFails(getDoc(doc(db, "topupIntents/tpi_1")));
+      await assertFails(getDocs(query(collection(db, "topupIntents"), limit(5))));
+      await assertFails(setDoc(doc(db, "topupIntents/tpi_2"), { studentId: "stu_a", amountCents: 5000, status: "awaiting_payment" }));
+      await assertFails(updateDoc(doc(db, "topupIntents/tpi_1"), { status: "processing" }));
+      await assertFails(deleteDoc(doc(db, "topupIntents/tpi_1")));
+    }
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "topupIntents/tpi_1")));
+  });
+});

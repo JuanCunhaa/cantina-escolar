@@ -132,6 +132,9 @@ const MESSAGES: Record<string, string> = {
   stale_topup: "Esta recarga foi estornada por outra operação agora. O comprovante foi atualizado: confira antes de estornar.",
   already_reversed: "Esta recarga já foi estornada por completo.",
   exceeds_reversible: "O valor passa do que ainda pode ser estornado desta recarga.",
+  payment_unavailable: "Pagamento online indisponível no momento para este meio. Nada foi cobrado; a recarga pode ser feita na secretaria.",
+  too_many_open_intents: "Já há recargas em aberto para este aluno. Pague ou aguarde a validade delas antes de gerar outra.",
+  intent_not_found: "Recarga não encontrada.",
   internal: "Não foi possível concluir agora. Tente novamente.",
 };
 

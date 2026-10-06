@@ -35,6 +35,9 @@ export default defineConfig({
       FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099",
       FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080",
       STORAGE_LOCAL_DIR: storageDir,
+      // Recarga online (F18): provedor de DEMONSTRAÇÃO, aceito só com APP_ENV=emulator; nunca cobra nem confirma.
+      PAYMENTS_PIX_PROVIDER: "demo",
+      PAYMENTS_CARD_PROVIDER: "demo",
       R2_ACCOUNT_ID: "",
       R2_ACCESS_KEY_ID: "",
       R2_SECRET_ACCESS_KEY: "",

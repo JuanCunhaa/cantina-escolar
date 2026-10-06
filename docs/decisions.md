@@ -15,7 +15,7 @@
 ## A decidir durante implementação
 
 - Versões estáveis e gerenciador de pacote, com lockfile em F01.
-- Provedor real por canal em F18, mediante documentação oficial e elegibilidade para recarga fechada.
+- Provedor real por canal: pesquisado na F18 (recomendação em docs/status/payment-provider-research.md), **aguardando aprovação do dono e aceitação comercial do provedor**.
 - Tamanho máximo de carrinho/lote e representação Decimal exata documentados antes dos comandos financeiros.
 - Mecanismo de conciliação agendada, após confirmar disponibilidade na hospedagem.
 - ~~Classificação de encerramento de não retirada com cobrança~~ — decidida na F13 (ver "Decisões de F13": `retained_charge_not_picked_up`).
@@ -251,3 +251,15 @@ Regra (expandir → migrar → contrair):
 - **Acesso**: secretaria tem `students.search` + `topup.register` (+ `topup.reverse` só se concedida); consulta recargas/comprovantes e o saldo do aluno escolhido; não acessa estoque/custos/lucro, reconciliação/auditoria nem gestão de usuários (A30). A família vê recarga/estorno só no extrato, com texto próprio (sem referência, observação, motivo da equipe nem operador).
 - **Interface**: `/operacao/recebimentos` (busca nominal com turma/turno e homônimos, saldo e últimas recargas, recebimento → revisão com crédito/taxa/líquido/liquidação → confirmação pela resposta; resposta perdida repete a MESMA chave; saldo só avança por `version`) e conferência do dia (data, "só os meus", totais); `/operacao/recebimentos/{id}` (comprovante interno imprimível e estorno com revisão). `StudentPicker` do PDV reaproveitado (prefixo de IDs).
 - **Rules/índices**: Rules NÃO mudaram (default-deny fecha `topups`, `reversals` e `uniquenessKeys`; testes novos provam). Índice novo `topups (studentId, createdAt desc)` — só acrescenta (compatível com a main publicada); publicar na HML antes do merge.
+
+## Decisões de F18 (06/10/2026)
+
+- **Provedor**: NENHUM escolhido/aprovado. Pesquisa (Mercado Pago, Asaas, Pagar.me) e recomendação em docs/status/payment-provider-research.md: Mercado Pago (API Orders) para Pix e cartão 1x, condicionado à aceitação comercial por escrito da recarga fechada, taxas da conta e sandbox aberto pelo dono. Sem adapter real nesta etapa: não se inventou API nem credencial.
+- **Configuração por canal**: `PAYMENTS_PIX_PROVIDER` / `PAYMENTS_CARD_PROVIDER` (src/modules/payments/online/config.ts). Ausente/`none`/desconhecido = canal indisponível (503 `payment_unavailable`, nada gravado). `demo` só com `APP_ENV=emulator` (recusado em homologação/produção); o provedor de demonstração não cobra nem confirma — não existe "simular pagamento".
+- **Fronteira simples** (`provider.ts`): `PixProvider.createPixCharge`/`CardProvider.createCardCharge` + `findCharge(referência)`; erro `rejected` (definitivo) × `uncertain` (timeout/5xx/409/resposta ilegível). Sem framework de gateways; o adapter real implementa só isso.
+- **Intenção local** `topupIntents/{tpi_…}` (ID de ator + chave): aluno, valor em centavos (R$ 1,00–2.000,00, os limites da recarga manual), BRL, canal, provedor, criada numa transação com perfil ATUAL e vínculo ativo (`topup.online`: só o responsável vinculado, aluno ativo), teto de 3 abertas por aluno e teto de saldo da carteira. Recarga iniciada pelo próprio aluno exige permissão própria ainda inexistente (pendência; o aluno não tem tela de carteira).
+- **Chamada externa fora do callback** e UMA vez por intenção: só a execução que criou a intenção chama o provedor (replay/clique duplo não); chave de idempotência = referência externa = ID da intenção. Desfecho gravado em transação separada que só sai de `creating`/`creation_uncertain` (resposta tardia não regride).
+- **Timeout**: `creation_uncertain`; conciliação = CONSULTA pela referência (automática pela tela por até 6×5 s e manual). Nunca nova cobrança automática. Reenvio só por pedido explícito, Pix, mesma chave e dentro da janela de deduplicação do provedor; cartão não é reenviado (token de uso único, nunca guardado). Sem cobrança encontrada após 30 min → `failed`/`not_created` (pagamento que apareça depois é da conciliação da F19).
+- **Estados**: `creating`, `creation_uncertain`, `awaiting_payment` (Pix: QR, copia e cola, validade de 30 min), `processing` (cartão aprovado/em análise ≠ recebido), `failed`; `expired` é derivado da validade e não descarta nada. `confirmed`/`in_review`/`reversed` e o crédito são da F19. NENHUM estado da F18 credita a carteira.
+- **Cartão**: só token do componente do provedor, `installments: 1`; esquema estrito recusa número/CVV/validade; o token fica fora do hash de idempotência e de qualquer documento/log. Fora do modo de demonstração o cartão fica indisponível até existir o componente do provedor escolhido.
+- **Rules/índices**: Rules NÃO mudaram (default-deny fecha `topupIntents`; teste novo). Índices novos (só acréscimo): `topupIntents (studentId, createdAt desc)` e `(studentId, status)` — publicar na HML antes do merge.
