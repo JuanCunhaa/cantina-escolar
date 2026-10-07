@@ -2,27 +2,26 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { symlinkEntryProblems, symlinkProblem, unsafeEntries, validateManifest, type Manifest } from "../../../scripts/ci/build-manifest.ts";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { main, symlinkEntryProblems, symlinkProblem, unsafeEntries, validateManifest, type Manifest } from "../../../scripts/ci/build-manifest.ts";
 import { E2E_BUILD_ENV } from "../../helpers/e2e-env.ts";
 
-const script = join(process.cwd(), "scripts/ci/build-manifest.ts");
 
 describe("build compartilhado: pacote, manifesto e validação no consumidor", () => {
   let dir: string;
   let sha: string;
+  // Em processo (cobertura real); o CLI só repassa argv/ambiente para main().
   const run = (args: string[], extraEnv: Record<string, string> = {}) => {
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, "error").mockImplementation((message: unknown) => {
+      logs.push(String(message));
+    });
     try {
-      const out = execFileSync(process.execPath, [script, ...args], {
-        cwd: dir,
-        encoding: "utf8",
-        stdio: "pipe",
-        env: { ...process.env, GITHUB_STEP_SUMMARY: "", GITHUB_RUN_ID: "100", GITHUB_RUN_ATTEMPT: "1", GITHUB_SHA: sha, GITHUB_EVENT_NAME: "pull_request", PR_HEAD_SHA: "a".repeat(40), PR_BASE_SHA: "b".repeat(40), ...extraEnv },
-      });
-      return { status: 0, out };
-    } catch (error) {
-      const e = error as { status: number; stderr: string; stdout: string };
-      return { status: e.status, out: `${e.stdout}${e.stderr}` };
+      const env = { GITHUB_RUN_ID: "100", GITHUB_RUN_ATTEMPT: "1", GITHUB_SHA: sha, GITHUB_EVENT_NAME: "pull_request", PR_HEAD_SHA: "a".repeat(40), PR_BASE_SHA: "b".repeat(40), ...extraEnv };
+      const status = main(args, { root: dir, env, log: (text) => logs.push(text) });
+      return { status, out: logs.join("\n") };
+    } finally {
+      spy.mockRestore();
     }
   };
   const write = (path: string, content: string) => {

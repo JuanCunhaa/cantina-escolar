@@ -14,18 +14,22 @@ export function missingConfig(specs: string[], env: Record<string, string | unde
   return problems;
 }
 
-if (import.meta.main) {
-  const [label, ...specs] = process.argv.slice(2);
+/** CLI testável: devolve o código de saída. */
+export function main(argv: string[], env: Record<string, string | undefined>, out: (text: string) => void = (text) => process.stdout.write(text)): number {
+  const [label, ...specs] = argv;
   if (!label || !specs.length || specs.some((s) => !/^[A-Z][A-Z0-9_]*(=[\w.-]+)?$/.test(s))) {
     console.error("Uso: node scripts/ci/require-config.ts <rótulo> NOME [NOME=valor ...]");
-    process.exit(2);
+    return 2;
   }
-  const problems = missingConfig(specs, process.env);
+  const problems = missingConfig(specs, env);
   if (problems.length) {
     const message = `${label}: configuração externa ausente ou não suportada (${problems.join("; ")}) — não executado, REPROVADO. Ver docs/testing/ci.md "Configuração externa".`;
-    console.log(`::error::${message}`);
-    if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### ❌ ${message}\n`);
-    process.exit(1);
+    out(`::error::${message}\n`);
+    if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, `### ❌ ${message}\n`);
+    return 1;
   }
-  console.log(`${label}: configuração presente (${specs.map((s) => s.split("=")[0]).join(", ")}).`);
+  out(`${label}: configuração presente (${specs.map((s) => s.split("=")[0]).join(", ")}).\n`);
+  return 0;
 }
+
+if (import.meta.main) process.exitCode = main(process.argv.slice(2), process.env);

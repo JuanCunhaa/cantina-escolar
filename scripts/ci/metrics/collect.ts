@@ -45,7 +45,7 @@ async function history(fetcher: Fetcher, repo: string, current: RunMetrics, limi
 async function collectorUsage(fetcher: Fetcher, repo: string, collectorRunId: number) {
   const own = (await fetcher(`repos/${repo}/actions/runs/${collectorRunId}`)) as ApiRun;
   const jobs = await paginate<ApiJob>(fetcher, `repos/${repo}/actions/runs/${collectorRunId}/jobs`, "jobs");
-  const started = jobs.map((j) => j.started_at).filter((v): v is string => Boolean(v)).sort()[0];
+  const started = jobs.map((j) => j.started_at).filter((v): v is string => Boolean(v)).sort((a, b) => a.localeCompare(b))[0];
   const previous = await paginate<ApiRun>(fetcher, `repos/${repo}/actions/workflows/${own.workflow_id}/runs?status=completed`, "workflow_runs", 1);
   let previousRawS = 0;
   let previousRounded = 0;
@@ -63,7 +63,7 @@ async function collectorUsage(fetcher: Fetcher, repo: string, collectorRunId: nu
   };
 }
 
-function parseArgs(argv: string[]) {
+export function parseArgs(argv: string[]) {
   const args: Record<string, string | boolean> = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i] ?? "";
@@ -78,33 +78,34 @@ function parseArgs(argv: string[]) {
   return args;
 }
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  const repo = String(args.repo ?? process.env.GITHUB_REPOSITORY ?? "");
+/** CLI testável: devolve o código de saída. `fetcher` injetável (testes usam fixtures; o workflow, o token). */
+export async function main(argv: string[], env: Record<string, string | undefined>, deps: { fetcher?: Fetcher; stdout?: (text: string) => void } = {}): Promise<number> {
+  const args = parseArgs(argv);
+  const repo = String(args.repo ?? env.GITHUB_REPOSITORY ?? "");
   const runId = Number(args.run);
   if (!/^[\w.-]+\/[\w.-]+$/.test(repo) || !Number.isSafeInteger(runId) || runId <= 0) {
     console.error("Uso: node scripts/ci/metrics/collect.ts --repo dono/repo --run <id> [--out dir] [--history N] [--collector-run <id>] [--gh]");
-    process.exit(2);
+    return 2;
   }
-  const token = process.env.GITHUB_TOKEN;
-  const fetcher = args.gh || !token ? ghCliFetcher() : tokenFetcher(token, process.env.GITHUB_API_URL);
-  const metrics = await fetchRunMetrics(fetcher, repo, runId);
-  const limit = args.history === undefined ? 0 : Number(args.history);
-  const hist = limit > 0 ? await history(fetcher, repo, metrics, limit) : null;
-  const collector = args["collector-run"] ? await collectorUsage(fetcher, repo, Number(args["collector-run"])) : null;
-  const report = { ...metrics, history: hist, collector };
-  const markdown = renderMarkdown(metrics, { history: hist, collector });
-  const out = String(args.out ?? "ci-metrics");
-  mkdirSync(out, { recursive: true });
-  writeFileSync(join(out, "ci-metrics.json"), `${JSON.stringify(report, null, 2)}\n`);
-  writeFileSync(join(out, "ci-metrics.md"), markdown);
-  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown);
-  else process.stdout.write(markdown);
+  try {
+    const fetcher = deps.fetcher ?? (args.gh || !env.GITHUB_TOKEN ? ghCliFetcher() : tokenFetcher(env.GITHUB_TOKEN));
+    const metrics = await fetchRunMetrics(fetcher, repo, runId);
+    const limit = args.history === undefined ? 0 : Number(args.history);
+    const hist = limit > 0 ? await history(fetcher, repo, metrics, limit) : null;
+    const collector = args["collector-run"] ? await collectorUsage(fetcher, repo, Number(args["collector-run"])) : null;
+    const report = { ...metrics, history: hist, collector };
+    const markdown = renderMarkdown(metrics, { history: hist, collector });
+    const out = String(args.out ?? "ci-metrics");
+    mkdirSync(out, { recursive: true });
+    writeFileSync(join(out, "ci-metrics.json"), `${JSON.stringify(report, null, 2)}\n`);
+    writeFileSync(join(out, "ci-metrics.md"), markdown);
+    if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, markdown);
+    else (deps.stdout ?? ((t) => process.stdout.write(t)))(markdown);
+    return 0;
+  } catch (error) {
+    console.error(`Coleta de métricas falhou: ${error instanceof Error ? error.message : String(error)}`);
+    return 1;
+  }
 }
 
-if (import.meta.main) {
-  main().catch((error: unknown) => {
-    console.error(`Coleta de métricas falhou: ${error instanceof Error ? error.message : String(error)}`);
-    process.exit(1);
-  });
-}
+if (import.meta.main) process.exitCode = await main(process.argv.slice(2), process.env);
