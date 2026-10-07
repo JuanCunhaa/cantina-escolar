@@ -143,3 +143,4 @@ Data de referência: 06/10/2026. Este arquivo descreve código entregue, não ap
 - Homologação publicada com o catálogo real: https://cantina-escolar-hml.vercel.app (login Vercel + contas fictícias `@hml.example.test`).
 
 <!-- probe P3: alteração só documental -->
+<!-- probe P3 b -->
