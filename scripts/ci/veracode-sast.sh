@@ -14,12 +14,12 @@ if [ -n "${VERACODE_SEED_DIR:-}" ]; then
 fi
 echo "Pacote enviado à análise: $(unzip -Z1 "$out/sast.zip" | grep -c -v '/$') arquivos"
 unzip -Z1 "$out/sast.zip" | grep -v '/$' | sed -E 's/.*\.([A-Za-z0-9]+)$/\1/' | sort | uniq -c | sort -rn | head -10
-creds="$(mktemp -d)"
-trap 'rm -rf "$creds"' EXIT
-( umask 077 && printf '[default]\nveracode_api_key_id = %s\nveracode_api_key_secret = %s\n' "$VERACODE_API_ID" "$VERACODE_API_KEY" > "$creds/credentials" )
 status=0
-docker run --rm -v "$PWD/$out:/scan" -v "$creds:/root/.veracode:ro" -w /scan \
+# Credenciais pelos parâmetros documentados do Pipeline Scan (o Actions mascara os valores no log). Um arquivo de
+# credenciais montado no container NÃO foi lido pela imagem (probe P4: "Missing value for credential: 'ID'").
+docker run --rm -v "$PWD/$out:/scan" -w /scan \
   veracode/pipeline-scan@sha256:894fd6d68bb2b2177f1a6931806be426e547ec627a5e750e3d938b23752676da \
+  --veracode_api_id "$VERACODE_API_ID" --veracode_api_key "$VERACODE_API_KEY" \
   --file sast.zip --fail_on_severity="Very High, High" --json_output_file results.json --filtered_json_output_file filtered_results.json || status=$?
 echo "Pipeline Scan terminou com código $status (o critério é avaliado abaixo)"
 node scripts/ci/veracode-report.ts sast "$out/results.json"
