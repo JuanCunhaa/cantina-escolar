@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fetchRunMetrics } from "./metrics/collect.ts";
-import { ghCliFetcher } from "./metrics/github.ts";
+import { ghCliFetcher, type Fetcher } from "./metrics/github.ts";
 import { bin } from "./lib/bin.ts";
 
 const REPRO: Record<string, string> = {
@@ -38,7 +38,7 @@ export type Gh = (...args: string[]) => string;
 const defaultGh: Gh = (...args) => execFileSync(bin("gh"), args, { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
 
 /** Status de um run (texto para a IA/dev). `gh` e diretório de logs injetáveis. */
-export async function status(argv: string[], deps: { gh?: Gh; logDir?: string } = {}): Promise<string> {
+export async function status(argv: string[], deps: { gh?: Gh; logDir?: string; fetcher?: Fetcher } = {}): Promise<string> {
   const gh = deps.gh ?? defaultGh;
   const arg = (name: string) => {
     const i = argv.indexOf(`--${name}`);
@@ -55,7 +55,7 @@ export async function status(argv: string[], deps: { gh?: Gh; logDir?: string } 
     runId = String(runs[0].databaseId);
   }
   if (!/^\d+$/.test(runId)) throw new Error("id de run inválido");
-  const m = await fetchRunMetrics(ghCliFetcher((args) => gh(...args)), repo, Number(runId));
+  const m = await fetchRunMetrics(deps.fetcher ?? ghCliFetcher(() => gh("auth", "token").trim()), repo, Number(runId));
   const out: string[] = [];
   out.push(`ci run ${m.run.id} · ${m.run.event} · ${m.run.branch} · ${m.run.head_sha.slice(0, 7)} · tentativas ${m.run.attempts} · ${m.run.status}/${m.run.conclusion ?? "—"}`);
   out.push(m.run.url);

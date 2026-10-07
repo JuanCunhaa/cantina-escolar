@@ -27,3 +27,14 @@ describe("referência da classificação documental", () => {
     expect((await referenceSha({ ...base, event: "workflow_dispatch", fetcher: async () => ({}) })).sha).toBe("");
   });
 });
+
+describe("mensagens fixas da referência (sem eco de entrada externa)", () => {
+  it("só textos conhecidos e número do run", async () => {
+    const { describeReference } = await import("../../../scripts/ci/reference-sha.ts");
+    expect(describeReference("base do PR")).toBe("base do PR");
+    expect(describeReference("último run verde 42")).toBe("último run verde 42");
+    expect(describeReference("último run verde x\ninjeção")).toBe("último run verde ?");
+    expect(describeReference("nenhum run verde anterior neste ref")).toBe("nenhum run verde anterior neste ref");
+    expect(describeReference("qualquer\noutra")).toBe("sem referência validada");
+  });
+});
