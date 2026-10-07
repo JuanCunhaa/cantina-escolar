@@ -1,8 +1,8 @@
 // Gate final obrigatório do CI (job `check`). Roda sempre (if: always()) e só aprova quando, para o modo classificado:
 // - cada job exigido terminou em success e cada job dispensado terminou em skipped (falha, cancelamento ou skip indevido reprovam);
 // - todo job em `needs` tem regra aqui (job novo sem regra reprova);
-// - cada suíte obrigatória tem resumo ok (relatório ausente, skip, contagem ≠ listada reprovam) e a soma dos grupos e2e
-//   é igual à suíte listada no job fast. Mudanças nestas regras são mudança de gate (classificação: fluxo completo).
+// - cada suíte obrigatória tem resumo ok (relatório ausente, skip, contagem ≠ listada reprovam) e a soma dos grupos (integração, e2e)
+//   é igual à suíte listada pelos próprios grupos. Mudanças nestas regras são mudança de gate (classificação: fluxo completo).
 // Uso: NEEDS='${{ toJSON(needs) }}' node scripts/ci/gate.ts --summaries <dir> [--repo dono/repo --run <id> --attempt <n>]
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -15,7 +15,7 @@ export const RULES = {
   full: {
     success: ["changes", "fast", "backend", "build", "e2e", "security", "quality"],
     skipped: [] as string[],
-    suites: ["unit", "rules", "integration", "e2e-g1", "e2e-g2"],
+    suites: ["unit", "rules", "integration-g1", "integration-g2", "e2e-g1", "e2e-g2"],
   },
   docs: {
     success: ["changes", "fast", "security"],
@@ -65,13 +65,14 @@ export function evaluateGate(needs: Needs, summaries: Record<string, SuiteSummar
     }
   }
   if (mode === "full") {
-    // União dos grupos e2e = suíte listada. Cada grupo lista a suíte inteira no próprio job (sem depender de outro job).
-    const g1 = summaries["e2e-g1"];
-    const g2 = summaries["e2e-g2"];
-    if (g1 && g2) {
+    // União dos grupos = suíte listada (integração e e2e). Cada grupo lista a suíte inteira no próprio job (sem depender de outro job).
+    for (const suite of ["integration", "e2e"]) {
+      const g1 = summaries[`${suite}-g1`];
+      const g2 = summaries[`${suite}-g2`];
+      if (!g1 || !g2) continue;
       const total = g1.expected_total;
-      if (!Number.isInteger(total) || !total || total !== g2.expected_total) problems.push(`contagem da suíte e2e listada ausente ou divergente entre os grupos (${g1.expected_total} / ${g2.expected_total})`);
-      else if (g1.total + g2.total !== total) problems.push(`e2e: g1 ${g1.total} + g2 ${g2.total} ≠ suíte listada ${total}`);
+      if (!Number.isInteger(total) || !total || total !== g2.expected_total) problems.push(`contagem da suíte ${suite} listada ausente ou divergente entre os grupos (${g1.expected_total} / ${g2.expected_total})`);
+      else if (g1.total + g2.total !== total) problems.push(`${suite}: g1 ${g1.total} + g2 ${g2.total} ≠ suíte listada ${total}`);
     }
   }
   return { ok: problems.length === 0, mode, problems, rows, suites };

@@ -7,7 +7,7 @@ Linha de base, medições e orçamento: docs/status/ci-baseline.md.
 
 ```
 changes ─┬─ fast ──────────────┬─ quality ─┐
-         ├─ backend ───────────┘           │
+         ├─ backend (g1), (g2) ┘           │
          ├─ build ── e2e (g1), e2e (g2) ───┼─ check  (if: always())
          ├─ security ──────────────────────┘
 ```
@@ -16,7 +16,7 @@ changes ─┬─ fast ──────────────┬─ quality 
 |---|---|---|
 | `changes` | classifica as mudanças (`docs` ou `full`), sem instalar dependências (~15 s) | decide o que roda sem atrasar o resto |
 | `fast` | JSON estruturado, actionlint, partição e2e, lint, typecheck, unit (+cobertura) | falha rápida; fora do caminho crítico |
-| `backend` | Rules + integração (emuladores), cobertura da integração | caminho crítico (~7 min de integração); mantido agrupado |
+| `backend (g1/g2)` | integração em 2 grupos, cada um com emulador próprio; Rules só no grupo indicado na partição; cobertura por grupo | caminho crítico (integração ~7 min num job só, run 37639559121) |
 | `build` | `npm run build` (Turbopack, como a Vercel) com ambiente hermético, Gitleaks no `.next`, pacote + manifesto | um build por run/tentativa, compartilhado |
 | `e2e (g1/g2)` | cada grupo com emuladores, servidor, dados e armazenamento próprios; usa o build compartilhado | divide a etapa mais longa |
 | `security` | Gitleaks, `npm audit` (produção), Veracode Pipeline Scan (SAST) e SCA | independente do código compilado |
@@ -73,10 +73,19 @@ g2: família e financeiro + diagnóstico de propagação). Um worker por runner,
 suíte e o grupo com o Playwright e o gate exige executados = listados, sem skip, e g1 + g2 = suíte. Spec novo sem grupo
 reprova (`node scripts/ci/e2e-groups.ts verify`). A propagação entre sessões segue diagnóstico **não bloqueante**.
 
+## Grupos da integração
+
+Partição em `scripts/ci/integration-groups.json`, por arquivo, equilibrada pelos tempos medidos no run 37639559121 (g1 ≈ 221 s;
+g2 ≈ 185 s + Rules ≈ 36 s). Cada grupo roda num job com emulador próprio (`INTEGRATION_GROUP` filtra o include de
+`vitest.integration.config.ts`; sem a variável, `npm run test:integration` roda a suíte inteira, como antes). O job lista a
+suíte e o grupo com `vitest list` (sem emulador) e o gate exige executados = listados, sem skip, e g1 + g2 = suíte. Arquivo
+novo sem grupo reprova (`node scripts/ci/integration-groups.ts verify`, no `fast` e no `ci:precheck`). O `quality` mescla
+unit + integração g1 + g2 (tentativa mais recente de cada grupo). Testes não foram alterados.
+
 ## Gate `check`
 
 `scripts/ci/gate.ts`: para o modo, cada job exigido = `success`, cada dispensado = `skipped`; falha, cancelamento ou skip
-indevido reprovam; job sem regra reprova; cada suíte (unit, rules, integration, e2e-g1, e2e-g2) precisa de resumo `ok` do
+indevido reprovam; job sem regra reprova; cada suíte (unit, rules, integration-g1, integration-g2, e2e-g1, e2e-g2) precisa de resumo `ok` do
 commit testado (ausente, ilegível, skip, contagem divergente reprovam). Em reexecução vale o resumo mais recente de cada
 suíte: grupos já aprovados no mesmo commit continuam válidos; commit novo exige tudo de novo. Credencial ausente nos
 scanners reprova o job (nunca aprovação silenciosa). **Gate implementado ≠ exigido pelo GitHub**: a `main` não tem
@@ -134,7 +143,7 @@ Versões de Node/Next ficam no manifesto do build (resumo do job `build`); o col
 
 1. Antes do push: `npm run ci:precheck` (JSON, partição e2e, lint, typecheck, unit) + testes afetados
    (`npm run test:integration`/`test:rules` se tocou backend; `npm run test:e2e:group -- g1|g2` se tocou a jornada).
-2. Agrupe as correções e faça um push só; cada push em PR roda o fluxo completo (~9 jobs).
+2. Agrupe as correções e faça um push só; cada push em PR roda o fluxo completo (~10 jobs).
 3. Status: `npm run ci:status -- --pr <n>` (ou `--run <id>`): jobs, etapa que falhou, teste:linha + erro principal, log
    completo salvo em `.agent-logs/`, artefatos, comando de reprodução e de reexecução.
 4. Acompanhar: **uma** chamada limitada, ex. `gh run watch <id> --exit-status --interval 60` com timeout da ferramenta;
@@ -145,7 +154,7 @@ Versões de Node/Next ficam no manifesto do build (resumo do job `build`); o col
 | Job | Reproduzir localmente |
 |---|---|
 | fast | `npm run ci:precheck` |
-| backend | `npm run test:rules` e `npm run test:integration` (Java 21) |
+| backend | `npm run test:rules` e `npm run test:integration` (Java 21); um grupo: `$env:INTEGRATION_GROUP='g1'; npm run test:integration` |
 | build | `npm run build` (CI/Vercel, Turbopack); nesta máquina Windows: `npm run build:webpack` |
 | e2e (gN) | modo dev: `npm run test:e2e:group -- gN`; compilado: `npm run build:webpack` e `$env:E2E_SERVER_MODE='start'; npm run test:e2e:group -- gN` (local usa webpack; o CI usa Turbopack) |
 | security | `npm run audit:prod` (Gitleaks/Veracode só no CI) |

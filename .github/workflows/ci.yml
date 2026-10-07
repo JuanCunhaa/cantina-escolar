@@ -2,7 +2,7 @@
 # Desenho, comandos de reprodução e reexecução: docs/testing/ci.md. O gate final é o job `check` (scripts/ci/gate.ts).
 #
 #   changes ─┬─ fast ──────────────┬─ quality ─┐
-#            ├─ backend ───────────┘           │
+#            ├─ backend (g1, g2) ──┘           │
 #            ├─ build ── e2e (g1, g2) ─────────┼─ check (sempre roda; aprova só o esperado para o modo)
 #            ├─ security ──────────────────────┘
 #
@@ -81,6 +81,9 @@ jobs:
       - name: Partição e2e (grupos cobrem a suíte obrigatória)
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: node scripts/ci/e2e-groups.ts verify
+      - name: Partição da integração (grupos cobrem a suíte)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: node scripts/ci/integration-groups.ts verify
       # lint, typecheck e unit rodam mesmo se um anterior falhar: todas as falhas aparecem na mesma execução.
       - name: npm run lint
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
@@ -115,11 +118,17 @@ jobs:
     outputs:
       coverage: coverage-unit-${{ github.run_id }}-a${{ github.run_attempt }}
 
+  # Integração dividida em 2 grupos (scripts/ci/integration-groups.json), cada um com emulador próprio; Rules roda só no
+  # grupo indicado na partição. O gate confere g1 + g2 = suíte listada.
   backend:
     needs: changes
     if: needs.changes.outputs.mode == 'full'
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [g1, g2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -135,36 +144,47 @@ jobs:
       - name: npm ci
         id: install
         run: npm ci
+      - name: Listar testes (suíte e grupo)
+        id: list
+        run: node scripts/ci/integration-groups.ts verify --list
       # Mesmos comandos de npm run test:rules / test:integration, com relatório JSON e cobertura (só integração executa src/).
       - name: Rules (emulador)
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.list.outcome == 'success' && steps.list.outputs.rules_group == matrix.group }}
         run: npx firebase emulators:exec --only auth,firestore --project demo-cantina "npx vitest run --config vitest.rules.config.ts --reporter=default --reporter=json --outputFile.json=ci-results/vitest-rules.json"
-      - name: Integração (emulador, com cobertura)
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: npx firebase emulators:exec --only auth,firestore --project demo-cantina "npx vitest run --config vitest.integration.config.ts --coverage --reporter=default --reporter=json --outputFile.json=ci-results/vitest-integration.json"
-      - name: Resumos das suítes
-        if: ${{ !cancelled() }}
+      - name: Integração ${{ matrix.group }} (emulador, com cobertura)
+        if: ${{ !cancelled() && steps.list.outcome == 'success' }}
         env:
+          INTEGRATION_GROUP: ${{ matrix.group }}
+        run: npx firebase emulators:exec --only auth,firestore --project demo-cantina "npx vitest run --config vitest.integration.config.ts --coverage --reporter=default --reporter=json --outputFile.json=ci-results/vitest-integration-${{ matrix.group }}.json"
+      - name: Resumos das suítes
+        if: ${{ !cancelled() && steps.list.outcome == 'success' }}
+        env:
+          EXPECTED: ${{ matrix.group == 'g1' && steps.list.outputs.expected_g1 || steps.list.outputs.expected_g2 }}
+          EXPECTED_TOTAL: ${{ steps.list.outputs.expected_total }}
+          GROUP: ${{ matrix.group }}
+          RULES: ${{ steps.list.outputs.rules_group == matrix.group }}
           JOB_ID: ${{ job.check_run_id }}
         run: |
           log="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/job/$JOB_ID"
           status=0
-          node scripts/ci/test-report.ts vitest ci-results/vitest-rules.json --suite rules --log-url "$log" || status=1
-          node scripts/ci/test-report.ts vitest ci-results/vitest-integration.json --suite integration --log-url "$log" || status=1
+          if [ "$RULES" = "true" ]; then
+            node scripts/ci/test-report.ts vitest ci-results/vitest-rules.json --suite rules --log-url "$log" || status=1
+          fi
+          node scripts/ci/test-report.ts vitest "ci-results/vitest-integration-$GROUP.json" --suite "integration-$GROUP" --expected "$EXPECTED" --expected-total "$EXPECTED_TOTAL" --log-url "$log" || status=1
           exit $status
       - name: "Artefato: resumos backend"
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.list.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ci-summary-backend-a${{ github.run_attempt }}
+          name: ci-summary-backend-${{ matrix.group }}-a${{ github.run_attempt }}
           path: ci-results/summary-*.json
           if-no-files-found: error
           retention-days: 30
       - name: "Artefato: cobertura integração"
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.list.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: coverage-integration-${{ github.run_id }}-a${{ github.run_attempt }}
+          name: coverage-integration-${{ matrix.group }}-${{ github.run_id }}-a${{ github.run_attempt }}
           path: coverage/integration/lcov.info
           if-no-files-found: error
           retention-days: 1
@@ -172,14 +192,12 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: backend-evidencias-${{ github.run_id }}-${{ github.run_attempt }}
+          name: backend-evidencias-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             ci-results/
             *-debug.log
           if-no-files-found: warn
           retention-days: 7
-    outputs:
-      coverage: coverage-integration-${{ github.run_id }}-a${{ github.run_attempt }}
 
   build:
     needs: changes
@@ -393,13 +411,22 @@ jobs:
         with:
           name: ${{ needs.fast.outputs.coverage }}
           path: coverage/unit
-      - name: "Artefato: cobertura integração"
+      # Um artefato por grupo e tentativa; em reexecução parcial vale a tentativa mais recente de cada grupo.
+      - name: "Artefato: cobertura integração (grupos)"
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: ${{ needs.backend.outputs.coverage }}
-          path: coverage/integration
-      - name: Mesclar LCOV (unit + integração)
-        run: node scripts/ci/lcov-merge.ts --out coverage/merged/lcov.info unit=coverage/unit/lcov.info integration=coverage/integration/lcov.info
+          pattern: coverage-integration-*-${{ github.run_id }}-a*
+          path: coverage/integration-artifacts
+      - name: Mesclar LCOV (unit + integração g1 + g2)
+        env:
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          args=()
+          for g in g1 g2; do
+            dir=$(find coverage/integration-artifacts -maxdepth 1 -type d -name "coverage-integration-$g-$RUN_ID-a*" | sort -V | tail -n 1)
+            args+=("integration-$g=${dir:-ausente}/lcov.info")
+          done
+          node scripts/ci/lcov-merge.ts --out coverage/merged/lcov.info unit=coverage/unit/lcov.info "${args[@]}"
       - name: Configuração do SonarQube Cloud
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

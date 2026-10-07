@@ -268,7 +268,7 @@ Regra (expandir → migrar → contrair):
 
 ## Decisões de CI/CD e FinOps (07/10/2026, antes da F19)
 
-- **Jobs**: `changes` → `fast`, `backend`, `build`, `security` em paralelo → `e2e (g1/g2)` após `build` → `quality` após `fast`+`backend` → `check` (sempre). 9 jobs no `ci` + 1 no `ci-metrics`. Backend continua agrupado (Rules + integração); dividir só com ganho medido.
+- **Jobs**: `changes` → `fast`, `backend (g1/g2)`, `build`, `security` em paralelo → `e2e (g1/g2)` após `build` → `quality` após `fast`+`backend` → `check` (sempre). 10 jobs no `ci` + 1 no `ci-metrics`. Integração dividida em 2 grupos por tempo medido (07/10/2026, decisão do dono; testes inalterados), Rules no grupo mais leve; ganho a confirmar na execução.
 - **E2E compilado**: comparação 3+3 no mesmo commit (docs/status/ci-baseline.md §4b) — build Turbopack + `next start` custou mediana 338 s × 612 s do `next dev` webpack, 0 × 1 falha; adotado. Muda modo E bundler: ganho é da configuração completa.
 - **Gate `check`** implementado em `scripts/ci/gate.ts`; **não é exigido pelo GitHub** (a `main` não tem proteção; ativar depende do dono/plano).
 - **Classificação documental** por lista explícita (`PROGRESS.md`, `docs/status/*.md`), referência = base do PR ou último run verde no ref (não o `before`: probe P3); dúvida ⇒ fluxo completo. Vercel usa a mesma regra (`ignoreCommand`: 0 ignora, 1 constrói).

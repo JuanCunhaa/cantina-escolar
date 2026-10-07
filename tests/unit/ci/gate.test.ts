@@ -17,8 +17,8 @@ const suite = (name: string, over: Partial<SuiteSummary> = {}): SuiteSummary => 
   failed: 0,
   skipped: 0,
   flaky: 0,
-  expected: name.startsWith("e2e") ? 36 : null,
-  expected_total: name.startsWith("e2e") ? 72 : null,
+  expected: /-g\d$/.test(name) ? 36 : null,
+  expected_total: /-g\d$/.test(name) ? 72 : null,
   duration_s: 1,
   failures: [],
   attempt: 1,
@@ -53,19 +53,21 @@ describe("gate final (check)", () => {
 
   it("credencial ou relatório ausente nunca vira aprovação: suíte sem resumo reprova", () => {
     const suites = allSuites();
-    delete suites.integration;
-    expect(evaluateGate(fullNeeds(), suites, SHA).problems).toEqual(["resumo da suíte integration ausente"]);
+    delete suites["integration-g2"];
+    expect(evaluateGate(fullNeeds(), suites, SHA).problems).toEqual(["resumo da suíte integration-g2 ausente"]);
   });
 
   it("resumo com skip, contagem divergente ou de outro commit reprova", () => {
     expect(evaluateGate(fullNeeds(), { ...allSuites(), unit: suite("unit", { ok: false, problems: ["2 teste(s) pulados"] }) }, SHA).ok).toBe(false);
     expect(evaluateGate(fullNeeds(), { ...allSuites(), "e2e-g2": suite("e2e-g2", { total: 35, passed: 35 }) }, SHA).problems).toEqual(["e2e: g1 36 + g2 35 ≠ suíte listada 72"]);
+    expect(evaluateGate(fullNeeds(), { ...allSuites(), "integration-g1": suite("integration-g1", { total: 35, passed: 35 }) }, SHA).problems).toEqual(["integration: g1 35 + g2 36 ≠ suíte listada 72"]);
     expect(evaluateGate(fullNeeds(), { ...allSuites(), rules: suite("rules", { sha: "0".repeat(40) }) }, SHA).problems[0]).toContain("de outro commit");
   });
 
   it("contagem e2e listada ausente ou divergente entre os grupos reprova", () => {
     expect(evaluateGate(fullNeeds(), { ...allSuites(), "e2e-g1": suite("e2e-g1", { expected_total: null }) }, SHA).problems[0]).toContain("contagem da suíte e2e listada ausente ou divergente");
     expect(evaluateGate(fullNeeds(), { ...allSuites(), "e2e-g2": suite("e2e-g2", { expected_total: 73 }) }, SHA).problems[0]).toContain("(72 / 73)");
+    expect(evaluateGate(fullNeeds(), { ...allSuites(), "integration-g2": suite("integration-g2", { expected_total: null }) }, SHA).problems[0]).toContain("contagem da suíte integration listada ausente ou divergente");
   });
 
   it("só documentação: exige skipped exatamente nos jobs da aplicação", () => {

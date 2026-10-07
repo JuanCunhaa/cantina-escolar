@@ -14,7 +14,7 @@ import { writeLines } from "./lib/output.ts";
 const REPRO: Record<string, string> = {
   changes: "node scripts/ci/classify-changes.ts --base origin/main --head HEAD",
   fast: "npm run lint; npm run typecheck; npm test; node scripts/ci/e2e-groups.ts verify",
-  backend: "npm run test:rules; npm run test:integration",
+  backend: "npm run test:rules; npm run test:integration (um grupo: $env:INTEGRATION_GROUP='g1'; npm run test:integration)",
   build: "npm run build (CI, Turbopack) — nesta máquina Windows: npm run build:webpack",
   e2e: "npm run build:webpack; $env:E2E_SERVER_MODE='start'; npm run test:e2e:group -- <g1|g2>   (sem build: modo dev, npm run test:e2e:group -- <g1|g2>)",
   security: "npm run audit:prod (Gitleaks/Veracode só no CI; Gitleaks é bloqueado nesta máquina)",

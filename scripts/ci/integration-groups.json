@@ -1,0 +1,29 @@
+{
+  "$comment": "Partição OBRIGATÓRIA da suíte de integração (vitest.integration.config.ts) em 2 grupos, um job e um emulador por grupo; equilibrada pelos tempos medidos no run 37639559121 (g1 ≈ 221 s; g2 ≈ 185 s de integração + Rules ≈ 36 s). Rules roda só no grupo `rules`. Todo arquivo novo precisa entrar em exatamente um grupo, senão o job fast reprova (docs/testing/ci.md).",
+  "groups": {
+    "g1": [
+      "amend-api.test.ts",
+      "checkout-api.test.ts",
+      "policies-api.test.ts",
+      "fulfillment-api.test.ts",
+      "wallet-api.test.ts",
+      "catalog-api.test.ts",
+      "topup-intents-api.test.ts",
+      "school-calendar.test.ts",
+      "probe-route.test.ts"
+    ],
+    "g2": [
+      "cancellation-api.test.ts",
+      "pos-api.test.ts",
+      "inventory-api.test.ts",
+      "topups-api.test.ts",
+      "students-api.test.ts",
+      "access-api.test.ts",
+      "probe-command.test.ts",
+      "orders-history-api.test.ts",
+      "menu-api.test.ts",
+      "photo-route.test.ts"
+    ]
+  },
+  "rules": "g2"
+}
