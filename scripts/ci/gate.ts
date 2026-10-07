@@ -7,7 +7,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { SuiteSummary } from "./test-report.ts";
-import { paginate, tokenFetcher } from "./metrics/github.ts";
+import { paginate, tokenFetcher, type Fetcher } from "./metrics/github.ts";
 
 export type Needs = Record<string, { result: string; outputs?: Record<string, string> }>;
 
@@ -98,11 +98,11 @@ export function readSummaries(dir: string): { attempt: number; summary: SuiteSum
   return out;
 }
 
-type FailedStep = { job: string; step: string; url: string | null };
+export type FailedStep = { job: string; step: string; url: string | null };
 
-async function failedSteps(repo: string, run: string, attempt: string, token: string): Promise<FailedStep[]> {
+export async function failedSteps(fetcher: Fetcher, repo: string, run: string, attempt: string): Promise<FailedStep[]> {
   const jobs = await paginate<{ name: string; conclusion: string | null; html_url: string | null; steps?: { name: string; conclusion: string | null }[] }>(
-    tokenFetcher(token, process.env.GITHUB_API_URL),
+    fetcher,
     `repos/${repo}/actions/runs/${run}/attempts/${attempt}/jobs`,
     "jobs",
   );
@@ -127,37 +127,40 @@ export function renderGate(result: GateResult, steps: FailedStep[]): string {
   return `${lines.join("\n")}\n`;
 }
 
-function arg(name: string): string | undefined {
-  const i = process.argv.indexOf(`--${name}`);
-  return i >= 0 ? process.argv[i + 1] : undefined;
-}
-
-async function main() {
+/** CLI testável: devolve o código de saída (0 aprovado, 1 reprovado). */
+export async function main(argv: string[], env: Record<string, string | undefined>, deps: { fetcher?: Fetcher; root?: string; stdout?: (text: string) => void } = {}): Promise<number> {
+  const arg = (name: string) => {
+    const i = argv.indexOf(`--${name}`);
+    return i >= 0 ? argv[i + 1] : undefined;
+  };
+  const root = deps.root ?? ".";
+  const out = deps.stdout ?? ((text: string) => process.stdout.write(text));
   let needs: Needs;
   try {
-    needs = JSON.parse(process.env.NEEDS ?? "") as Needs;
+    needs = JSON.parse(env.NEEDS ?? "") as Needs;
   } catch {
-    console.error("NEEDS ausente ou ilegível: gate reprovado");
-    process.exit(1);
+    out("NEEDS ausente ou ilegível: gate reprovado\n");
+    return 1;
   }
-  const result = evaluateGate(needs, latestSummaries(readSummaries(arg("summaries") ?? "ci-summaries")), process.env.GITHUB_SHA);
+  const result = evaluateGate(needs, latestSummaries(readSummaries(join(root, arg("summaries") ?? "ci-summaries"))), env.GITHUB_SHA);
   let steps: FailedStep[] = [];
   const repo = arg("repo");
   const run = arg("run");
   const attempt = arg("attempt");
-  if (!result.ok && repo && run && attempt && process.env.GITHUB_TOKEN) {
+  const fetcher = deps.fetcher ?? (env.GITHUB_TOKEN ? tokenFetcher(env.GITHUB_TOKEN) : undefined);
+  if (!result.ok && repo && run && attempt && fetcher) {
     try {
-      steps = await failedSteps(repo, run, attempt, process.env.GITHUB_TOKEN);
+      steps = await failedSteps(fetcher, repo, run, attempt);
     } catch (error) {
       result.problems.push(`(diagnóstico) não foi possível listar as etapas com falha: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   const markdown = renderGate(result, steps);
-  mkdirSync("ci-results", { recursive: true });
-  writeFileSync("ci-results/gate.json", `${JSON.stringify({ ...result, failed_steps: steps }, null, 2)}\n`);
-  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown);
-  process.stdout.write(markdown);
-  process.exit(result.ok ? 0 : 1);
+  mkdirSync(join(root, "ci-results"), { recursive: true });
+  writeFileSync(join(root, "ci-results/gate.json"), `${JSON.stringify({ ...result, failed_steps: steps }, null, 2)}\n`);
+  if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, markdown);
+  out(markdown);
+  return result.ok ? 0 : 1;
 }
 
-if (import.meta.main) void main();
+if (import.meta.main) process.exitCode = await main(process.argv.slice(2), process.env);

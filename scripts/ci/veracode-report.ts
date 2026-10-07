@@ -49,13 +49,35 @@ export function productionPackages(tree: NpmTree): Set<string> {
   return out;
 }
 
-export function evaluateSca(report: { records?: ScaRecord[] }, prod: Set<string>) {
+type LockMeta = { version?: string; optional?: boolean; devOptional?: boolean; peer?: boolean; os?: string[]; cpu?: string[] };
+export type Lockfile = { packages?: Record<string, LockMeta> };
+
+/** Pacote da árvore de produção pode faltar no inventário do agente só se for opcional/de outra plataforma (não instalado). */
+export function uncoveredProduction(prod: Set<string>, scanned: Set<string>, lock: Lockfile): { expected_missing: string[]; unexpected_missing: string[] } {
+  const expected: string[] = [];
+  const unexpected: string[] = [];
+  const entries = Object.entries(lock.packages ?? {});
+  for (const key of [...prod].filter((k) => !scanned.has(k)).sort((a, b) => a.localeCompare(b))) {
+    const at = key.lastIndexOf("@");
+    const name = key.slice(0, at);
+    const version = key.slice(at + 1);
+    const meta = entries.find(([path, m]) => path.endsWith(`node_modules/${name}`) && m.version === version)?.[1];
+    const skippable = Boolean(meta && (meta.optional || meta.devOptional || meta.peer || meta.os || meta.cpu));
+    (skippable ? expected : unexpected).push(key);
+  }
+  return { expected_missing: expected, unexpected_missing: unexpected };
+}
+
+export function evaluateSca(report: { records?: ScaRecord[] }, prod: Set<string>, lock?: Lockfile) {
   const problems: string[] = [];
   const record = report.records?.[0];
   if (!record || !Array.isArray(record.libraries) || !Array.isArray(record.vulnerabilities)) {
-    return { ok: false, problems: ["estrutura do relatório SCA não reconhecida (records[0].libraries/vulnerabilities)"], libraries: 0, prod_expected: prod.size, findings: [] };
+    return { ok: false, problems: ["estrutura do relatório SCA não reconhecida (records[0].libraries/vulnerabilities)"], libraries: 0, prod_expected: prod.size, findings: [], coverage: null };
   }
   if (!record.libraries.length) problems.push("SCA não identificou nenhuma dependência: análise ineficaz");
+  const scanned = new Set(record.libraries.flatMap((l) => (l.versions ?? []).map((v) => `${l.coordinate1 ?? l.name ?? "?"}@${v.version}`)));
+  const coverage = lock ? uncoveredProduction(prod, scanned, lock) : null;
+  if (coverage?.unexpected_missing.length) problems.push(`dependência(s) de produção fora do inventário do SCA: ${coverage.unexpected_missing.slice(0, 10).join(", ")}`);
   const findings = record.vulnerabilities.flatMap((v) => {
     const score = Math.max(v.cvss3Score ?? 0, v.cvssScore ?? 0);
     return (v.libraries ?? []).map((ref) => {
@@ -70,36 +92,39 @@ export function evaluateSca(report: { records?: ScaRecord[] }, prod: Set<string>
   const blocking = findings.filter((f) => f.blocking);
   if (blocking.length) problems.push(`${blocking.length} vulnerabilidade(s) CVSS ≥ 7 em dependência de produção`);
   if (findings.some((f) => f.package.startsWith("?@"))) problems.push("vulnerabilidade sem biblioteca identificável: revisar relatório completo");
-  return { ok: problems.length === 0, problems, libraries: record.libraries.length, prod_expected: prod.size, findings };
+  return { ok: problems.length === 0, problems, libraries: scanned.size, prod_expected: prod.size, findings, coverage };
 }
 
-const write = (name: string, data: unknown, markdown: string) => {
+const writeReport = (env: Record<string, string | undefined>, out: (text: string) => void, name: string, data: unknown, markdown: string) => {
   mkdirSync("ci-results", { recursive: true });
   writeFileSync(`ci-results/${name}.json`, `${JSON.stringify(data, null, 2)}\n`);
-  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown);
-  process.stdout.write(markdown);
+  if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, markdown);
+  out(markdown);
 };
 const load = (path: string | undefined) => {
   if (!path || !existsSync(path)) throw new Error(`relatório ausente: ${path ?? "(sem caminho)"}`);
   return JSON.parse(readFileSync(path, "utf8"));
 };
 
-if (import.meta.main) {
-  const [kind, file, extra] = process.argv.slice(2);
+/** CLI testável: devolve o código de saída. */
+export function main(argv: string[], env: Record<string, string | undefined>, out: (text: string) => void = (text) => process.stdout.write(text)): number {
+  const [kind, file, extra, lockPath] = argv;
   try {
     if (kind === "sast") {
       const r = evaluateSast(load(file) as SastResults);
-      write("veracode-sast", r, `### ${r.ok ? "✅" : "❌"} Veracode Pipeline Scan (SAST)\n\n- Severidades: ${JSON.stringify(r.by_severity)}\n- Módulos: ${r.modules.join(", ") || "—"}\n${r.message ? `- Mensagem: ${r.message}\n` : ""}${r.problems.map((p) => `- ${p}\n`).join("")}`);
-      process.exit(r.ok ? 0 : 1);
+      writeReport(env, out, "veracode-sast", r, `### ${r.ok ? "✅" : "❌"} Veracode Pipeline Scan (SAST)\n\n- Severidades: ${JSON.stringify(r.by_severity)}\n- Módulos: ${r.modules.join(", ") || "—"}\n${r.message ? `- Mensagem: ${r.message}\n` : ""}${r.problems.map((p) => `- ${p}\n`).join("")}`);
+      return r.ok ? 0 : 1;
     } else if (kind === "sca") {
-      const r = evaluateSca(load(file) as { records?: ScaRecord[] }, productionPackages(load(extra) as NpmTree));
-      write("veracode-sca", r, `### ${r.ok ? "✅" : "❌"} Veracode SCA (agente, --no-upload)\n\n- Bibliotecas identificadas: ${r.libraries} (pacotes de produção esperados pelo npm ls: ${r.prod_expected})\n- Achados: ${r.findings.length} (bloqueantes: ${r.findings.filter((f) => f.blocking).length})\n${r.problems.map((p) => `- ${p}\n`).join("")}`);
-      process.exit(r.ok ? 0 : 1);
+      const r = evaluateSca(load(file) as { records?: ScaRecord[] }, productionPackages(load(extra) as NpmTree), lockPath ? (load(lockPath) as Lockfile) : undefined);
+      writeReport(env, out, "veracode-sca", r, `### ${r.ok ? "✅" : "❌"} Veracode SCA (agente, --no-upload)\n\n- Bibliotecas identificadas (nome@versão): ${r.libraries}; árvore de produção pelo npm ls: ${r.prod_expected}${r.coverage ? ` (fora do inventário: ${r.coverage.expected_missing.length} opcionais/de outra plataforma, ${r.coverage.unexpected_missing.length} inesperadas)` : ""}\n- Achados: ${r.findings.length} (bloqueantes: ${r.findings.filter((f) => f.blocking).length})\n${r.problems.map((p) => `- ${p}\n`).join("")}`);
+      return r.ok ? 0 : 1;
     }
-    console.error("Uso: node scripts/ci/veracode-report.ts sast <results.json> | sca <srcclr.json> <npm-ls-prod.json>");
-    process.exit(2);
+    console.error("Uso: node scripts/ci/veracode-report.ts sast <results.json> | sca <srcclr.json> <npm-ls-prod.json> [package-lock.json]");
+    return 2;
   } catch (error) {
     console.error(`Avaliação Veracode reprovada: ${error instanceof Error ? error.message : String(error)}`);
-    process.exit(1);
+    return 1;
   }
 }
+
+if (import.meta.main) process.exitCode = main(process.argv.slice(2), process.env);

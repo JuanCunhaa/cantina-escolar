@@ -10,6 +10,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, posix, relative } from "node:path";
 import { E2E_BUILD_ENV } from "../../tests/helpers/e2e-env.ts";
+import { bin, npmVersion } from "./lib/bin.ts";
 
 export const PACKAGE_FILE = "build.tar.gz";
 /** Excluídos por serem dispensáveis à execução: cache incremental da compilação e rastros (trace) de diagnóstico. */
@@ -69,9 +70,8 @@ export function symlinkEntryProblems(verboseLines: string[], expected: Symlink[]
 }
 
 export const sha256File = (path: string) => createHash("sha256").update(readFileSync(path)).digest("hex");
-const git = (...args: string[]) => execFileSync("git", args, { encoding: "utf8" }).trim();
 
-export function listBuildFiles(root = ".next"): { files: string[]; bytes: number; problems: string[]; symlinks: Symlink[] } {
+export function listBuildFiles(projectRoot = "."): { files: string[]; bytes: number; problems: string[]; symlinks: Symlink[] } {
   const files: string[] = [];
   const problems: string[] = [];
   const symlinks: Symlink[] = [];
@@ -79,7 +79,7 @@ export function listBuildFiles(root = ".next"): { files: string[]; bytes: number
   const walk = (dir: string) => {
     for (const entry of readdirSync(dir)) {
       const full = join(dir, entry);
-      const rel = relative(".", full).replace(/\\/g, "/");
+      const rel = relative(projectRoot, full).replace(/\\/g, "/");
       const stat = lstatSync(full);
       if (stat.isSymbolicLink()) {
         const target = readlinkSync(full).split("\\").join("/");
@@ -102,9 +102,10 @@ export function listBuildFiles(root = ".next"): { files: string[]; bytes: number
       bytes += stat.size;
     }
   };
-  if (!existsSync(root)) problems.push(`${root} não existe: build ausente`);
+  const root = join(projectRoot, ".next");
+  if (!existsSync(root)) problems.push(".next não existe: build ausente");
   else walk(root);
-  return { files: files.sort(), bytes, problems, symlinks: symlinks.sort((a, b) => a.path.localeCompare(b.path)) };
+  return { files: files.sort((a, b) => a.localeCompare(b)), bytes, problems, symlinks: symlinks.sort((a, b) => a.path.localeCompare(b.path)) };
 }
 
 export type Actual = { runId: string; headSha: string; githubSha: string; lockfileSha256: string; nodeVersion: string; packageSha256: string | null; packageSize: number | null };
@@ -132,115 +133,141 @@ export function unsafeEntries(entries: string[]): string[] {
   return entries.filter((e) => !e.startsWith(".next/") || e.split("/").includes("..") || e.startsWith("/") || /^[A-Za-z]:/.test(e));
 }
 
-function arg(name: string): string | undefined {
-  const i = process.argv.indexOf(`--${name}`);
-  return i >= 0 ? process.argv[i + 1] : undefined;
-}
-const env = (name: string) => process.env[name] ?? "";
-const summary = (text: string) => process.env.GITHUB_STEP_SUMMARY && appendFileSync(process.env.GITHUB_STEP_SUMMARY, text);
+type Env = Record<string, string | undefined>;
+export type CliContext = { root: string; env: Env; log?: (text: string) => void };
 
-function pack() {
-  const out = arg("out");
-  const name = arg("name");
-  const command = arg("build-command") ?? "";
-  if (!out || !name || !/^[\w.-]+$/.test(name)) throw new Error("pack exige --out <dir> --name <artefato>");
-  const { files, bytes, problems, symlinks } = listBuildFiles();
+const value = (env: Env, name: string) => env[name] ?? "";
+const gitIn = (root: string, ...args: string[]) => execFileSync(bin("git"), args, { cwd: root, encoding: "utf8" }).trim();
+const tar = (root: string, args: string[]) => execFileSync(bin("tar"), args, { cwd: root, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
+/** Caminho relativo à raiz para o tar (o tar do Git para Windows trata "C:" como host remoto). */
+const rel = (root: string, path: string) => relative(root, path).split("\\").join("/");
+const writeSummary = (env: Env, text: string) => {
+  if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, text);
+};
+
+export function pack(ctx: CliContext, opts: { out: string; name: string; buildCommand: string }): Manifest {
+  const { root, env } = ctx;
+  if (!/^[\w.-]+$/.test(opts.name)) throw new Error("pack exige --out <dir> --name <artefato>");
+  const { files, bytes, problems, symlinks } = listBuildFiles(root);
   if (problems.length) throw new Error(`pacote recusado:\n- ${problems.join("\n- ")}`);
+  const out = join(root, opts.out);
   mkdirSync(out, { recursive: true });
   const listPath = join(out, "files.txt");
   writeFileSync(listPath, `${files.join("\0")}\0`);
   const tarPath = join(out, PACKAGE_FILE);
-  execFileSync("tar", ["--null", "-czf", tarPath, "-T", listPath]);
+  tar(root, ["--null", "-czf", rel(root, tarPath), "-T", rel(root, listPath)]);
   rmSync(listPath);
-  const sha = (value: string) => (/^[0-9a-f]{40}$/.test(value) ? value : null);
+  const sha = (text: string) => (/^[0-9a-f]{40}$/.test(text) ? text : null);
   const manifest: Manifest = {
     schema: "cantina-build-manifest/1",
-    artifact: name,
-    compiled_sha: git("rev-parse", "HEAD"),
-    github_sha: env("GITHUB_SHA"),
-    event: env("GITHUB_EVENT_NAME"),
-    ref: env("GITHUB_REF"),
-    pull_request: env("GITHUB_EVENT_NAME").startsWith("pull_request") ? { head_sha: sha(env("PR_HEAD_SHA")), base_sha: sha(env("PR_BASE_SHA")) } : null,
-    producer: { workflow: env("GITHUB_WORKFLOW"), run_id: env("GITHUB_RUN_ID"), run_attempt: env("GITHUB_RUN_ATTEMPT"), job: env("GITHUB_JOB") },
+    artifact: opts.name,
+    compiled_sha: gitIn(root, "rev-parse", "HEAD"),
+    github_sha: value(env, "GITHUB_SHA"),
+    event: value(env, "GITHUB_EVENT_NAME"),
+    ref: value(env, "GITHUB_REF"),
+    pull_request: value(env, "GITHUB_EVENT_NAME").startsWith("pull_request") ? { head_sha: sha(value(env, "PR_HEAD_SHA")), base_sha: sha(value(env, "PR_BASE_SHA")) } : null,
+    producer: { workflow: value(env, "GITHUB_WORKFLOW"), run_id: value(env, "GITHUB_RUN_ID"), run_attempt: value(env, "GITHUB_RUN_ATTEMPT"), job: value(env, "GITHUB_JOB") },
     runtime: {
       node: process.version,
-      npm: (() => {
-        try {
-          return execFileSync(process.platform === "win32" ? "npm.cmd" : "npm", ["--version"], { encoding: "utf8", shell: process.platform === "win32" }).trim();
-        } catch {
-          return null;
-        }
-      })(),
-      next: (JSON.parse(readFileSync("node_modules/next/package.json", "utf8")) as { version: string }).version,
+      npm: npmVersion(),
+      next: (JSON.parse(readFileSync(join(root, "node_modules/next/package.json"), "utf8")) as { version: string }).version,
       platform: `${process.platform}-${process.arch}`,
     },
-    lockfile_sha256: sha256File("package-lock.json"),
+    lockfile_sha256: sha256File(join(root, "package-lock.json")),
     mode: "emulator",
     build_env: { ...E2E_BUILD_ENV },
-    build_command: command,
+    build_command: opts.buildCommand,
     package: { file: PACKAGE_FILE, sha256: sha256File(tarPath), size_bytes: lstatSync(tarPath).size, files: files.length, uncompressed_bytes: bytes, excluded: EXCLUDED.map(String), symlinks },
     created_at: new Date().toISOString(),
   };
   writeFileSync(join(out, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-  console.log(`Pacote ${name}: ${files.length} arquivos, ${(manifest.package.size_bytes / 1_048_576).toFixed(1)} MB (${(bytes / 1_048_576).toFixed(1)} MB sem compressão), sha256 ${manifest.package.sha256}`);
-  summary(`### Build compartilhado \`${name}\`\n\n- SHA compilado: \`${manifest.compiled_sha}\`${manifest.pull_request?.head_sha ? ` (merge de teste; head do PR \`${manifest.pull_request.head_sha}\`)` : ""}\n- Produtor: run ${manifest.producer.run_id}, tentativa ${manifest.producer.run_attempt}\n- Node ${manifest.runtime.node}, npm ${manifest.runtime.npm ?? "?"}, Next ${manifest.runtime.next}; modo emulator\n- ${files.length} arquivos; ${(manifest.package.size_bytes / 1_048_576).toFixed(1)} MB; sha256 \`${manifest.package.sha256}\`\n`);
+  const mb = (manifest.package.size_bytes / 1_048_576).toFixed(1);
+  (ctx.log ?? console.log)(`Pacote ${opts.name}: ${files.length} arquivos, ${mb} MB (${(bytes / 1_048_576).toFixed(1)} MB sem compressão), sha256 ${manifest.package.sha256}`);
+  const head = manifest.pull_request?.head_sha ? ` (merge de teste; head do PR \`${manifest.pull_request.head_sha}\`)` : "";
+  writeSummary(
+    env,
+    `### Build compartilhado \`${opts.name}\`\n\n- SHA compilado: \`${manifest.compiled_sha}\`${head}\n- Produtor: run ${manifest.producer.run_id}, tentativa ${manifest.producer.run_attempt}\n- Node ${manifest.runtime.node}, npm ${manifest.runtime.npm ?? "?"}, Next ${manifest.runtime.next}; modo emulator\n- ${files.length} arquivos; ${mb} MB; sha256 \`${manifest.package.sha256}\`\n`,
+  );
+  return manifest;
 }
 
-function verify() {
-  const dir = arg("dir");
-  if (!dir) throw new Error("verify exige --dir <dir>");
+export type Consumed = { artifact: string; producer_run_id: string; producer_attempt: string; consumer_attempt: string; compiled_sha: string; package_sha256: string };
+
+export function verify(ctx: CliContext, opts: { dir: string }): Consumed {
+  const { root, env } = ctx;
+  const dir = join(root, opts.dir);
   const manifestPath = join(dir, "manifest.json");
   if (!existsSync(manifestPath)) throw new Error("manifest.json ausente no artefato do build");
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Manifest;
   const tarPath = join(dir, manifest.package?.file ?? PACKAGE_FILE);
   const present = existsSync(tarPath);
   const errors = validateManifest(manifest, {
-    runId: env("GITHUB_RUN_ID"),
-    headSha: git("rev-parse", "HEAD"),
-    githubSha: env("GITHUB_SHA"),
-    lockfileSha256: sha256File("package-lock.json"),
+    runId: value(env, "GITHUB_RUN_ID"),
+    headSha: gitIn(root, "rev-parse", "HEAD"),
+    githubSha: value(env, "GITHUB_SHA"),
+    lockfileSha256: sha256File(join(root, "package-lock.json")),
     nodeVersion: process.version,
     packageSha256: present ? sha256File(tarPath) : null,
     packageSize: present ? lstatSync(tarPath).size : null,
   });
   // Só inspeciona o tar depois que o checksum confere com o manifesto (não abre pacote adulterado).
   if (present && !errors.length) {
-    const entries = execFileSync("tar", ["-tzf", tarPath], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 }).split("\n").filter(Boolean);
-    const verbose = execFileSync("tar", ["-tvzf", tarPath], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 }).split("\n").filter(Boolean);
+    const entries = tar(root, ["-tzf", rel(root, tarPath)]).split("\n").filter(Boolean);
+    const verbose = tar(root, ["-tvzf", rel(root, tarPath)]).split("\n").filter(Boolean);
     errors.push(...symlinkEntryProblems(verbose, manifest.package.symlinks ?? []));
     const unsafe = unsafeEntries(entries);
     if (unsafe.length) errors.push(`entradas inseguras no pacote: ${unsafe.slice(0, 5).join(", ")}`);
     if (entries.filter((e) => !e.endsWith("/")).length !== manifest.package.files) errors.push("número de arquivos do pacote não confere com o manifesto");
   }
-  if (existsSync(".next")) errors.push(".next já existe no consumidor: o build compartilhado não pode ser misturado a outra compilação");
+  if (existsSync(join(root, ".next"))) errors.push(".next já existe no consumidor: o build compartilhado não pode ser misturado a outra compilação");
   if (errors.length) throw new Error(`build compartilhado recusado:\n- ${errors.join("\n- ")}`);
-  execFileSync("tar", ["-xzf", tarPath]);
-  const consumed = {
+  tar(root, ["-xzf", rel(root, tarPath)]);
+  const consumed: Consumed = {
     artifact: manifest.artifact,
     producer_run_id: manifest.producer.run_id,
     producer_attempt: manifest.producer.run_attempt,
-    consumer_attempt: env("GITHUB_RUN_ATTEMPT"),
+    consumer_attempt: value(env, "GITHUB_RUN_ATTEMPT"),
     compiled_sha: manifest.compiled_sha,
     package_sha256: manifest.package.sha256,
   };
-  mkdirSync("ci-results", { recursive: true });
-  writeFileSync("ci-results/build-consumed.json", `${JSON.stringify(consumed, null, 2)}\n`);
-  console.log(`Build consumido: ${manifest.artifact} (produzido na tentativa ${manifest.producer.run_attempt}; consumidor na tentativa ${consumed.consumer_attempt}); SHA ${manifest.compiled_sha}`);
-  summary(`Build consumido: \`${manifest.artifact}\` — produzido na tentativa ${manifest.producer.run_attempt}, consumido na tentativa ${consumed.consumer_attempt}, SHA \`${manifest.compiled_sha}\`, sha256 \`${manifest.package.sha256}\`\n\n`);
+  mkdirSync(join(root, "ci-results"), { recursive: true });
+  writeFileSync(join(root, "ci-results/build-consumed.json"), `${JSON.stringify(consumed, null, 2)}\n`);
+  (ctx.log ?? console.log)(`Build consumido: ${manifest.artifact} (produzido na tentativa ${manifest.producer.run_attempt}; consumidor na tentativa ${consumed.consumer_attempt}); SHA ${manifest.compiled_sha}`);
+  writeSummary(env, `Build consumido: \`${manifest.artifact}\` — produzido na tentativa ${manifest.producer.run_attempt}, consumido na tentativa ${consumed.consumer_attempt}, SHA \`${manifest.compiled_sha}\`, sha256 \`${manifest.package.sha256}\`\n\n`);
+  return consumed;
 }
 
-if (import.meta.main) {
+/** CLI: devolve o código de saída. */
+export function main(argv: string[], ctx: CliContext): number {
+  const arg = (name: string) => {
+    const i = argv.indexOf(`--${name}`);
+    return i >= 0 ? argv[i + 1] : undefined;
+  };
   try {
-    const command = process.argv[2];
-    if (command === "env") for (const [k, v] of Object.entries(E2E_BUILD_ENV)) console.log(`${k}=${v}`);
-    else if (command === "pack") pack();
-    else if (command === "verify") verify();
-    else {
-      console.error("Uso: node scripts/ci/build-manifest.ts env | pack --out <dir> --name <artefato> [--build-command <cmd>] | verify --dir <dir>");
-      process.exit(2);
+    const command = argv[0];
+    if (command === "env") {
+      for (const [k, v] of Object.entries(E2E_BUILD_ENV)) (ctx.log ?? console.log)(`${k}=${v}`);
+      return 0;
     }
+    if (command === "pack") {
+      const out = arg("out");
+      const name = arg("name");
+      if (!out || !name) throw new Error("pack exige --out <dir> --name <artefato>");
+      pack(ctx, { out, name, buildCommand: arg("build-command") ?? "" });
+      return 0;
+    }
+    if (command === "verify") {
+      const dir = arg("dir");
+      if (!dir) throw new Error("verify exige --dir <dir>");
+      verify(ctx, { dir });
+      return 0;
+    }
+    console.error("Uso: node scripts/ci/build-manifest.ts env | pack --out <dir> --name <artefato> [--build-command <cmd>] | verify --dir <dir>");
+    return 2;
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
+    return 1;
   }
 }
+
+if (import.meta.main) process.exitCode = main(process.argv.slice(2), { root: process.cwd(), env: process.env });

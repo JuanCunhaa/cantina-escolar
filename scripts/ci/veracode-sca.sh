@@ -10,4 +10,4 @@ bash scripts/ci/tools/install-srcclr.sh
 # Árvore de PRODUÇÃO pelo lockfile (base do critério de bloqueio). Código de saída do npm ls não decide nada aqui.
 npm ls --omit=dev --all --json --package-lock-only > "$out/npm-ls-prod.json" || true
 srcclr scan . --no-upload --json="$out/sca.json"
-node scripts/ci/veracode-report.ts sca "$out/sca.json" "$out/npm-ls-prod.json"
+node scripts/ci/veracode-report.ts sca "$out/sca.json" "$out/npm-ls-prod.json" package-lock.json

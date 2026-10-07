@@ -233,7 +233,7 @@ export function computeRunMetrics(input: {
 /** Assinatura de equivalência para comparação histórica: evento + conjunto de jobs que executaram na 1ª tentativa. */
 export function equivalenceKey(metrics: RunMetrics): string {
   const names = new Set(metrics.jobs.filter((j) => j.attempt === 1 && j.duration_s > 0).map((j) => j.name));
-  return `${metrics.run.event === "push" ? "push" : metrics.run.event}|${[...names].sort().join(",")}`;
+  return `${metrics.run.event === "push" ? "push" : metrics.run.event}|${[...names].sort((a, b) => a.localeCompare(b)).join(",")}`;
 }
 
 export function percentile(values: number[], p: number): number | null {

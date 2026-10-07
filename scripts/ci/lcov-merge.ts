@@ -72,7 +72,7 @@ export function mergeCoverage(reports: Coverage[]): Coverage {
 
 export function serializeLcov(cov: Coverage): string {
   const out: string[] = [];
-  for (const file of [...cov.keys()].sort()) {
+  for (const file of [...cov.keys()].sort((a, b) => a.localeCompare(b))) {
     const c = cov.get(file)!;
     out.push(`SF:${file}`);
     const fns = [...c.functions.entries()].sort((a, b) => a[1].line - b[1].line || a[0].localeCompare(b[0]));
@@ -103,13 +103,14 @@ export function stats(cov: Coverage) {
   return { files: cov.size, lines, lines_hit: hit, line_rate: lines ? Math.round((hit / lines) * 1000) / 10 : 0 };
 }
 
-if (import.meta.main) {
-  const outIndex = process.argv.indexOf("--out");
-  const out = outIndex >= 0 ? process.argv[outIndex + 1] : undefined;
-  const inputs = process.argv.slice(2).filter((a, i, all) => a !== "--out" && all[i - 1] !== "--out");
-  if (!out || !inputs.length || inputs.some((i) => !/^[\w-]+=.+/.test(i))) {
+/** CLI testável: devolve o código de saída. */
+export function main(argv: string[], env: Record<string, string | undefined>, out: (text: string) => void = (text) => process.stdout.write(text)): number {
+  const outIndex = argv.indexOf("--out");
+  const target = outIndex >= 0 ? argv[outIndex + 1] : undefined;
+  const inputs = argv.filter((a, i, all) => a !== "--out" && all[i - 1] !== "--out");
+  if (!target || !inputs.length || inputs.some((i) => !/^[\w-]+=.+/.test(i))) {
     console.error("Uso: node scripts/ci/lcov-merge.ts --out <lcov> <suite>=<lcov> [...]");
-    process.exit(2);
+    return 2;
   }
   const contributions: Record<string, ReturnType<typeof stats>> = {};
   const reports: Coverage[] = [];
@@ -128,16 +129,19 @@ if (import.meta.main) {
   // Cobertura parcial seria enganosa: relatório esperado ausente ou vazio reprova.
   if (missing.length) {
     console.error(`LCOV ausente/vazio: ${missing.join(", ")}`);
-    process.exit(1);
+    return 1;
   }
   const merged = mergeCoverage(reports);
-  mkdirSync(dirname(out), { recursive: true });
-  writeFileSync(out, serializeLcov(merged));
+  mkdirSync(dirname(target), { recursive: true });
+  writeFileSync(target, serializeLcov(merged));
   const summary = { suites: contributions, merged: stats(merged), excluded: { rules: "não executa código da aplicação (firestore.rules no emulador)", e2e: "servidor Next em outro processo, sem instrumentação" } };
-  writeFileSync(`${dirname(out)}/coverage-summary.json`, `${JSON.stringify(summary, null, 2)}\n`);
+  writeFileSync(`${dirname(target)}/coverage-summary.json`, `${JSON.stringify(summary, null, 2)}\n`);
   const md = `### Cobertura (LCOV mesclado)\n\n| Suíte | Arquivos | Linhas | Cobertas | % |\n|---|---|---|---|---|\n${Object.entries(contributions)
     .map(([s, v]) => `| ${s} | ${v.files} | ${v.lines} | ${v.lines_hit} | ${v.line_rate} |`)
     .join("\n")}\n| **mesclado** | ${summary.merged.files} | ${summary.merged.lines} | ${summary.merged.lines_hit} | ${summary.merged.line_rate} |\n\nNão contribuem: Rules (sem código de src/) e e2e (sem instrumentação do servidor).\n`;
-  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, md);
-  process.stdout.write(md);
+  if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, md);
+  out(md);
+  return 0;
 }
+
+if (import.meta.main) process.exitCode = main(process.argv.slice(2), process.env);

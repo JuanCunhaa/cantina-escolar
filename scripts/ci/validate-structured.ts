@@ -2,18 +2,32 @@
 // todo .json rastreado pelo git precisa ser JSON válido. Sem dependências instaladas.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { bin } from "./lib/bin.ts";
 
-const files = execFileSync("git", ["ls-files", "-z", "--", "*.json"], { encoding: "utf8" }).split("\0").filter(Boolean);
-const errors: string[] = [];
-for (const file of files) {
-  try {
-    JSON.parse(readFileSync(file, "utf8").replace(/^﻿/, ""));
-  } catch (error) {
-    errors.push(`${file}: ${error instanceof Error ? error.message : String(error)}`);
+export function invalidJson(files: string[], read: (file: string) => string): string[] {
+  const errors: string[] = [];
+  for (const file of files) {
+    try {
+      JSON.parse(read(file).replace(/^﻿/, ""));
+    } catch (error) {
+      errors.push(`${file}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
+  return errors;
 }
-if (errors.length) {
-  console.error(`JSON inválido:\n- ${errors.join("\n- ")}`);
-  process.exit(1);
+
+export function main(deps: { cwd?: string; log?: (text: string) => void } = {}): number {
+  const cwd = deps.cwd ?? process.cwd();
+  const log = deps.log ?? console.log;
+  const files = execFileSync(bin("git"), ["ls-files", "-z", "--", "*.json"], { cwd, encoding: "utf8" }).split("\0").filter(Boolean);
+  const errors = invalidJson(files, (file) => readFileSync(join(cwd, file), "utf8"));
+  if (errors.length) {
+    log(`JSON inválido:\n- ${errors.join("\n- ")}`);
+    return 1;
+  }
+  log(`${files.length} arquivo(s) JSON válidos.`);
+  return 0;
 }
-console.log(`${files.length} arquivo(s) JSON válidos.`);
+
+if (import.meta.main) process.exitCode = main();

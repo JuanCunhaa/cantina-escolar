@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateSast, evaluateSca, productionPackages } from "../../../scripts/ci/veracode-report.ts";
+import { evaluateSast, evaluateSca, productionPackages, uncoveredProduction } from "../../../scripts/ci/veracode-report.ts";
 
 // Estruturas mínimas no formato documentado; o formato real será conferido no probe P4 (com credenciais).
 describe("critérios Veracode (avaliação local, fail-closed)", () => {
@@ -38,5 +38,20 @@ describe("critérios Veracode (avaliação local, fail-closed)", () => {
     expect(r.findings.find((f) => f.cve === "2026-2")).toMatchObject({ production: false, blocking: false });
     expect(evaluateSca({ records: [{ libraries: [], vulnerabilities: [] }] }, prod).problems).toEqual(["SCA não identificou nenhuma dependência: análise ineficaz"]);
     expect(evaluateSca({}, prod).ok).toBe(false);
+  });
+
+  it("SCA: pacote de produção fora do inventário só é aceito se opcional/de outra plataforma (medido no probe P4)", () => {
+    const prod = new Set(["next@16.3.8", "@next/swc-darwin-x64@16.3.8", "zod@4.6.5"]);
+    const lock = {
+      packages: {
+        "node_modules/next": { version: "16.3.8" },
+        "node_modules/@next/swc-darwin-x64": { version: "16.3.8", optional: true, os: ["darwin"] },
+        "node_modules/zod": { version: "4.6.5" },
+      },
+    };
+    expect(uncoveredProduction(prod, new Set(["next@16.3.8"]), lock)).toEqual({ expected_missing: ["@next/swc-darwin-x64@16.3.8"], unexpected_missing: ["zod@4.6.5"] });
+    const report = { records: [{ libraries: [{ coordinate1: "next", versions: [{ version: "16.3.8" }] }], vulnerabilities: [] }] };
+    expect(evaluateSca(report, prod, lock).problems).toEqual(["dependência(s) de produção fora do inventário do SCA: zod@4.6.5"]);
+    expect(evaluateSca(report, new Set(["next@16.3.8", "@next/swc-darwin-x64@16.3.8"]), lock)).toMatchObject({ ok: true, libraries: 1 });
   });
 });

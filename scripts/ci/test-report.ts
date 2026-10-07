@@ -2,6 +2,7 @@
 // Relatório ausente/ilegível, suíte vazia, skip, contagem diferente da esperada ou falha => ok:false e saída 1.
 // Uso: node scripts/ci/test-report.ts <playwright|vitest> <arquivo.json> --suite <nome> [--expected N] [--expected-total N] [--log-url URL]
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 export type Failure = { file: string; line: number | null; title: string; error: string; attachments: string[] };
 export type SuiteSummary = {
@@ -140,48 +141,70 @@ export function renderSummary(s: SuiteSummary): string {
   return `${lines.join("\n")}\n`;
 }
 
-function arg(name: string): string | undefined {
-  const i = process.argv.indexOf(`--${name}`);
-  return i >= 0 ? process.argv[i + 1] : undefined;
+type Kind = "playwright" | "vitest";
+
+const emptyBase = (suite: string, kind: Kind, problem: string): ReturnType<typeof summarizePlaywright> => ({
+  schema: "cantina-ci-suite/1",
+  suite,
+  kind,
+  total: 0,
+  passed: 0,
+  failed: 0,
+  skipped: 0,
+  flaky: 0,
+  duration_s: null,
+  failures: [],
+  globalErrors: [problem],
+});
+
+/** Lê o relatório e monta o resumo; relatório ausente ou ilegível vira problema (nunca sucesso). */
+export function buildSummary(kind: Kind, file: string, opts: { suite: string; expected?: string; expectedTotal?: string; logUrl?: string; env: Record<string, string | undefined>; cwd?: string }): SuiteSummary {
+  const { suite, env } = opts;
+  let base: ReturnType<typeof summarizePlaywright>;
+  if (!existsSync(file)) base = emptyBase(suite, kind, `relatório ausente: ${file}`);
+  else {
+    try {
+      const report = JSON.parse(readFileSync(file, "utf8"));
+      base = kind === "playwright" ? summarizePlaywright(report as PwReport, suite) : summarizeVitest(report as VtReport, suite, opts.cwd);
+    } catch (error) {
+      base = emptyBase(suite, kind, `relatório ilegível: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  const expected = opts.expected === undefined || opts.expected === "" ? null : Number(opts.expected);
+  const verdict = evaluate(base, expected === null ? null : Number.isFinite(expected) ? expected : Number.NaN);
+  const { globalErrors: _ignored, ...rest } = base;
+  void _ignored;
+  return {
+    ...rest,
+    ...verdict,
+    expected,
+    expected_total: opts.expectedTotal ? Number(opts.expectedTotal) : null,
+    attempt: env.GITHUB_RUN_ATTEMPT ? Number(env.GITHUB_RUN_ATTEMPT) : null,
+    sha: env.GITHUB_SHA ?? null,
+    log_url: opts.logUrl ?? null,
+  };
 }
 
-if (import.meta.main) {
-  const [kind, file] = process.argv.slice(2);
+/** CLI testável: grava ci-results/summary-<suíte>.json e devolve 0 (ok) ou 1. */
+export function main(argv: string[], env: Record<string, string | undefined>, deps: { root?: string; stdout?: (text: string) => void } = {}): number {
+  const arg = (name: string) => {
+    const i = argv.indexOf(`--${name}`);
+    return i >= 0 ? argv[i + 1] : undefined;
+  };
+  const [kind, file] = argv;
   const suite = arg("suite");
   if ((kind !== "playwright" && kind !== "vitest") || !file || !suite || !/^[\w.-]+$/.test(suite)) {
     console.error("Uso: node scripts/ci/test-report.ts <playwright|vitest> <arquivo.json> --suite <nome> [--expected N] [--expected-total N] [--log-url URL]");
-    process.exit(2);
+    return 2;
   }
-  const expectedRaw = arg("expected");
-  const expected = expectedRaw === undefined || expectedRaw === "" ? null : Number(expectedRaw);
-  let base: ReturnType<typeof summarizePlaywright>;
-  if (!existsSync(file)) {
-    base = { schema: "cantina-ci-suite/1", suite, kind, total: 0, passed: 0, failed: 0, skipped: 0, flaky: 0, duration_s: null, failures: [], globalErrors: [`relatório ausente: ${file}`] };
-  } else {
-    try {
-      const report = JSON.parse(readFileSync(file, "utf8"));
-      base = kind === "playwright" ? summarizePlaywright(report as PwReport, suite) : summarizeVitest(report as VtReport, suite);
-    } catch (error) {
-      base = { schema: "cantina-ci-suite/1", suite, kind, total: 0, passed: 0, failed: 0, skipped: 0, flaky: 0, duration_s: null, failures: [], globalErrors: [`relatório ilegível: ${error instanceof Error ? error.message : String(error)}`] };
-    }
-  }
-  const verdict = evaluate(base, expected !== null && Number.isFinite(expected) ? expected : expectedRaw ? Number.NaN : null);
-  const rest = { ...base } as Partial<typeof base>;
-  delete rest.globalErrors;
-  const totalRaw = arg("expected-total");
-  const summary: SuiteSummary = {
-    ...(rest as Omit<typeof base, "globalErrors">),
-    ...verdict,
-    expected,
-    expected_total: totalRaw ? Number(totalRaw) : null,
-    attempt: process.env.GITHUB_RUN_ATTEMPT ? Number(process.env.GITHUB_RUN_ATTEMPT) : null,
-    sha: process.env.GITHUB_SHA ?? null,
-    log_url: arg("log-url") ?? null,
-  };
-  mkdirSync("ci-results", { recursive: true });
-  writeFileSync(`ci-results/summary-${suite}.json`, `${JSON.stringify(summary, null, 2)}\n`);
+  const root = deps.root ?? ".";
+  const summary = buildSummary(kind, join(root, file), { suite, expected: arg("expected"), expectedTotal: arg("expected-total"), logUrl: arg("log-url"), env, cwd: root === "." ? process.cwd() : root });
+  mkdirSync(join(root, "ci-results"), { recursive: true });
+  writeFileSync(join(root, `ci-results/summary-${suite}.json`), `${JSON.stringify(summary, null, 2)}\n`);
   const markdown = renderSummary(summary);
-  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown);
-  process.stdout.write(markdown);
-  process.exit(summary.ok ? 0 : 1);
+  if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, markdown);
+  (deps.stdout ?? ((text: string) => process.stdout.write(text)))(markdown);
+  return summary.ok ? 0 : 1;
 }
+
+if (import.meta.main) process.exitCode = main(process.argv.slice(2), process.env);
