@@ -80,7 +80,7 @@ gitleaks git --redact .
 semgrep scan --config=auto src
 ```
 
-Gitleaks dir verifica arquivos, git verifica histórico; sem Git, usar dir. Semgrep auto usa regras do registry; fixar regras/versões relevantes para CI reprodutível e avaliar findings. Esses comandos não foram rodados na aplicação, que ainda será desenvolvida. Em logs, manter redaction e não colar valor do segredo encontrado.
+No CI as versões ficam fixadas por SHA-256/digest em scripts/ci/tools/ e no workflow (Gitleaks 8.30.1, actionlint 1.7.12, Semgrep 1.179.0 transitório, Veracode Pipeline Scan `cmd-26.9.0` e SCA `srcclr` 3.8.120); nesta máquina a política de Controle de Aplicativo bloqueia o Gitleaks — usar o CI. Detalhes, critérios e configuração externa: docs/testing/ci.md. Gitleaks dir verifica arquivos, git verifica histórico; sem Git, usar dir. Semgrep auto usa regras do registry; fixar regras/versões relevantes para CI reprodutível e avaliar findings. Esses comandos não foram rodados na aplicação, que ainda será desenvolvida. Em logs, manter redaction e não colar valor do segredo encontrado.
 
 ## Estado das ferramentas
 

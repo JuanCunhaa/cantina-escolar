@@ -20,3 +20,4 @@
 - Fotos com upload limitado, compressão, formatos seguros, dimensões padronizadas e metadados, sem base64 no banco.
 - Alertas de orçamento/consumo configuráveis; documentar operações cobradas e não prometer custo zero.
 - Sem microsserviços, multilojas, addons genéricos, app nativo ou sincronização offline para este escopo.
+- CI: dados enviados a serviços externos são só os previstos — Veracode Pipeline Scan recebe o pacote do fonte (`git archive`, sem `.env`/build/dependências) para análise remota sem publicação na plataforma; o agente SCA consulta a Veracode com `--no-upload` (não publica, mas não é offline); o SonarQube Cloud recebe fonte e cobertura. O build compartilhado entre jobs não leva `.env`, credenciais nem dados; só as chaves aleatórias por build exigidas pelo `next start` (docs/testing/ci.md).
