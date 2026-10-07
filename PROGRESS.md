@@ -141,3 +141,5 @@ Data de referência: 06/10/2026. Este arquivo descreve código entregue, não ap
 - Limpeza das fotos antigas `products/demo-*/demo.png` no R2 de homologação (`POST /api/admin/storage/sweep` dry-run e depois `apply`). Não feita no fechamento da F06.
 - Fixar as GitHub Actions do workflow por SHA de commit (2 achados não bloqueantes do Semgrep AppSec).
 - Homologação publicada com o catálogo real: https://cantina-escolar-hml.vercel.app (login Vercel + contas fictícias `@hml.example.test`).
+
+<!-- probe P3: alteração só documental -->
