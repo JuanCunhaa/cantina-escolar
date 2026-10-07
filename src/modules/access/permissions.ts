@@ -7,6 +7,8 @@ import { EXTRA_PERMISSIONS, type ExtraPermission, type Role } from "./roles";
  * Pedidos (F13): `orders.operate` = pedidos do dia, preparo, entrega e marcar não retirado (cantina e administração);
  * `orders.resolve` = resolver não retirado (só administração). Cancelamento (F14): `orders.cancel` = cancelamento OPERACIONAL com motivo, mesmo depois do prazo da família (cantina e administração);
  * o cancelamento da FAMÍLIA vem do vínculo ativo (ação `orders.cancel` sobre o aluno), não de capacidade.
+ * Pagamentos online (F19): `payments.review` = revisar pagamentos em divergência, pendências de reembolso/chargeback e acionar a
+ * conciliação com o provedor (só administração).
  * Reagendamento/antecipação e troca de produtos (F16): `orders.amend` (cantina e administração), sempre com motivo e auditoria;
  * a exceção operacional de horário só existe nesse comando da equipe. O responsável NÃO reagenda nem troca (cancela e compra de novo).
  */
@@ -25,6 +27,7 @@ export const CAPABILITIES = [
   "inventory.manage",
   "topup.register",
   "topup.reverse",
+  "payments.review",
   "costs.read",
   "profit.read",
   "audit.read",

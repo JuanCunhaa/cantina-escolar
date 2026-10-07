@@ -66,6 +66,12 @@ export function FamilyWallet({ user }: { user: User }) {
               <p>
                 Saldo: <strong data-testid="wallet-balance">{slot?.view ? formatBRL(slot.view.balanceCents) : "…"}</strong>
               </p>
+              {slot && slot.pendingCents > 0 && (
+                <p role="alert" className="notice notice-error" data-testid="wallet-blocked">
+                  Pendência de pagamento de {formatBRL(slot.pendingCents)} (reembolso ou contestação de uma recarga online). Novas compras estão bloqueadas até a escola
+                  regularizar: procure a secretaria.
+                </p>
+              )}
               <p className="muted" role="status" data-testid="wallet-reading" data-sync={slot?.sync ?? "unknown"}>
                 {readingText(slot)}
               </p>

@@ -483,6 +483,19 @@ describe("saldo, calendário e cardápio", () => {
     await expectLedger(zero);
   });
 
+  it("carteira com pendência de reembolso/chargeback (F19) NÃO faz venda de balcão, mesmo com saldo; nada é gravado e a liberação reabre a venda", async () => {
+    const p = await newProduct({ price: 400, stock: 20 });
+    const student = await newStudent({ cents: 2000 });
+    await db().doc(`wallets/${student}`).set({ pendingReversalCents: 3800 }, { merge: true });
+    const before = await snapshot(student, [p]);
+    const r = await sell(cantina, saleBody(student, [{ productId: p }]));
+    expect(r).toMatchObject({ status: 409, body: { error: "wallet_blocked", details: { pendingCents: 3800 } } });
+    expect(await snapshot(student, [p])).toEqual(before);
+    await db().doc(`wallets/${student}`).set({ pendingReversalCents: 0 }, { merge: true });
+    expect((await sell(cantina, saleBody(student, [{ productId: p }]))).body).toMatchObject({ wallet: { balanceCents: 1600 } });
+    await expectLedger(student);
+  });
+
   it("aluno sem carteira (nunca recebeu saldo) é recusado por saldo, sem criar carteira", async () => {
     const p = await newProduct({ stock: 5 });
     const student = await newStudent({ cents: 0 });

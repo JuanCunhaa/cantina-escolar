@@ -12,7 +12,7 @@ import { readMenuForSale } from "@/modules/menu/queries";
 import { priceChanges, reviewedCart, subtotalOf, totalOf, type ResolvedLine } from "@/modules/orders/model";
 import { commitPurchaseUsage, decidePurchase, readPurchaseGuard } from "@/modules/policies/purchase-guard";
 import { checkCounterDay } from "@/modules/school/settings";
-import { applyDelta, parseWalletState } from "@/modules/wallet/model";
+import { applyDelta, assertCanSpend, parseWalletState } from "@/modules/wallet/model";
 import { counterReason, counterSaleSchema, directSaleSchema, feeRecordOf, type CounterItem, type FeeRecord, type PaymentMethod } from "./model";
 
 /**
@@ -127,6 +127,7 @@ export async function placeCounterSale(db: Firestore, actor: Actor, raw: unknown
     const walletRef = db.doc(`wallets/${studentId}`);
     const walletSnap = await tx.get(walletRef);
     const walletBefore = parseWalletState(walletSnap.data());
+    assertCanSpend(walletSnap.data()); // pendência de reversão externa (F19) bloqueia nova compra
     const items: CounterItem[] = prepared.map((l, index) => ({
       lineNo: index + 1,
       productId: l.product.id,

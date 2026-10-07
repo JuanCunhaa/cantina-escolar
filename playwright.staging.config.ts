@@ -19,7 +19,9 @@ export default defineConfig({
   // Reagendamento/troca (F16): e2e usa pedidos reais do checkout com saldo de fixture (emulador); o equivalente publicado, sem pedido nem saldo, é staging/amend-smoke.spec.ts.
   // Recarga manual (F17): e2e cria alunos por escrita direta no emulador; o equivalente na homologação, com recebimentos SIMULADOS
   // pelo fluxo normal e saldo real no livro, é staging/topups-hml.spec.ts.
-  testIgnore: ["e2e/wallet*.spec.ts", "e2e/policies*.spec.ts", "e2e/checkout*.spec.ts", "e2e/my-orders*.spec.ts", "e2e/fulfillment*.spec.ts", "e2e/cancellation*.spec.ts", "e2e/pos*.spec.ts", "e2e/amend*.spec.ts", "e2e/topups*.spec.ts"],
+  // Confirmação de pagamento online (F19): e2e usa fixtures de carteira/pendência por escrita direta no emulador; o equivalente na
+  // homologação, com o sandbox real do Mercado Pago, é staging/online-confirmation-sandbox.spec.ts.
+  testIgnore: ["e2e/payments-confirmation*.spec.ts", "e2e/wallet*.spec.ts", "e2e/policies*.spec.ts", "e2e/checkout*.spec.ts", "e2e/my-orders*.spec.ts", "e2e/fulfillment*.spec.ts", "e2e/cancellation*.spec.ts", "e2e/pos*.spec.ts", "e2e/amend*.spec.ts", "e2e/topups*.spec.ts"],
   timeout: 120000,
   fullyParallel: false,
   workers: 1,

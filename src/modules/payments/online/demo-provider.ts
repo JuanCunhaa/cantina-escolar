@@ -49,6 +49,13 @@ export const demoPixProvider: PixProvider = {
   async findCharge(reference) {
     return charges.get(reference) ?? null;
   },
+  // A demonstração NUNCA confirma pagamento: não existe order paga para consultar (sem "simular pagamento").
+  async getOrder() {
+    return null;
+  },
+  async accountId() {
+    return "demo";
+  },
 };
 
 export const demoCardProvider: CardProvider = {
@@ -66,5 +73,11 @@ export const demoCardProvider: CardProvider = {
   },
   async findCharge(reference) {
     return charges.get(reference) ?? null;
+  },
+  async getOrder() {
+    return null;
+  },
+  async accountId() {
+    return "demo";
   },
 };

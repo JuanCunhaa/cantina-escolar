@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import { collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, setDoc, updateDoc } from "firebase/firestore";
 
@@ -149,5 +149,41 @@ describe("Firestore rules — F18: intenções de recarga online fechadas ao cli
       await assertFails(deleteDoc(doc(db, "topupIntents/tpi_1")));
     }
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "topupIntents/tpi_1")));
+  });
+});
+
+describe("Firestore rules — F19: eventos do provedor e pendências fechados ao cliente; o cliente não mexe no bloqueio da carteira", () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "paymentEvents/pev_1"), { provider: "mercadopago", accountId: "123", orderId: "ORD1", intentId: "tpi_1", outcome: "credited" });
+      await setDoc(doc(ctx.firestore(), "paymentPendencies/tpi_1"), { intentId: "tpi_1", studentId: "stu_a", status: "open", outstandingCents: 3800, cause: "chargeback" });
+      await setDoc(doc(ctx.firestore(), "wallets/stu_a"), { studentId: "stu_a", balanceCents: 0, version: 2, pendingReversalCents: 3800 });
+    });
+  });
+
+  it("ninguém (responsável, outra família, aluno, equipe, administração, anônimo) lê, cria, altera ou apaga eventos e pendências", async () => {
+    for (const [uid, role] of [["famA", "guardian"], ["famB", "guardian"], ["aluA", "student"], ["sec", "secretaria"], ["cant", "cantina"], ["adm", "admin"]] as const) {
+      const db = (await as(uid, role)).firestore();
+      for (const path of ["paymentEvents/pev_1", "paymentPendencies/tpi_1"]) {
+        await assertFails(getDoc(doc(db, path)));
+        await assertFails(updateDoc(doc(db, path), { status: "resolved", outstandingCents: 0 }));
+        await assertFails(deleteDoc(doc(db, path)));
+      }
+      await assertFails(getDocs(query(collection(db, "paymentPendencies"), limit(5))));
+      await assertFails(getDocs(query(collection(db, "paymentEvents"), limit(5))));
+      await assertFails(setDoc(doc(db, "paymentEvents/pev_novo"), { orderId: "ORD2", outcome: "credited" }));
+    }
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "paymentPendencies/tpi_1")));
+  });
+
+  it("o responsável vê a própria carteira (inclusive o aviso de pendência), mas ninguém do cliente altera ou zera o bloqueio", async () => {
+    const fam = (await as("famA", "guardian")).firestore();
+    expect((await assertSucceeds(getDoc(doc(fam, "wallets/stu_a")))).get("pendingReversalCents")).toBe(3800);
+    for (const [uid, role] of [["famA", "guardian"], ["aluA", "student"], ["sec", "secretaria"], ["cant", "cantina"], ["adm", "admin"]] as const) {
+      const db = (await as(uid, role)).firestore();
+      await assertFails(updateDoc(doc(db, "wallets/stu_a"), { pendingReversalCents: 0 }));
+      await assertFails(setDoc(doc(db, "wallets/stu_a"), { studentId: "stu_a", balanceCents: 100000, version: 3, pendingReversalCents: 0 }));
+    }
+    await assertFails(getDoc(doc((await as("famB", "guardian")).firestore(), "wallets/stu_a")));
   });
 });

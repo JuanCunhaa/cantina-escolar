@@ -23,6 +23,8 @@ import {
   type DisplayStatus,
   type IntentStatus,
 } from "./intent-model";
+import { REVIEW_LABEL, type ReviewReason } from "./confirmation-model";
+import type { IntentDoc } from "./intent-doc";
 import { ProviderError, type ChargeRequest, type OnlineProviders, type PixData, type ProviderCharge } from "./provider";
 
 /**
@@ -33,29 +35,10 @@ import { ProviderError, type ChargeRequest, type OnlineProviders, type PixData, 
  *   3. transação de desfecho: só sai de `creating`/`creation_uncertain` (desfecho tardio não regride um estado já decidido).
  * Timeout/erro incerto → `creation_uncertain`; a conciliação CONSULTA o provedor pela referência e nunca cria outra cobrança
  * sozinha (reenvio só a pedido da família, Pix, mesma chave, dentro da janela de deduplicação do provedor).
- * Nada aqui credita carteira: confirmação confiável e crédito são da F19.
+ * Nada aqui credita carteira: a confirmação confiável e o crédito são da F19 (`confirmation.ts`); esta tela só LÊ o resultado.
  */
 
 export type IntentDeps = { providers: OnlineProviders; clock?: () => Date };
-
-type IntentDoc = {
-  intentId: string;
-  channel: Channel;
-  status: IntentStatus;
-  studentId: string;
-  studentName: string;
-  amountCents: number;
-  currency: "BRL";
-  provider: { id: string; mode: "demo" | "live" };
-  payer: { name: string; email: string };
-  charge: { id: string; providerStatus: string } | null;
-  pix: PixData | null;
-  failure: { code: string } | null;
-  creation: { attempts: number; lastOutcome: string | null; lastCheckedAt: Timestamp | null };
-  version: number;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-};
 
 export type IntentView = {
   intentId: string;
@@ -72,8 +55,17 @@ export type IntentView = {
   pix: PixData | null;
   failure: { code: string; message: string } | null;
   needsReconcile: boolean;
-  /** Sempre falso aqui: só a confirmação da F19 credita. Exposto para a tela não sugerir saldo novo. */
-  credited: false;
+  /**
+   * Verdadeiro SOMENTE quando o servidor lançou o crédito (`confirmed`/`reversed`). "Em processamento" (Pix aguardando,
+   * cartão em análise) NUNCA é crédito; `credit` traz o movimento do livro (`walletSeq`) para a tela reconciliar a carteira
+   * por versão — nem o listener nem o redirect do provedor confirmam nada.
+   */
+  credited: boolean;
+  credit: { amountCents: number; walletEntryId: string; walletSeq: number; balanceAfterCents: number; confirmedAt: string; afterExpiry: boolean } | null;
+  reversal: { accountedCents: number; recoveredCents: number; pendingCents: number; cause: "refund" | "chargeback" } | null;
+  review: { reason: ReviewReason; label: string } | null;
+  /** Pagamento ainda sem desfecho (Pix aguardando / cartão em análise): a tela consulta o servidor até decidir. */
+  awaitingConfirmation: boolean;
 };
 
 const FAILURE_MESSAGE: Record<string, string> = {
@@ -102,7 +94,13 @@ export function intentView(data: IntentDoc, now: Date): IntentView {
     pix: data.status === "awaiting_payment" ? data.pix : null,
     failure: data.failure ? { code: data.failure.code, message: failureMessage(data.failure.code) } : null,
     needsReconcile: needsReconcile(data.status, ms(data.updatedAt), now),
-    credited: false,
+    credited: data.status === "confirmed" || data.status === "reversed",
+    credit: data.confirmation
+      ? { amountCents: data.confirmation.paidCents, walletEntryId: data.confirmation.walletEntryId, walletSeq: data.confirmation.walletSeq, balanceAfterCents: data.confirmation.balanceAfterCents, confirmedAt: data.confirmation.confirmedAt.toDate().toISOString(), afterExpiry: data.confirmation.afterExpiry }
+      : null,
+    reversal: data.reversal && data.reversal.accountedCents > 0 ? { accountedCents: data.reversal.accountedCents, recoveredCents: data.reversal.recoveredCents, pendingCents: data.reversal.pendingCents, cause: data.reversal.cause } : null,
+    review: data.status === "in_review" && data.review ? { reason: data.review.reason, label: REVIEW_LABEL[data.review.reason] } : null,
+    awaitingConfirmation: data.status === "awaiting_payment" || data.status === "processing",
   };
 }
 

@@ -4,7 +4,7 @@ import { invalid } from "@/lib/domain-error";
 import { addDays, isLocalDate, localInstant } from "@/lib/dates/school-time";
 import type { Actor } from "@/modules/access/actor";
 import { authorizeStudent } from "@/modules/access/authorize";
-import { checkLedger, ENTRY_TYPES, parseWalletState, type EntryType, type LedgerRow } from "./model";
+import { checkLedger, ENTRY_TYPES, parseWalletState, pendingReversalOf, type EntryType, type LedgerRow } from "./model";
 
 export type LedgerEntryView = {
   id: string;
@@ -16,7 +16,14 @@ export type LedgerEntryView = {
   reason: string | null;
   createdAt: string | null;
 };
-export type WalletReading = { studentId: string; balanceCents: number; version: number; entries: LedgerEntryView[] };
+export type WalletReading = {
+  studentId: string;
+  balanceCents: number;
+  version: number;
+  /** Pendência de reembolso/chargeback aberta (F19): > 0 bloqueia novas despesas da carteira até a regularização. */
+  pendingReversalCents: number;
+  entries: LedgerEntryView[];
+};
 
 const PAGE = 20;
 
@@ -44,7 +51,7 @@ export async function readWallet(db: Firestore, actor: Actor, studentId: string)
     await authorizeStudent(db, actor, studentId, "wallet.read", tx);
     const [wallet, entries] = await Promise.all([tx.get(db.doc(`wallets/${studentId}`)), tx.get(db.collection(`wallets/${studentId}/entries`).orderBy("seq", "desc").limit(PAGE))]);
     const state = parseWalletState(wallet.data());
-    return { studentId, ...state, entries: entries.docs.map((doc) => toEntry(doc.id, doc.data())) };
+    return { studentId, ...state, pendingReversalCents: pendingReversalOf(wallet.data()), entries: entries.docs.map((doc) => toEntry(doc.id, doc.data())) };
   });
 }
 

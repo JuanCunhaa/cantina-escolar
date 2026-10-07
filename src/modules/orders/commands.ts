@@ -11,7 +11,7 @@ import { readMenuForSale } from "@/modules/menu/queries";
 import { commitPurchaseUsage, decidePurchase, readPurchaseGuard } from "@/modules/policies/purchase-guard";
 import { checkPurchase } from "@/modules/school/settings";
 import type { PolicySnapshot } from "@/modules/school/calendar";
-import { applyDelta, parseWalletState } from "@/modules/wallet/model";
+import { applyDelta, assertCanSpend, parseWalletState } from "@/modules/wallet/model";
 import { checkoutSchema, priceChanges, purchaseReason, reviewedCart, subtotalOf, totalOf, type OrderItem, type OrderStatus, type ResolvedLine } from "./model";
 
 export type CheckoutOrder = {
@@ -144,6 +144,7 @@ export async function placeAdvanceOrders(db: Firestore, actor: Actor, raw: unkno
       const walletRef = db.doc(`wallets/${studentId}`);
       const walletSnap = await tx.get(walletRef);
       const walletBefore = parseWalletState(walletSnap.data());
+      assertCanSpend(walletSnap.data()); // pendência de reversão externa (F19) bloqueia nova compra
       const orders = prepared.map((d) => {
         const orderId = orderIdOf(current.uid, input.key, d.date);
         return { ...d, orderId };

@@ -5,5 +5,11 @@
     "deploymentEnabled": {
       "ci/probe-*": false
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/payments-reconcile",
+      "schedule": "0 9 * * *"
+    }
+  ]
 }

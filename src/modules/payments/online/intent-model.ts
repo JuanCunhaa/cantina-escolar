@@ -10,12 +10,18 @@ import type { PixData, ProviderCharge } from "./provider";
  * - `awaiting_payment`: Pix gerado (QR, copia e cola, validade);
  * - `processing`: cartão enviado ao provedor (aprovado ou em análise) — ainda não é recebimento confirmado;
  * - `failed`: o provedor recusou, ou a conciliação concluiu que a cobrança não foi criada.
- * `expired` é DERIVADO (Pix vencido pela validade local) e não descarta nada: um pagamento confirmado depois é conciliado
- * pela F19, que também cria `confirmed`, `in_review` e `reversed`. Nenhum estado daqui credita a carteira.
+ * F19 (confirmação confiável, `confirmation.ts`):
+ * - `confirmed`: o servidor consultou o provedor e o pagamento bate (identidade, conta, moeda, valor); o crédito foi lançado
+ *   na carteira NA MESMA transação. É o único estado que representa saldo novo;
+ * - `in_review`: o provedor informa pagamento, mas algo não bate (valor, moeda, conta, ambiente, teto de saldo) — NÃO credita,
+ *   fica para a administração; `expired`: o provedor encerrou a cobrança sem pagamento;
+ * - `reversed`: reembolso/chargeback TOTAL de um crédito já lançado (parcial mantém `confirmed` com `reversal`).
+ * `expired` também é EXIBIDO para Pix vencido pela validade local, sem descartar nada: pagamento confirmado depois é
+ * conciliado e creditado (nenhum estado terminal local bloqueia a confirmação).
  */
-export const INTENT_STATUSES = ["creating", "creation_uncertain", "awaiting_payment", "processing", "failed"] as const;
+export const INTENT_STATUSES = ["creating", "creation_uncertain", "awaiting_payment", "processing", "failed", "expired", "in_review", "confirmed", "reversed"] as const;
 export type IntentStatus = (typeof INTENT_STATUSES)[number];
-export type DisplayStatus = IntentStatus | "expired";
+export type DisplayStatus = IntentStatus;
 export const OPEN_STATUSES: readonly IntentStatus[] = ["creating", "creation_uncertain", "awaiting_payment"];
 
 export const CHANNELS = ["pix", "card"] as const;
@@ -37,6 +43,9 @@ export const STATUS_LABEL: Record<DisplayStatus, string> = {
   processing: "Pagamento em análise",
   failed: "Não concluída",
   expired: "Expirada",
+  in_review: "Em revisão",
+  confirmed: "Crédito lançado",
+  reversed: "Revertida",
 };
 
 const key = z.string().regex(/^[A-Za-z0-9_-]{8,128}$/);

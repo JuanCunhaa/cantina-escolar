@@ -5,7 +5,7 @@ import type { Actor } from "@/modules/access/actor";
 import { decideStudentAction, studentAccessRefs } from "@/modules/access/authorize";
 import { ForbiddenError } from "@/modules/access/errors";
 import { auditInTransaction } from "@/modules/audit/log";
-import { parseWalletState, planTransfer, transferSchema } from "./model";
+import { assertCanSpend, parseWalletState, planTransfer, transferSchema } from "./model";
 
 export type TransferLeg = {
   studentId: string;
@@ -62,6 +62,7 @@ export async function transferBetweenWallets(db: Firestore, actor: Actor, raw: u
       const toSnap = snaps[7]!;
       const fromBefore = parseWalletState(fromSnap.data());
       const toBefore = parseWalletState(toSnap.data());
+      assertCanSpend(fromSnap.data()); // transferência de SAÍDA é despesa: bloqueada com pendência de reversão externa (F19)
       const plan = planTransfer(fromBefore, toBefore, input.amountCents); // lança saldo insuficiente / limite
 
       const now = FieldValue.serverTimestamp();

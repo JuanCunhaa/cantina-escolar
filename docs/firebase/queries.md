@@ -75,3 +75,10 @@ Busca por nome: `students` por intervalo de prefixo em `nameNormalized` (custo =
 - Histórico do aluno (`GET /api/topups/online?studentId=`): `topupIntents where studentId == orderBy createdAt desc limit 10` — índice `topupIntents (studentId ASC, createdAt DESC)`; autorização `wallet.read` (vínculo lido na hora).
 - Teto de abertas (na transação de criação): `topupIntents where studentId == and status in [creating, creation_uncertain, awaiting_payment]` — índice `topupIntents (studentId ASC, status ASC)`; Pix vencido é descontado em memória.
 - Detalhe/conciliação (`GET /api/topups/online/{id}`, `POST …/{id}/reconcile`): documento por ID. Sem listener: a tela lê pela API (o QR não muda; a confirmação é da F19).
+
+### Confirmação e revisão de pagamentos online (F19)
+
+- Webhook (`POST /api/webhooks/mercadopago`): documento por ID (`topupIntents/{external_reference}`, `wallets/{aluno}`, `paymentEvents/{id}`, `paymentPendencies/{id}`) — sem consulta por filtro.
+- Varredura/cron/manual (`sweepIntents`): `topupIntents where status in [creating, creation_uncertain, awaiting_payment, processing, in_review] and createdAt >= −30 d orderBy createdAt desc limit N`; `status in [failed, expired] and createdAt >= −7 d`; `status == confirmed and confirmation.confirmedAt >= −120 d orderBy confirmation.confirmedAt desc` — índices `(status, createdAt DESC)` e `(status, confirmation.confirmedAt DESC)`. Limite por execução (100; máx. 300).
+- Revisão (`GET /api/admin/payments`): `paymentPendencies where status == open limit 100` (ordenado em memória) e `topupIntents where status == in_review limit 100` — igualdade em campo único, sem índice composto.
+- Leitura da carteira (`GET /api/wallets?studentId=`) devolve também `pendingReversalCents`.

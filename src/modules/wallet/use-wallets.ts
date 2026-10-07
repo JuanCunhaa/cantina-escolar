@@ -11,10 +11,10 @@ import type { CheckoutResult } from "@/modules/orders/commands";
 import { purchaseReason } from "@/modules/orders/model";
 import { applyReading, mergeEntries, syncState, type SyncState, type WalletReading, type WalletView } from "./view";
 
-export type WalletSlot = { view: WalletView | null; entries: LedgerEntryView[]; sync: SyncState | "unknown"; listenerError: boolean; readError: boolean };
-type Slot = { view: WalletView | null; entries: LedgerEntryView[]; listenerError: boolean; readError: boolean };
+export type WalletSlot = { view: WalletView | null; entries: LedgerEntryView[]; sync: SyncState | "unknown"; listenerError: boolean; readError: boolean; pendingCents: number };
+type Slot = { view: WalletView | null; entries: LedgerEntryView[]; listenerError: boolean; readError: boolean; pendingCents: number };
 
-const EMPTY: Slot = { view: null, entries: [], listenerError: false, readError: false };
+const EMPTY: Slot = { view: null, entries: [], listenerError: false, readError: false, pendingCents: 0 };
 
 function entryFromDoc(id: string, d: Record<string, unknown>): LedgerEntryView {
   return {
@@ -63,8 +63,9 @@ export function useWallets(user: User, studentIds: readonly string[]) {
         update(id, (slot) => ({ ...slot, readError: true }));
         return false;
       }
-      const { balanceCents, version, entries } = result.data;
-      update(id, (slot) => ({ ...slot, readError: false, view: applyReading(slot.view, { balanceCents, version, source: "read" }), entries: mergeEntries(slot.entries, entries) }));
+      const { balanceCents, version, entries, pendingReversalCents } = result.data;
+      // Pendência de reembolso/chargeback (F19): só a leitura do SERVIDOR libera a tela; o servidor sempre recusa a despesa.
+      update(id, (slot) => ({ ...slot, readError: false, pendingCents: pendingReversalCents ?? 0, view: applyReading(slot.view, { balanceCents, version, source: "read" }), entries: mergeEntries(slot.entries, entries) }));
       return true;
     },
     [update],
@@ -82,6 +83,20 @@ export function useWallets(user: User, studentIds: readonly string[]) {
         );
       }
     },
+    [feed],
+  );
+
+  /**
+   * Crédito de recarga online JÁ LANÇADO pelo servidor (intenção `confirmed`): saldo e lançamento pela versão do livro. Nunca é
+   * chamado por listener nem por redirect; leitura/listener mais antigos não fazem o saldo regredir (`applyReading`).
+   */
+  const applyConfirmedCredit = useCallback(
+    (credit: { studentId: string; entryId: string; walletSeq: number; balanceAfterCents: number; amountCents: number; reason: string }) =>
+      feed(
+        credit.studentId,
+        { balanceCents: credit.balanceAfterCents, version: credit.walletSeq, source: "command" },
+        [{ id: credit.entryId, seq: credit.walletSeq, type: "topup", amountCents: credit.amountCents, balanceAfterCents: credit.balanceAfterCents, counterpartStudentId: null, reason: credit.reason, createdAt: null }],
+      ),
     [feed],
   );
 
@@ -113,6 +128,9 @@ export function useWallets(user: User, studentIds: readonly string[]) {
             const balanceCents = snap.exists() ? Number(snap.get("balanceCents")) : 0;
             const version = snap.exists() ? Number(snap.get("version")) : 0;
             feed(id, { balanceCents, version, source: "listener", fromCache: snap.metadata.fromCache });
+            // O listener só ACRESCENTA o aviso de pendência (nunca o limpa): a liberação vem da leitura do servidor.
+            const pending = snap.exists() ? Number(snap.get("pendingReversalCents") ?? 0) : 0;
+            if (pending > 0) update(id, (slot) => (slot.pendingCents >= pending ? slot : { ...slot, pendingCents: pending }));
             update(id, (slot) => (slot.listenerError ? { ...slot, listenerError: false } : slot));
           },
           () => update(id, (slot) => ({ ...slot, listenerError: true })),
@@ -141,5 +159,5 @@ export function useWallets(user: User, studentIds: readonly string[]) {
     return out;
   }, [slots, idsKey]);
 
-  return { wallets: result, refresh, applyTransfer, applyCheckout };
+  return { wallets: result, refresh, applyTransfer, applyCheckout, applyConfirmedCredit };
 }

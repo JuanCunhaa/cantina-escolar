@@ -21,4 +21,10 @@ describe("stagingPayments", () => {
     const env = stagingPayments({ PAYMENTS_PIX_PROVIDER: "mercadopago", PAYMENTS_CARD_PROVIDER: "mercadopago", MERCADOPAGO_ENV: "sandbox", MERCADOPAGO_ACCESS_TOKEN: token, MERCADOPAGO_PUBLIC_KEY: token });
     expect(env).toMatchObject({ PAYMENTS_PIX_PROVIDER: "mercadopago", PAYMENTS_CARD_PROVIDER: "mercadopago", MERCADOPAGO_ENV: "sandbox", MERCADOPAGO_ACCESS_TOKEN: token });
   });
+
+  it("repassa a chave do webhook e o segredo do cron (F19) só quando informados; ausentes ficam vazios (endpoint recusa tudo)", () => {
+    const base = { PAYMENTS_PIX_PROVIDER: "mercadopago", MERCADOPAGO_ENV: "sandbox", MERCADOPAGO_ACCESS_TOKEN: token };
+    expect(stagingPayments(base)).toMatchObject({ MERCADOPAGO_WEBHOOK_SECRET: "", CRON_SECRET: "" });
+    expect(stagingPayments({ ...base, MERCADOPAGO_WEBHOOK_SECRET: "  chave-de-teste  ", CRON_SECRET: "cron-de-teste" })).toMatchObject({ MERCADOPAGO_WEBHOOK_SECRET: "chave-de-teste", CRON_SECRET: "cron-de-teste" });
+  });
 });

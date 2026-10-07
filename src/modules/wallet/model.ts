@@ -37,6 +37,23 @@ export function parseWalletState(data: Record<string, unknown> | undefined): Wal
   return { balanceCents: balanceCents as number, version: version as number };
 }
 
+/**
+ * Pendência de reversão externa (F19): reembolso/chargeback de um pagamento online cujo crédito não pôde ser recuperado
+ * integralmente da carteira (já consumido). `pendingReversalCents` > 0 BLOQUEIA novas despesas da carteira (compra antecipada,
+ * balcão, troca com cobrança e transferência de saída) até a administração regularizar; reembolsos e créditos continuam
+ * permitidos. Nunca vira saldo negativo: o saldo só sai por movimento do livro, limitado ao que existe.
+ */
+export function pendingReversalOf(data: Record<string, unknown> | undefined): number {
+  const value = data?.pendingReversalCents;
+  return Number.isSafeInteger(value) && (value as number) > 0 ? (value as number) : 0;
+}
+
+/** Recusa nova despesa de carteira com pendência de reversão externa aberta (409 `wallet_blocked`). */
+export function assertCanSpend(data: Record<string, unknown> | undefined): void {
+  const pendingCents = pendingReversalOf(data);
+  if (pendingCents > 0) throw conflict("wallet_blocked", "A carteira tem uma pendência de pagamento em análise e está bloqueada para novas compras. Procure a secretaria.", { pendingCents });
+}
+
 /** Resultado de aplicar um valor assinado (centavos) a uma carteira: novo saldo e seq do movimento. */
 export function applyDelta(state: WalletState, deltaCents: number): WalletState {
   const balanceCents = state.balanceCents + deltaCents;

@@ -7,6 +7,7 @@ import { formatBRL } from "@/lib/money/format";
 import { parseBRLToCents } from "@/lib/money/parse";
 import { useFamilyStudents } from "@/modules/guardians/use-family-students";
 import { executeWithRetry } from "@/modules/wallet/operation";
+import { useWallets, type WalletSlot } from "@/modules/wallet/use-wallets";
 import type { IntentView } from "../online/intent-commands";
 import { MercadoPagoCardBrick, type CardSubmission } from "./mercadopago-card-brick";
 
@@ -23,14 +24,18 @@ type Op =
 
 const timeFmt = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 const CHANNEL_LABEL: Record<Channel, string> = { pix: "Pix", card: "Cartão de crédito (1x)" };
-const AUTO_RECONCILE = { tries: 6, everyMs: 5000 };
+/** Acompanhamento do pagamento: 5 s nos primeiros 2 min, depois 20 s até ~15 min. Só CONSULTA o servidor (que consulta o provedor). */
+const AUTO_RECONCILE = { fastTries: 24, fastEveryMs: 5000, slowTries: 40, slowEveryMs: 20000 };
+const delayFor = (tries: number) => (tries < AUTO_RECONCILE.fastTries ? AUTO_RECONCILE.fastEveryMs : AUTO_RECONCILE.slowEveryMs);
 
 /** "Indisponível" é resposta definitiva (nada gravado/cobrado), não falha transitória: não repetir. */
 const definitiveUnavailable = <T,>(r: ApiResult<T>): ApiResult<T> => (!r.ok && r.error === "payment_unavailable" ? { ...r, status: 422 } : r);
 
 /**
- * Recarga online pelo responsável (F18): aluno, valor e meio → revisão → cobrança no provedor. Gerar o Pix ou enviar o
- * cartão NÃO credita: o saldo só muda com a confirmação confiável do pagamento (F19), e a tela diz isso. Sem provedor
+ * Recarga online pelo responsável (F18/F19): aluno, valor e meio → revisão → cobrança no provedor → acompanhamento. Gerar o
+ * Pix ou enviar o cartão NÃO credita: o saldo só muda quando o SERVIDOR confirma o pagamento no provedor e lança o crédito
+ * ("Crédito lançado"); a tela distingue "em processamento" disso, consulta o servidor enquanto espera e reconcilia o saldo
+ * por versão da carteira (listener atrasado, leitura antiga e redirect nunca confirmam nem fazem o saldo regredir). Sem provedor
  * configurado o meio aparece indisponível (nunca há botão de simular pagamento). Resposta perdida repete a MESMA chave;
  * cobrança incerta é conciliada por consulta, sem gerar outra.
  */
@@ -51,6 +56,9 @@ export function OnlineTopup({ user }: { user: User }) {
   const [copied, setCopied] = useState(false);
   const attempt = useRef<{ sig: string; key: string } | null>(null);
   const inFlight = useRef(false);
+  // Saldo exibido da carteira do aluno da recarga: leitura do servidor + listener, sempre reconciliados pela versão do livro.
+  const walletHook = useWallets(user, intent ? [intent.studentId] : []);
+  const creditedWallet = intent ? walletHook.wallets[intent.studentId] : undefined;
 
   useEffect(() => {
     let alive = true;
@@ -89,28 +97,39 @@ export function OnlineTopup({ user }: { user: User }) {
     if (r.ok) setIntent(r.data);
   }
 
-  // Conciliação automática curta enquanto a criação estiver incerta (só CONSULTA; nunca gera outra cobrança).
+  // Acompanhamento: enquanto a criação estiver incerta OU o pagamento aguardar confirmação, consulta o SERVIDOR (que consulta
+  // o provedor). Nunca gera outra cobrança. O crédito só aparece quando a resposta traz a intenção `confirmed`.
   const intentId = intent?.intentId;
-  const intentNeedsCheck = intent?.needsReconcile === true;
+  const intentWatch = intent ? intent.needsReconcile || intent.awaitingConfirmation : false;
   useEffect(() => {
-    if (!intentId || !intentNeedsCheck) return;
+    if (!intentId || !intentWatch) return;
     let tries = 0;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
     const tick = async () => {
-      if (stopped || tries >= AUTO_RECONCILE.tries) return;
+      if (stopped || tries >= AUTO_RECONCILE.fastTries + AUTO_RECONCILE.slowTries) return;
       tries += 1;
       const r = await api<IntentView>(user, "POST", `/api/topups/online/${intentId}/reconcile`, {}, { timeoutMs: 20000 });
       if (stopped) return;
       if (r.ok) setIntent(r.data);
-      if (!r.ok || r.data.needsReconcile) timer = setTimeout(tick, AUTO_RECONCILE.everyMs);
+      if (!r.ok || r.data.needsReconcile || r.data.awaitingConfirmation) timer = setTimeout(tick, delayFor(tries));
     };
-    timer = setTimeout(tick, AUTO_RECONCILE.everyMs);
+    timer = setTimeout(tick, AUTO_RECONCILE.fastEveryMs);
     return () => {
       stopped = true;
       clearTimeout(timer);
     };
-  }, [user, intentId, intentNeedsCheck]);
+  }, [user, intentId, intentWatch]);
+
+  // Crédito JÁ lançado pelo servidor: aplica ao saldo exibido pela versão do livro (idempotente; nunca regride).
+  const credit = intent?.credit ?? null;
+  const credited = intent?.credited === true;
+  const applyCredit = walletHook.applyConfirmedCredit;
+  const creditStudent = intent?.studentId;
+  useEffect(() => {
+    if (!creditStudent || !credit || !credited) return;
+    applyCredit({ studentId: creditStudent, entryId: credit.walletEntryId, walletSeq: credit.walletSeq, balanceAfterCents: credit.balanceAfterCents, amountCents: credit.amountCents, reason: "Recarga online" });
+  }, [creditStudent, credit, credited, applyCredit]);
 
   function review(event: FormEvent) {
     event.preventDefault();
@@ -292,7 +311,7 @@ export function OnlineTopup({ user }: { user: User }) {
         </div>
       )}
 
-      {intent && <IntentPanel intent={intent} checking={checking} copied={copied} onCopy={copy} onReconcile={(resend) => void reconcile(intent.intentId, resend)} />}
+      {intent && <IntentPanel intent={intent} checking={checking} copied={copied} onCopy={copy} onReconcile={(resend) => void reconcile(intent.intentId, resend)} wallet={creditedWallet} />}
 
       <section aria-labelledby="topup-history-title">
         <h2 id="topup-history-title">Últimas recargas online{selected && names.get(selected) ? ` · ${names.get(selected)}` : ""}</h2>
@@ -313,7 +332,7 @@ export function OnlineTopup({ user }: { user: User }) {
   );
 }
 
-function IntentPanel({ intent, checking, copied, onCopy, onReconcile }: { intent: IntentView; checking: boolean; copied: boolean; onCopy: (text: string) => void; onReconcile: (resend: boolean) => void }) {
+function IntentPanel({ intent, checking, copied, onCopy, onReconcile, wallet }: { intent: IntentView; checking: boolean; copied: boolean; onCopy: (text: string) => void; onReconcile: (resend: boolean) => void; wallet?: WalletSlot }) {
   const status = intent.displayStatus;
   return (
     <section aria-labelledby="topup-intent-title" data-testid="topup-intent" data-status={status} data-intent={intent.intentId}>
@@ -344,8 +363,48 @@ function IntentPanel({ intent, checking, copied, onCopy, onReconcile }: { intent
           <p className="muted">O saldo será atualizado quando o pagamento for confirmado. Não pague o mesmo código duas vezes.</p>
         </div>
       )}
-      {status === "expired" && <p>Este Pix venceu sem confirmação. Se você pagou antes do vencimento, o valor será conciliado; caso contrário, gere outro.</p>}
-      {status === "processing" && <p>O pagamento foi enviado ao provedor e está em análise. O saldo será atualizado quando o pagamento for confirmado.</p>}
+      {status === "expired" && (
+        <p>
+          Este Pix venceu sem confirmação. Se você pagou antes do vencimento, o valor será conciliado e creditado automaticamente; caso contrário, gere outro.
+          {intent.awaitingConfirmation ? " Seguimos conferindo com o provedor." : ""}
+        </p>
+      )}
+      {status === "processing" && (
+        <p data-testid="topup-processing">
+          Pagamento em processamento: o cartão foi enviado ao provedor e está em análise. <strong>Ainda não é saldo</strong>: o crédito só é lançado quando o pagamento for confirmado.
+        </p>
+      )}
+      {intent.awaitingConfirmation && status === "awaiting_payment" && (
+        <p className="muted" data-testid="topup-not-credited">
+          Pagamento em processamento: nenhum crédito foi lançado ainda.
+        </p>
+      )}
+      {status === "confirmed" && intent.credit && (
+        <div data-testid="topup-credited" data-wallet-seq={intent.credit.walletSeq}>
+          <p>
+            <strong>Crédito lançado:</strong> {formatBRL(intent.credit.amountCents)} na carteira de {intent.studentName}. Saldo depois do crédito: <strong>{formatBRL(intent.credit.balanceAfterCents)}</strong>.
+          </p>
+          {intent.credit.afterExpiry && <p className="muted">O pagamento chegou depois da validade (ou da falha registrada) e foi creditado mesmo assim, uma única vez.</p>}
+          {intent.reversal && <p role="status">Parte do pagamento foi devolvida: {formatBRL(intent.reversal.accountedCents)}.</p>}
+        </div>
+      )}
+      {status === "reversed" && (
+        <p role="status" className="notice" data-testid="topup-reversed">
+          {intent.reversal?.cause === "chargeback" ? "Este pagamento foi contestado (chargeback)" : "Este pagamento foi devolvido"}: {formatBRL(intent.reversal?.accountedCents ?? intent.amountCents)} saiu da carteira.
+          {intent.reversal && intent.reversal.pendingCents > 0 ? ` Havia ${formatBRL(intent.reversal.pendingCents)} já consumidos: a escola vai regularizar a pendência e novas compras ficam bloqueadas até lá.` : ""}
+        </p>
+      )}
+      {status === "in_review" && (
+        <p role="status" className="notice" data-testid="topup-review-notice">
+          Recebemos o aviso de pagamento, mas ele precisa de conferência pela escola ({intent.review?.label ?? "divergência"}). <strong>Nenhum crédito foi lançado ainda.</strong> Procure a secretaria se
+          precisar de ajuda.
+        </p>
+      )}
+      {intent.credited && wallet?.view && (
+        <p data-testid="topup-wallet" data-version={wallet.view.version} data-sync={wallet.sync}>
+          Saldo atual da carteira: <strong data-testid="topup-wallet-balance">{formatBRL(wallet.view.balanceCents)}</strong>
+        </p>
+      )}
       {(status === "creating" || status === "creation_uncertain") && (
         <div>
           <p>A resposta do provedor não chegou. Estamos conferindo se a cobrança foi gerada — não gere outra recarga enquanto isso.</p>

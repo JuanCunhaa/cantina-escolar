@@ -14,7 +14,7 @@ import { exceptionRefOf } from "@/modules/policies/purchase-guard";
 import { applyUsageDeltas, readUsage, usageAfter, type UsageDelta } from "@/modules/policies/usage";
 import type { PolicySnapshot } from "@/modules/school/calendar";
 import { checkDestination } from "@/modules/school/settings";
-import { applyDelta, parseWalletState } from "@/modules/wallet/model";
+import { applyDelta, assertCanSpend, parseWalletState } from "@/modules/wallet/model";
 import { MAX_ORDER_LINES, exchangeDifference, exchangeQuoteSchema, exchangeSchema, rescheduleSchema, type ExchangeQuote, type ExchangeQuoteInput } from "./amend-model";
 import { CANCELLED, aggregateStatus, deliveredOf, exchangeCreditOf, exchangedOf, isOpenStatus, remainingOf, type PrepStage } from "./fulfillment-model";
 import { statusInfo } from "./history-model";
@@ -413,6 +413,7 @@ async function planExchange(db: Firestore, tx: Transaction, p: { order: OrderSta
       if (evaluation && !evaluation.allowed) throw policyDenied(evaluation);
       if (expectedDifferenceCents !== differenceCents) throw conflict("difference_changed", "A diferença calculada pelo servidor mudou: revise a troca e confirme de novo.", { quote });
       if (differenceCents === 0) return null;
+      if (differenceCents > 0) assertCanSpend(walletSnap.data()); // troca com cobrança é despesa (F19: bloqueada com pendência)
       try {
         return applyDelta(walletBefore, -differenceCents); // + cobra, − devolve; saldo nunca negativo, teto respeitado
       } catch (error) {
