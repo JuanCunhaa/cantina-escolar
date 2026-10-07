@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { fetchRunMetrics } from "./metrics/collect.ts";
 import { ghCliFetcher, type Fetcher } from "./metrics/github.ts";
 import { bin } from "./lib/bin.ts";
+import { writeLines } from "./lib/output.ts";
 
 const REPRO: Record<string, string> = {
   changes: "node scripts/ci/classify-changes.ts --base origin/main --head HEAD",
@@ -91,7 +92,7 @@ export async function status(argv: string[], deps: { gh?: Gh; logDir?: string; f
 
 if (import.meta.main) {
   try {
-    console.log(await status(process.argv.slice(2)));
+    writeLines(await status(process.argv.slice(2)));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

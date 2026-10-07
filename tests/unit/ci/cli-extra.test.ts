@@ -148,3 +148,12 @@ describe("build-manifest: comandos env e uso", () => {
     expect(buildMain(["verify", "--dir", "nada"], { root: dir, env: {} })).toBe(1);
   });
 });
+
+describe("saída de texto sem forjar linhas", () => {
+  it("escreve cada linha isolada, sem CR embutido", async () => {
+    const { writeLines } = await import("../../../scripts/ci/lib/output.ts");
+    const lines: string[] = [];
+    writeLines("a\r\nb\nc", (l) => lines.push(l));
+    expect(lines).toEqual(["a\n", "b\n", "c\n"]);
+  });
+});

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { computeRunMetrics, equivalenceKey, summarizeHistory, type ApiArtifact, type ApiAttempt, type ApiJob, type ApiRun, type RunMetrics } from "./compute.ts";
 import { ghCliFetcher, paginate, tokenFetcher, type Fetcher } from "./github.ts";
 import { renderMarkdown } from "./render.ts";
+import { writeLines } from "../lib/output.ts";
 
 export async function fetchRunMetrics(fetcher: Fetcher, repo: string, runId: number, withExtras = true): Promise<RunMetrics> {
   const run = (await fetcher(`repos/${repo}/actions/runs/${runId}`)) as ApiRun;
@@ -100,7 +101,8 @@ export async function main(argv: string[], env: Record<string, string | undefine
     writeFileSync(join(out, "ci-metrics.json"), `${JSON.stringify(report, null, 2)}\n`);
     writeFileSync(join(out, "ci-metrics.md"), markdown);
     if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, markdown);
-    else (deps.stdout ?? ((t) => process.stdout.write(t)))(markdown);
+    else if (deps.stdout) deps.stdout(markdown);
+    else writeLines(markdown);
     return 0;
   } catch (error) {
     console.error(`Coleta de métricas falhou: ${error instanceof Error ? error.message : String(error)}`);

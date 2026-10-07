@@ -51,7 +51,8 @@ export async function main(env: Record<string, string | undefined>, deps: { fetc
     result = { sha: "", reason: "falha" };
   }
   const sha = SHA.test(result.sha) ? result.sha : "";
-  log(sha ? `referência validada: ${sha} (${describeReference(result.reason)})` : `sem referência validada (${describeReference(result.reason)}): fluxo completo`);
+  const message = sha ? `referência validada: ${sha} (${describeReference(result.reason)})` : `sem referência validada (${describeReference(result.reason)}): fluxo completo`;
+  log(message.replace(/[\r\n]/g, ""));
   if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `base=${sha}\n`);
   return 0;
 }
