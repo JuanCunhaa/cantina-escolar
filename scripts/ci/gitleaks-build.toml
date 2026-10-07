@@ -1,0 +1,15 @@
+# Gitleaks para o PACOTE do build compartilhado do CI (scripts/ci/build-manifest.ts), não para o repositório.
+# Regras padrão + UMA exceção revisada (07/10/2026, probe P1, run 37573366265): chaves aleatórias que o próprio
+# `next build` gera a cada compilação e que o `next start` exige — modo preview (prerender-manifest.json) e criptografia
+# das Server Actions (server/server-reference-manifest.json). Não são credenciais de serviço; valem só para este build de
+# emulador (nunca publicado; a Vercel gera as suas). Exceção estreita: só essas 3 chaves nesses 2 arquivos (condição E).
+# Qualquer outro achado no pacote reprova o job.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "chaves por build do Next (preview/Server Actions) exigidas pelo next start"
+condition = "AND"
+regexTarget = "line"
+paths = ['''(^|/)\.next/prerender-manifest\.json$''', '''(^|/)\.next/server/server-reference-manifest\.json$''']
+regexes = ['''^\s*"(previewModeSigningKey|previewModeEncryptionKey|encryptionKey)"\s*:\s*"[^"]*",?\s*$''']
