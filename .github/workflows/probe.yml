@@ -63,12 +63,8 @@ jobs:
       - run: npm run build
       - name: Conteúdo do .next (inspeção do que é diagnóstico)
         run: |
-          du -sh .next .next/* 2>/dev/null | sort -h | tail -15
+          du -sh .next/* .next/server/* 2>/dev/null | sort -h | tail -20
           ls -la .next
-      - name: Gitleaks no resultado do build
-        run: |
-          bash scripts/ci/tools/install-gitleaks.sh "$RUNNER_TEMP/bin"
-          "$RUNNER_TEMP/bin/gitleaks" dir --redact --no-banner .next
       - name: Empacotar build + manifesto
         id: pack
         run: |
@@ -76,6 +72,15 @@ jobs:
           node scripts/ci/build-manifest.ts pack --out build-artifact --name "$name" --build-command "npm run build"
           echo "artifact=$name" >> "$GITHUB_OUTPUT"
           cat build-artifact/manifest.json
+      - name: (diagnóstico do probe) Gitleaks no .next inteiro, inclusive cache
+        continue-on-error: true
+        run: |
+          bash scripts/ci/tools/install-gitleaks.sh "$RUNNER_TEMP/bin"
+          "$RUNNER_TEMP/bin/gitleaks" dir --redact --no-banner -v .next
+      - name: Gitleaks no pacote do build
+        run: |
+          mkdir -p "$RUNNER_TEMP/pacote" && tar -xzf build-artifact/build.tar.gz -C "$RUNNER_TEMP/pacote"
+          "$RUNNER_TEMP/bin/gitleaks" dir --redact --no-banner -v "$RUNNER_TEMP/pacote"
       - name: "Artefato: enviar build"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
