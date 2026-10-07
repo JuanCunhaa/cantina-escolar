@@ -138,6 +138,22 @@ O `check` reprovou listando exatamente esses jobs/etapas com links. Desequilíbr
 
 Consumo total da tarefa: ≈153 min arredondados de 166 (probes 40, comparação 53, P4 18, P5 8, probe Gitleaks 1, final 32).
 
+## 4d. Integração em 2 grupos (run 37643124577, commit `934138a`) × run 37639559121 (`df4474b`)
+
+Mesmo PR, sem mudança de teste; entre as duas execuções também saiu o Semgrep (`71d5360`).
+
+| Medida | Antes (37639559121) | Depois (37643124577) |
+|---|---|---|
+| Espera até o resultado | 10m30s | **6m53s** |
+| Minutos brutos somados | 25,0 | 22,9 |
+| Estimativa arredondada | 31 (10 jobs) | 27 (10 jobs) |
+| `backend` | 502 s (1 job) | g1 268 s · g2 285 s |
+
+Integração: g1 215 s (180 testes) · g2 204 s (236 testes) + Rules 39 s (56); g1 + g2 = 416 listados. Demais jobs: `fast` 92 s,
+`build` 89 s, `e2e` g1 180 s / g2 172 s, `security` 167 s (sem Semgrep), `quality` 100 s, `check` 8 s. Cobertura mesclada
+62,1% (unit 25,9%, integração g1 30%, g2 38,9%); Sonar OK (código novo 85,7%). Caminho crítico agora: `backend (g2)` →
+`quality`; build + e2e (~4,5 min) fica logo abaixo. Uma execução só: não é mediana.
+
 ## 5. Evidências dos probes (Actions real)
 
 - **Vercel**: 0 status/deploy nos commits de `ci/probe-*` (`git.deploymentEnabled` no `vercel.json`).
