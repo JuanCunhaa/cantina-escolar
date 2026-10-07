@@ -32,3 +32,4 @@ Comando: `/cantina-task F01`. Retomada: `/cantina-resume`.
 | [F24](F24.md) | E | Homologação, backup e entrega | F23 |
 
 F18 depende da escolha externa do gateway. Registrar código/testes prontos e homologação pendente separadamente; continuar trabalho independente. Segurança/auditoria/testes surgem em cada módulo desde F01/F03 e recebem revisão global em F22/F23.
+<!-- probe P3 -->
