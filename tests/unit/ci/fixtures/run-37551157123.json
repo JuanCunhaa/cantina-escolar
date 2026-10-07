@@ -1,0 +1,379 @@
+{
+ "run": {
+  "id": 37551157123,
+  "name": "ci",
+  "path": ".github/workflows/ci.yml",
+  "workflow_id": 372723832,
+  "event": "pull_request",
+  "head_branch": "feat/f18-mercadopago-adapter",
+  "head_sha": "e564ee16071aa3e9f2d02d90a5398db057f08e53",
+  "html_url": "https://github.com/JuanCunhaa/cantina-escolar/actions/runs/37551157123",
+  "status": "completed",
+  "conclusion": "success",
+  "run_attempt": 1,
+  "created_at": "2026-10-07T00:17:13Z",
+  "run_started_at": "2026-10-07T00:17:13Z",
+  "pull_requests": []
+ },
+ "attempts": [
+  {
+   "run_attempt": 1,
+   "run_started_at": "2026-10-07T00:17:13Z",
+   "created_at": "2026-10-07T00:17:13Z",
+   "status": "completed",
+   "conclusion": "success"
+  }
+ ],
+ "jobsByAttempt": [
+  [
+   {
+    "id": 112566695258,
+    "name": "security",
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-10-07T00:17:13Z",
+    "started_at": "2026-10-07T00:17:15Z",
+    "completed_at": "2026-10-07T00:17:54Z",
+    "runner_name": "GitHub Actions 1000026672",
+    "labels": [
+     "ubuntu-latest"
+    ],
+    "html_url": "https://github.com/JuanCunhaa/cantina-escolar/actions/runs/37551157123/job/112566695258",
+    "steps": [
+     {
+      "name": "Set up job",
+      "number": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:17:16Z",
+      "completed_at": "2026-10-07T00:17:17Z"
+     },
+     {
+      "name": "Run actions/checkout@v4",
+      "number": 2,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:17:17Z",
+      "completed_at": "2026-10-07T00:17:19Z"
+     },
+     {
+      "name": "Gitleaks v8.30.1 (binário fixado, SHA-256 conferido)",
+      "number": 3,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:17:19Z",
+      "completed_at": "2026-10-07T00:17:21Z"
+     },
+     {
+      "name": "Run actions/setup-python@v5",
+      "number": 4,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:17:21Z",
+      "completed_at": "2026-10-07T00:17:21Z"
+     },
+     {
+      "name": "Semgrep 1.179.0 (regras do registry)",
+      "number": 5,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:17:21Z",
+      "completed_at": "2026-10-07T00:17:52Z"
+     },
+     {
+      "name": "Post Run actions/setup-python@v5",
+      "number": 9,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:17:52Z",
+      "completed_at": "2026-10-07T00:17:52Z"
+     },
+     {
+      "name": "Post Run actions/checkout@v4",
+      "number": 10,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:17:52Z",
+      "completed_at": "2026-10-07T00:17:53Z"
+     },
+     {
+      "name": "Complete job",
+      "number": 11,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:17:53Z",
+      "completed_at": "2026-10-07T00:17:53Z"
+     }
+    ]
+   },
+   {
+    "id": 112566695479,
+    "name": "check",
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-10-07T00:17:13Z",
+    "started_at": "2026-10-07T00:17:15Z",
+    "completed_at": "2026-10-07T00:35:59Z",
+    "runner_name": "GitHub Actions 1000026673",
+    "labels": [
+     "ubuntu-latest"
+    ],
+    "html_url": "https://github.com/JuanCunhaa/cantina-escolar/actions/runs/37551157123/job/112566695479",
+    "steps": [
+     {
+      "name": "Set up job",
+      "number": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:17:16Z",
+      "completed_at": "2026-10-07T00:17:21Z"
+     },
+     {
+      "name": "Run actions/checkout@v4",
+      "number": 2,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:17:21Z",
+      "completed_at": "2026-10-07T00:17:23Z"
+     },
+     {
+      "name": "Run actions/setup-node@v4",
+      "number": 3,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:17:23Z",
+      "completed_at": "2026-10-07T00:17:28Z"
+     },
+     {
+      "name": "Run actions/setup-java@v4",
+      "number": 4,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:17:28Z",
+      "completed_at": "2026-10-07T00:17:28Z"
+     },
+     {
+      "name": "Run npm ci",
+      "number": 5,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:17:28Z",
+      "completed_at": "2026-10-07T00:17:51Z"
+     },
+     {
+      "name": "Run npm run lint",
+      "number": 6,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:17:51Z",
+      "completed_at": "2026-10-07T00:18:04Z"
+     },
+     {
+      "name": "Run npm run typecheck",
+      "number": 7,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:18:04Z",
+      "completed_at": "2026-10-07T00:18:14Z"
+     },
+     {
+      "name": "Run npm test",
+      "number": 8,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:18:14Z",
+      "completed_at": "2026-10-07T00:18:21Z"
+     },
+     {
+      "name": "Run npm run test:rules",
+      "number": 9,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:18:21Z",
+      "completed_at": "2026-10-07T00:18:55Z"
+     },
+     {
+      "name": "Run npm run test:integration",
+      "number": 10,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:18:55Z",
+      "completed_at": "2026-10-07T00:25:57Z"
+     },
+     {
+      "name": "Run npx playwright install --with-deps chromium",
+      "number": 11,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:25:57Z",
+      "completed_at": "2026-10-07T00:26:23Z"
+     },
+     {
+      "name": "Recursos do runner (início do e2e)",
+      "number": 12,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:26:23Z",
+      "completed_at": "2026-10-07T00:26:23Z"
+     },
+     {
+      "name": "npm run test:e2e",
+      "number": 13,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:26:23Z",
+      "completed_at": "2026-10-07T00:34:51Z"
+     },
+     {
+      "name": "Recursos do runner (fim do e2e)",
+      "number": 14,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:34:51Z",
+      "completed_at": "2026-10-07T00:34:52Z"
+     },
+     {
+      "name": "Evidências do e2e (resultados, error-context, relatório e traces)",
+      "number": 15,
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-10-07T00:34:52Z",
+      "completed_at": "2026-10-07T00:34:52Z"
+     },
+     {
+      "name": "e2e — propagação entre sessões (listener, não bloqueante)",
+      "number": 16,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:34:52Z",
+      "completed_at": "2026-10-07T00:35:21Z"
+     },
+     {
+      "name": "Run npm run build",
+      "number": 17,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:35:21Z",
+      "completed_at": "2026-10-07T00:35:54Z"
+     },
+     {
+      "name": "Run npm run audit:prod",
+      "number": 18,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:35:54Z",
+      "completed_at": "2026-10-07T00:35:55Z"
+     },
+     {
+      "name": "Post Run actions/setup-java@v4",
+      "number": 34,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:35:55Z",
+      "completed_at": "2026-10-07T00:35:55Z"
+     },
+     {
+      "name": "Post Run actions/setup-node@v4",
+      "number": 35,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:35:55Z",
+      "completed_at": "2026-10-07T00:35:56Z"
+     },
+     {
+      "name": "Post Run actions/checkout@v4",
+      "number": 36,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:35:56Z",
+      "completed_at": "2026-10-07T00:35:56Z"
+     },
+     {
+      "name": "Complete job",
+      "number": 37,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:35:56Z",
+      "completed_at": "2026-10-07T00:35:56Z"
+     }
+    ]
+   },
+   {
+    "id": 112566695629,
+    "name": "semgrep-appsec",
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-10-07T00:17:13Z",
+    "started_at": "2026-10-07T00:17:16Z",
+    "completed_at": "2026-10-07T00:19:18Z",
+    "runner_name": "GitHub Actions 1000026674",
+    "labels": [
+     "ubuntu-latest"
+    ],
+    "html_url": "https://github.com/JuanCunhaa/cantina-escolar/actions/runs/37551157123/job/112566695629",
+    "steps": [
+     {
+      "name": "Set up job",
+      "number": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:17:17Z",
+      "completed_at": "2026-10-07T00:17:19Z"
+     },
+     {
+      "name": "Run actions/checkout@v4",
+      "number": 2,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:17:19Z",
+      "completed_at": "2026-10-07T00:17:21Z"
+     },
+     {
+      "name": "Run actions/setup-python@v5",
+      "number": 3,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:17:21Z",
+      "completed_at": "2026-10-07T00:17:21Z"
+     },
+     {
+      "name": "Semgrep CI (AppSec Platform)",
+      "number": 4,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:17:21Z",
+      "completed_at": "2026-10-07T00:19:15Z"
+     },
+     {
+      "name": "Post Run actions/setup-python@v5",
+      "number": 7,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:19:15Z",
+      "completed_at": "2026-10-07T00:19:15Z"
+     },
+     {
+      "name": "Post Run actions/checkout@v4",
+      "number": 8,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:19:15Z",
+      "completed_at": "2026-10-07T00:19:15Z"
+     },
+     {
+      "name": "Complete job",
+      "number": 9,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-07T00:19:15Z",
+      "completed_at": "2026-10-07T00:19:15Z"
+     }
+    ]
+   }
+  ]
+ ],
+ "artifacts": []
+}

@@ -1,5 +1,13 @@
-# CI da Cantina Escolar. Nunca usa credencial real: só emuladores com projeto demo-cantina.
-# Executado no GitHub Actions desde 01/10/2026 (repositório privado JuanCunhaa/cantina-escolar).
+# CI da Cantina Escolar. Nunca usa credencial da aplicação: só emuladores com projeto demo-cantina e dados fictícios.
+# Desenho, comandos de reprodução e reexecução: docs/testing/ci.md. O gate final é o job `check` (scripts/ci/gate.ts).
+#
+#   changes ─┬─ fast ──────────────┬─ quality ─┐
+#            ├─ backend (g1, g2) ──┘           │
+#            ├─ build ── e2e (g1, g2) ─────────┼─ check (sempre roda; aprova só o esperado para o modo)
+#            ├─ security ──────────────────────┘
+#
+# Modo `docs` (só PROGRESS.md/docs/status/*.md): roda changes, fast (JSON estruturado) e security (Gitleaks); o restante
+# fica `skipped` e o check exige exatamente isso. Qualquer dúvida na classificação => modo `full`.
 name: ci
 
 on:
@@ -15,118 +23,457 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      mode: ${{ steps.classify.outputs.mode }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      # Referência = o que já foi validado: base do PR, ou o último run VERDE deste workflow no ref (push). Não usar o
+      # push anterior: seu run pode ter sido cancelado pela concorrência (medido no probe P3).
+      - name: Referência validada
+        id: reference
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/ci/reference-sha.ts
+      - name: Classificar mudanças (lista documental explícita)
+        id: classify
+        env:
+          BASE: ${{ steps.reference.outputs.base }}
+        run: node scripts/ci/classify-changes.ts --base "$BASE" --head "$GITHUB_SHA"
+
+  fast:
+    needs: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      MODE: ${{ needs.changes.outputs.mode }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: ${{ needs.changes.outputs.mode == 'full' && 'npm' || '' }}
+      - name: Documentos estruturados (JSON válido)
+        run: node scripts/ci/validate-structured.ts
+      - name: npm ci
+        id: install
+        if: env.MODE == 'full'
+        run: npm ci
+      - name: actionlint (workflows)
+        if: ${{ !cancelled() && env.MODE == 'full' }}
+        run: |
+          bash scripts/ci/tools/install-actionlint.sh "$RUNNER_TEMP/bin"
+          "$RUNNER_TEMP/bin/actionlint" -color
+      - name: Partição e2e (grupos cobrem a suíte obrigatória)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: node scripts/ci/e2e-groups.ts verify
+      - name: Partição da integração (grupos cobrem a suíte)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: node scripts/ci/integration-groups.ts verify
+      # lint, typecheck e unit rodam mesmo se um anterior falhar: todas as falhas aparecem na mesma execução.
+      - name: npm run lint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run lint
+      - name: npm run typecheck
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run typecheck
+      - name: npm test (unit, com cobertura)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm test -- --coverage --reporter=default --reporter=json --outputFile.json=ci-results/vitest-unit.json
+      - name: Resumo da suíte unit
+        if: ${{ !cancelled() && env.MODE == 'full' }}
+        env:
+          JOB_ID: ${{ job.check_run_id }}
+        run: node scripts/ci/test-report.ts vitest ci-results/vitest-unit.json --suite unit --log-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/job/$JOB_ID"
+      - name: "Artefato: resumo unit"
+        if: ${{ !cancelled() && env.MODE == 'full' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-summary-unit-a${{ github.run_attempt }}
+          path: ci-results/summary-unit.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: "Artefato: cobertura unit"
+        if: ${{ !cancelled() && env.MODE == 'full' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-unit-${{ github.run_id }}-a${{ github.run_attempt }}
+          path: coverage/unit/lcov.info
+          if-no-files-found: error
+          retention-days: 1
+    outputs:
+      coverage: coverage-unit-${{ github.run_id }}-a${{ github.run_attempt }}
+
+  # Integração dividida em 2 grupos (scripts/ci/integration-groups.json), cada um com emulador próprio; Rules roda só no
+  # grupo indicado na partição. O gate confere g1 + g2 = suíte listada.
+  backend:
+    needs: changes
+    if: needs.changes.outputs.mode == 'full'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [g1, g2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           cache: npm
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: npm ci
+        id: install
+        run: npm ci
+      - name: Listar testes (suíte e grupo)
+        id: list
+        run: node scripts/ci/integration-groups.ts verify --list
+      # Mesmos comandos de npm run test:rules / test:integration, com relatório JSON e cobertura (só integração executa src/).
+      - name: Rules (emulador)
+        if: ${{ !cancelled() && steps.list.outcome == 'success' && steps.list.outputs.rules_group == matrix.group }}
+        run: npx firebase emulators:exec --only auth,firestore --project demo-cantina "npx vitest run --config vitest.rules.config.ts --reporter=default --reporter=json --outputFile.json=ci-results/vitest-rules.json"
+      - name: Integração ${{ matrix.group }} (emulador, com cobertura)
+        if: ${{ !cancelled() && steps.list.outcome == 'success' }}
+        env:
+          INTEGRATION_GROUP: ${{ matrix.group }}
+        run: npx firebase emulators:exec --only auth,firestore --project demo-cantina "npx vitest run --config vitest.integration.config.ts --coverage --reporter=default --reporter=json --outputFile.json=ci-results/vitest-integration-${{ matrix.group }}.json"
+      - name: Resumos das suítes
+        if: ${{ !cancelled() && steps.list.outcome == 'success' }}
+        env:
+          EXPECTED: ${{ matrix.group == 'g1' && steps.list.outputs.expected_g1 || steps.list.outputs.expected_g2 }}
+          EXPECTED_TOTAL: ${{ steps.list.outputs.expected_total }}
+          GROUP: ${{ matrix.group }}
+          RULES: ${{ steps.list.outputs.rules_group == matrix.group }}
+          JOB_ID: ${{ job.check_run_id }}
+        run: |
+          log="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/job/$JOB_ID"
+          status=0
+          if [ "$RULES" = "true" ]; then
+            node scripts/ci/test-report.ts vitest ci-results/vitest-rules.json --suite rules --log-url "$log" || status=1
+          fi
+          node scripts/ci/test-report.ts vitest "ci-results/vitest-integration-$GROUP.json" --suite "integration-$GROUP" --expected "$EXPECTED" --expected-total "$EXPECTED_TOTAL" --log-url "$log" || status=1
+          exit $status
+      - name: "Artefato: resumos backend"
+        if: ${{ !cancelled() && steps.list.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-summary-backend-${{ matrix.group }}-a${{ github.run_attempt }}
+          path: ci-results/summary-*.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: "Artefato: cobertura integração"
+        if: ${{ !cancelled() && steps.list.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-integration-${{ matrix.group }}-${{ github.run_id }}-a${{ github.run_attempt }}
+          path: coverage/integration/lcov.info
+          if-no-files-found: error
+          retention-days: 1
+      - name: Evidências do backend (logs dos emuladores)
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backend-evidencias-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ci-results/
+            *-debug.log
+          if-no-files-found: warn
+          retention-days: 7
+
+  build:
+    needs: changes
+    if: needs.changes.outputs.mode == 'full'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      artifact: ${{ steps.pack.outputs.artifact }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Ambiente hermético do build (emulador, valores fictícios)
+        run: node scripts/ci/build-manifest.ts env >> "$GITHUB_ENV"
+      # Build PADRÃO (Turbopack), o mesmo comando da Vercel; o .next resultante é o que os grupos e2e executam.
+      - run: npm run build
+      - name: Empacotar build + manifesto
+        id: pack
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          name="build-${GITHUB_RUN_ID}-a${GITHUB_RUN_ATTEMPT}"
+          node scripts/ci/build-manifest.ts pack --out build-artifact --name "$name" --build-command "npm run build"
+          echo "artifact=$name" >> "$GITHUB_OUTPUT"
+      # Varre EXATAMENTE o conteúdo que será enviado (pacote extraído à parte), com achados detalhados e segredo mascarado.
+      # Única exceção (revisada): chaves por build do Next exigidas pelo next start (scripts/ci/gitleaks-build.toml).
+      - name: Gitleaks no pacote do build
+        run: |
+          bash scripts/ci/tools/install-gitleaks.sh "$RUNNER_TEMP/bin"
+          mkdir -p "$RUNNER_TEMP/pacote" && tar -xzf build-artifact/build.tar.gz -C "$RUNNER_TEMP/pacote"
+          "$RUNNER_TEMP/bin/gitleaks" dir --redact --no-banner -v --config scripts/ci/gitleaks-build.toml "$RUNNER_TEMP/pacote"
+      - name: "Artefato: enviar build"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.pack.outputs.artifact }}
+          path: build-artifact/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  e2e:
+    name: e2e (${{ matrix.group }})
+    needs: [changes, build]
+    if: needs.changes.outputs.mode == 'full'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [g1, g2]
+    env:
+      E2E_SERVER_MODE: start
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: 21
       - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run test:rules
-      - run: npm run test:integration
+      - name: "Artefato: baixar build"
+        id: download
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ needs.build.outputs.artifact }}
+          path: build-artifact
+      - name: Build ausente ou expirado
+        if: failure() && steps.download.outcome == 'failure'
+        env:
+          ARTIFACT: ${{ needs.build.outputs.artifact }}
+        run: |
+          echo "::error::Artefato $ARTIFACT ausente ou expirado (retenção de 1 dia). Reexecute o job build deste run: ele gera um novo artefato do MESMO commit e reexecuta os grupos e2e e o check."
+          exit 1
+      - name: Validar manifesto e extrair o build (mesmo run e commit)
+        run: node scripts/ci/build-manifest.ts verify --dir build-artifact
+      - name: Listar testes (suíte e grupo)
+        id: list
+        run: node scripts/ci/e2e-groups.ts verify --list
       - run: npx playwright install --with-deps chromium
       - name: Recursos do runner (início do e2e)
         continue-on-error: true
         run: |
           mkdir -p ci-diagnostics
           bash scripts/ci/resource-snapshot.sh inicio-e2e >> ci-diagnostics/resources.txt
-      - name: npm run test:e2e
+      - name: e2e ${{ matrix.group }} (emuladores e servidor próprios)
         id: e2e
-        run: npm run test:e2e
-      # Observabilidade (só diagnóstico): recursos ao terminar e evidências do Playwright quando o e2e FALHA. O passo de testes
-      # segue definindo o status do job; estes passos não o mascaram. Só dados fictícios do emulador (nada de .env/segredos).
+        run: node scripts/ci/e2e-groups.ts run "${{ matrix.group }}"
       - name: Recursos do runner (fim do e2e)
         continue-on-error: true
         if: always()
-        run: bash scripts/ci/resource-snapshot.sh fim-e2e-${{ steps.e2e.outcome }} >> ci-diagnostics/resources.txt
-      - name: Evidências do e2e (resultados, error-context, relatório e traces)
-        if: failure() && steps.e2e.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        run: bash scripts/ci/resource-snapshot.sh "fim-e2e-${{ steps.e2e.outcome }}" >> ci-diagnostics/resources.txt
+      - name: Resumo do grupo
+        if: ${{ !cancelled() && steps.list.outcome == 'success' }}
+        env:
+          EXPECTED: ${{ matrix.group == 'g1' && steps.list.outputs.expected_g1 || steps.list.outputs.expected_g2 }}
+          EXPECTED_TOTAL: ${{ steps.list.outputs.expected_total }}
+          GROUP: ${{ matrix.group }}
+          JOB_ID: ${{ job.check_run_id }}
+        run: node scripts/ci/test-report.ts playwright "ci-results/playwright-$GROUP.json" --suite "e2e-$GROUP" --expected "$EXPECTED" --expected-total "$EXPECTED_TOTAL" --log-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/job/$JOB_ID"
+      - name: "Artefato: resumo do grupo"
+        if: ${{ !cancelled() && steps.list.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: e2e-evidencias-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ci-summary-e2e-${{ matrix.group }}-a${{ github.run_attempt }}
+          path: ci-results/summary-e2e-${{ matrix.group }}.json
+          if-no-files-found: error
+          retention-days: 30
+      # Propagação entre sessões pelo listener (carteira, F08): diagnóstico NÃO bloqueante, registrado à parte, com o timeout
+      # padrão. Fica no g2 (mesmo ambiente isolado); a falha aparece no passo e no resumo, sem entrar no gate.
+      - name: e2e — propagação entre sessões (listener, não bloqueante)
+        if: ${{ matrix.group == 'g2' && !cancelled() && steps.e2e.outcome != 'skipped' }}
+        continue-on-error: true
+        env:
+          E2E_REPORT: propagation
+        run: npm run test:e2e:propagation
+      - name: Evidências do e2e (resultados, error-context, relatório)
+        if: failure() && steps.e2e.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-evidencias-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             test-results/
             playwright-report/
             ci-diagnostics/
+            ci-results/
           if-no-files-found: warn
           retention-days: 7
-      # Propagação entre sessões pelo listener (carteira, F08): registrada À PARTE, com o timeout padrão. Não bloqueia o
-      # check enquanto o dono não decidir (PR #4/#5: atraso de listener inconclusivo); a falha fica visível no passo.
-      - name: e2e — propagação entre sessões (listener, não bloqueante)
-        run: npm run test:e2e:propagation
-        continue-on-error: true
-      # Build PADRÃO (Turbopack, SWC nativo disponível no Linux). Localmente só o build webpack foi comprovado;
-      # este passo é a primeira prova do build padrão e só vale quando o CI for de fato executado.
-      - run: npm run build
-        env:
-          APP_ENV: emulator
-          NEXT_PUBLIC_USE_FIREBASE_EMULATORS: "true"
-          NEXT_PUBLIC_FIREBASE_API_KEY: demo-key
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: demo-cantina.firebaseapp.com
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-cantina
-          NEXT_PUBLIC_FIREBASE_APP_ID: demo-app
-          FIREBASE_PROJECT_ID: demo-cantina
-      - run: npm run audit:prod
 
   security:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    needs: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      MODE: ${{ needs.changes.outputs.mode }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Gitleaks v8.30.1 (binário fixado, SHA-256 conferido)
-        env:
-          GITLEAKS_VERSION: 8.30.1
-          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+      - name: Gitleaks v8.30.1 (histórico e diretório)
         run: |
-          curl -sSfL -o gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
-          tar -xzf gitleaks.tar.gz gitleaks
-          ./gitleaks version
-          ./gitleaks git --redact --no-banner .
-          ./gitleaks dir --redact --no-banner .
-      - uses: actions/setup-python@v5
+          bash scripts/ci/tools/install-gitleaks.sh "$RUNNER_TEMP/bin"
+          # -v: achados detalhados (segredo mascarado) no log; exceções revisadas em .gitleaksignore.
+          "$RUNNER_TEMP/bin/gitleaks" git --redact --no-banner -v .
+          "$RUNNER_TEMP/bin/gitleaks" dir --redact --no-banner -v .
+      # Os passos abaixo rodam no modo full e independentemente uns dos outros (todos os achados na mesma execução).
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: ${{ !cancelled() && env.MODE == 'full' }}
         with:
-          python-version: "3.13"
-      # Versão fixada na 1ª execução real do CI (01/10/2026); as regras de --config=auto vêm do registry e podem mudar.
-      - name: Semgrep 1.179.0 (regras do registry)
-        run: |
-          pip install semgrep==1.179.0
-          semgrep scan --config=auto --error src
+          node-version: 24
+      - name: npm audit (produção, a partir do lockfile)
+        if: ${{ !cancelled() && env.MODE == 'full' }}
+        run: npm audit --omit=dev --audit-level=high --package-lock-only
+      # Veracode Pipeline Scan (SAST): fonte do commit enviado ao motor remoto da Veracode, sem publicação na plataforma.
+      - name: Veracode Pipeline Scan (SAST)
+        if: ${{ !cancelled() && env.MODE == 'full' }}
+        env:
+          VERACODE_API_ID: ${{ secrets.VERACODE_API_ID }}
+          VERACODE_API_KEY: ${{ secrets.VERACODE_API_KEY }}
+          VERACODE_REGION: ${{ vars.VERACODE_REGION }}
+        run: bash scripts/ci/veracode-sast.sh
+      # Veracode SCA (agente) com --no-upload: não publica resultados; não é offline.
+      - name: Veracode SCA (agente, --no-upload)
+        if: ${{ !cancelled() && env.MODE == 'full' }}
+        env:
+          SRCCLR_API_TOKEN: ${{ secrets.SRCCLR_API_TOKEN }}
+          VERACODE_REGION: ${{ vars.VERACODE_REGION }}
+        run: bash scripts/ci/veracode-sca.sh
+      - name: "Artefato: relatórios de segurança"
+        if: ${{ !cancelled() && env.MODE == 'full' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: security-relatorios-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            veracode/results.json
+            veracode/filtered_results.json
+            veracode/sca.json
+            ci-results/veracode-*.json
+          if-no-files-found: warn
+          retention-days: 30
 
-  # Semgrep AppSec Platform: políticas do painel, resultados enviados à conta do dono. Job isolado porque o `semgrep ci`
-  # diff-aware de PR busca commits (git fetch) no repositório privado: só aqui o checkout mantém o GITHUB_TOKEN
-  # (permissions: contents: read, válido só durante o job) e nenhum outro passo roda neste job. Sem o segredo (ex.: PR
-  # do Dependabot) a etapa avisa e não roda; o scan do job security continua obrigatório.
-  semgrep-appsec:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+  # SonarQube Cloud (plano Free, Quality Gate disponível no plano). O scanner ENVIA o código-fonte e a cobertura ao serviço.
+  # Cobertura real: LCOV de unit + integração (Rules não executa src/; e2e não é instrumentado). Análise automática do
+  # SonarQube Cloud deve ficar DESLIGADA para não duplicar (configuração externa).
+  quality:
+    needs: [changes, fast, backend]
+    if: needs.changes.outputs.mode == 'full'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          python-version: "3.13"
-      - name: Semgrep CI (AppSec Platform)
+          node-version: 24
+      - name: "Artefato: cobertura unit"
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ needs.fast.outputs.coverage }}
+          path: coverage/unit
+      # Um artefato por grupo e tentativa; em reexecução parcial vale a tentativa mais recente de cada grupo.
+      - name: "Artefato: cobertura integração (grupos)"
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: coverage-integration-*-${{ github.run_id }}-a*
+          path: coverage/integration-artifacts
+      - name: Mesclar LCOV (unit + integração g1 + g2)
         env:
-          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+          RUN_ID: ${{ github.run_id }}
         run: |
-          if [ -z "$SEMGREP_APP_TOKEN" ]; then echo "::warning::SEMGREP_APP_TOKEN indisponível; semgrep ci não executado."; exit 0; fi
-          pip install semgrep==1.179.0
-          semgrep ci
+          args=()
+          for g in g1 g2; do
+            dir=$(find coverage/integration-artifacts -maxdepth 1 -type d -name "coverage-integration-$g-$RUN_ID-a*" | sort -V | tail -n 1)
+            args+=("integration-$g=${dir:-ausente}/lcov.info")
+          done
+          node scripts/ci/lcov-merge.ts --out coverage/merged/lcov.info unit=coverage/unit/lcov.info "${args[@]}"
+      - name: Configuração do SonarQube Cloud
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+        run: node scripts/ci/require-config.ts "SonarQube Cloud" SONAR_TOKEN SONAR_ORGANIZATION SONAR_PROJECT_KEY
+      # Sem sonar.qualitygate.wait: o scanner reprovaria também por condições de segurança. O gate é decidido no passo
+      # seguinte, que ignora as condições de segurança (Sonar não é gate de segurança; segurança é o job `security`).
+      - name: SonarQube Cloud (análise)
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
+      - name: Quality Gate sem condições de segurança
+        if: ${{ !cancelled() }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: node scripts/ci/sonar-gate.ts .scannerwork/report-task.txt
+
+  check:
+    needs: [changes, fast, backend, build, e2e, security, quality]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/ci
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      # Resumos de todas as tentativas deste run; o gate usa o mais recente por suíte e reprova o que faltar.
+      - name: "Artefato: resumos das suítes"
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: ci-summary-*
+          path: ci-summaries
+      - name: Gate final
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/ci/gate.ts --summaries ci-summaries --repo "$GITHUB_REPOSITORY" --run "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT"

@@ -25,3 +25,11 @@ next-env.d.ts
 .secrets/
 .staging-fixtures*.json
 ci-diagnostics/
+
+# CI: resultados, pacote do build, relatórios de scanners e métricas (gerados; nunca versionar)
+ci-results/
+ci-summaries/
+build-artifact/
+veracode/
+ci-metrics/
+.scannerwork/

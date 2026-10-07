@@ -1,0 +1,8 @@
+# Exceções REVISADAS do Gitleaks (por fingerprint exato: arquivo, regra e linha; no histórico, também o commit).
+# Cada entrada precisa de justificativa. Qualquer achado novo continua reprovando o job security.
+#
+# 07/10/2026 — impressão digital PÚBLICA da chave GPG que assina o repositório apt oficial da Veracode SCA (publicada no
+# keyserver; usada para verificar a assinatura do índice em scripts/ci/tools/install-srcclr.sh). Não é segredo; a regra
+# generic-api-key casa pelo nome da variável (KEY_*) e pela entropia do hexadecimal.
+437b311c460b0f037eda0ee9d921f17be1c7b836:scripts/ci/tools/install-srcclr.sh:generic-api-key:8
+scripts/ci/tools/install-srcclr.sh:generic-api-key:8

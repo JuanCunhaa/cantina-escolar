@@ -1,0 +1,31 @@
+{
+  "$comment": "Partição OBRIGATÓRIA da suíte e2e (playwright.config.ts) em 2 grupos, por arquivo/jornada; equilibrada pelos tempos medidos (docs/testing/ci.md). Todo spec novo precisa entrar em exatamente um grupo, senão o job fast reprova. A propagação entre sessões fica fora: diagnóstico não bloqueante.",
+  "groups": {
+    "g1": [
+      "foundation.spec.ts",
+      "access.spec.ts",
+      "students.spec.ts",
+      "catalog.spec.ts",
+      "menu.spec.ts",
+      "calendar.spec.ts",
+      "inventory.spec.ts",
+      "policies.spec.ts",
+      "pos.spec.ts",
+      "fulfillment.spec.ts",
+      "shell-photos.spec.ts"
+    ],
+    "g2": [
+      "wallet.spec.ts",
+      "topups.spec.ts",
+      "online-topup.spec.ts",
+      "checkout.spec.ts",
+      "my-orders.spec.ts",
+      "amend.spec.ts",
+      "cancellation.spec.ts"
+    ]
+  },
+  "diagnostic": {
+    "group": "g2",
+    "files": ["wallet.propagation.spec.ts"]
+  }
+}

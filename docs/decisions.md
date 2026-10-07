@@ -265,3 +265,16 @@ Regra (expandir → migrar → contrair):
 - **Estados**: `creating`, `creation_uncertain`, `awaiting_payment` (Pix: QR, copia e cola, validade de 30 min), `processing` (cartão aprovado/em análise ≠ recebido), `failed`; `expired` é derivado da validade e não descarta nada. `confirmed`/`in_review`/`reversed` e o crédito são da F19. NENHUM estado da F18 credita a carteira.
 - **Cartão**: só token do componente do provedor, `installments: 1`; esquema estrito recusa número/CVV/validade; o token fica fora do hash de idempotência e de qualquer documento/log. Fora do modo de demonstração o cartão fica indisponível até existir o componente do provedor escolhido.
 - **Rules/índices**: Rules NÃO mudaram (default-deny fecha `topupIntents`; teste novo). Índices novos (só acréscimo): `topupIntents (studentId, createdAt desc)` e `(studentId, status)` — publicar na HML antes do merge.
+
+## Decisões de CI/CD e FinOps (07/10/2026, antes da F19)
+
+- **Jobs**: `changes` → `fast`, `backend (g1/g2)`, `build`, `security` em paralelo → `e2e (g1/g2)` após `build` → `quality` após `fast`+`backend` → `check` (sempre). 10 jobs no `ci` + 1 no `ci-metrics`. Integração dividida em 2 grupos por tempo medido (07/10/2026, decisão do dono; testes inalterados), Rules no grupo mais leve; medido no run 37643124577: espera 6m53s × 10m30s (docs/status/ci-baseline.md §4d).
+- **E2E compilado**: comparação 3+3 no mesmo commit (docs/status/ci-baseline.md §4b) — build Turbopack + `next start` custou mediana 338 s × 612 s do `next dev` webpack, 0 × 1 falha; adotado. Muda modo E bundler: ganho é da configuração completa.
+- **Gate `check`** implementado em `scripts/ci/gate.ts`; **não é exigido pelo GitHub** (a `main` não tem proteção; ativar depende do dono/plano).
+- **Classificação documental** por lista explícita (`PROGRESS.md`, `docs/status/*.md`), referência = base do PR ou último run verde no ref (não o `before`: probe P3); dúvida ⇒ fluxo completo. Vercel usa a mesma regra (`ignoreCommand`: 0 ignora, 1 constrói).
+- **Build compartilhado** com manifesto; nomes únicos por tentativa produtora; reexecução consome o artefato original; expirado ⇒ reexecutar o job `build` (novo artefato do mesmo commit). Links relativos do Turbopack para `node_modules/` aceitos e validados (probe P1).
+- **Gitleaks no pacote do build** com UMA exceção revisada: chaves aleatórias por build do Next (preview e Server Actions) exigidas pelo `next start`; controles negativos detectados (probe P1).
+- **Credencial/configuração ausente reprova** (Veracode, Sonar) por `scripts/ci/require-config.ts` (probe de recusa).
+- **Veracode**: Pipeline Scan (envio do fonte ao motor remoto, sem publicação) e SCA `--no-upload` (não publica; não é offline); Semgrep removido do CI em 07/10/2026 (decisão do dono, após a validação do Veracode). Suporte documentado: TS ≤ 5 e Node ≤ 22 (projeto: TS 6, Node 24).
+- **Sonar**: Quality Gate bloqueante (o do plano Free), cobertura real de unit + integração (Rules e e2e não contribuem, por não executarem `src/` instrumentado).
+- **FinOps**: metadados da API como fonte; execução identificada por (nome, runner, início, fim) — a API devolve jobs não reexecutados com ID novo; jobs sem runner fora do consumo; cobrança oficial indisponível (sem ampliar escopo).

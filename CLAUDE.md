@@ -33,6 +33,7 @@ Desenvolver site operacional para uma escola (~300 alunos), com Next.js/React, T
 - PROGRESS.md deve conter tarefa, arquivos, decisões, comandos/resultados, pendências e próxima ação; manter curto. Histórico detalhado pode ir em docs/status/history.md.
 - Marcar concluído somente comportamento integrado/aceite comprovado; pendência de credencial não equivale a homologação.
 - Fazer commits coerentes quando Git disponível; não criar push/deploy/operação real de pagamento sem autorização pertinente.
+- CI (docs/testing/ci.md): `npm run ci:precheck` + testes afetados antes do push; agrupar correções; `npm run ci:status -- --pr <n>` para falhas (log completo em .agent-logs/); reexecutar só o job falho no mesmo commit, sem laço para obter verde nem processo periódico. Mudanças em workflows, scripts/ci, gate e listas de classificação são mudança de gate.
 - Preview e main compartilham o backend de homologação: mudança de Rules/índices segue expandir → migrar → contrair, compatível com a versão publicada da main durante a transição (docs/decisions.md, "Coordenação de Rules × aplicação").
 - Pacote inicial ainda não tem aplicação/dependências. F01 cria package.json/lockfile e scripts válidos no diretório atual sem sobrescrever estes documentos. Não rodar npm antes disso.
 
