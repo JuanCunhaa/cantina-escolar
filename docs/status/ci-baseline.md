@@ -81,8 +81,9 @@ Amostra: 20 execuções concluídas mais recentes do `ci` (05–07/10/2026). Tem
 | C comparação dev × compilado (6 execuções) | 80 | 53 (48 brutos) | concluído |
 | P4 Veracode (com credenciais) | ≤ 20 | 18 | concluído (§5) |
 | P5 Sonar (análise inicial da main + PR) | 5 | 8 | concluído (§5) |
-| F execução final do PR | 40 | — | aguarda pré-requisitos |
-| **Total** | **166** | **120** antes da execução final (estimada em ~38) | |
+| F execução final do PR | 40 | 32 | concluída — vermelha (§4c) |
+| Probe Gitleaks (exceção revisada) | — | 1 | concluído |
+| **Total** | **166** | **≈153** | contingência para nova execução completa NÃO autorizada |
 
 Probes de infraestrutura (branch descartável `ci/probe-infra`, 11 runs): 40 min arredondados, 12,1 brutos. A diferença
 mostra o custo do arredondamento por job: jobs de segundos custam 1 min cada.
@@ -111,6 +112,31 @@ timeouts e retries; dados fictícios e emuladores locais nos dois modos (`APP_EN
 Regra fixada antes (mediana do custo total menor e não mais falhas): **compilado** (mediana 338 s × 612 s; 0 × 1 falha).
 Com 3 amostras isso é indicativo; a falha de `dev r1` é o mesmo defeito intermitente da `main` e NÃO é atribuída ao modo.
 Decisão: o `ci` usa o build compartilhado + `next start` nos 2 grupos (já no `ci.yml`).
+
+## 4c. Execução final no PR #27 (run 37580206257, commit `f230542`) — antes × depois
+
+| Medida | Antes (mediana n=20) | Depois (1 execução) |
+|---|---|---|
+| Espera até o resultado (1ª tentativa) | 16m42s | **10m08s** |
+| Minutos brutos somados | 22,4 | 26,5 |
+| Estimativa arredondada | 24 | 32 (10 jobs) |
+
+Jobs: `changes` 7 s · `fast` 90 s · `backend` 491 s (caminho crítico) · `build` 83 s · `e2e (g1)` 335 s · `e2e (g2)` 179 s
+(com o diagnóstico de propagação) · `security` 200 s · `semgrep-appsec` 104 s · `quality` 89 s · `check` 10 s; criação→início
+2–3 s em todos. Artefatos: build 14,5 MB (1 dia), coberturas 0,1 MB (1 dia), resumos/relatórios pequenos (30 dias);
+transferências 1–2 s. e2e: 72/72 verdes (36 + 36). Integração/Rules/unit verdes; LCOV mesclado 62% (unit 25,7%,
+integração 47,5%; 263 arquivos).
+
+Vermelho por 2 problemas do código de CI desta tarefa (não da aplicação), corrigidos em commits locais ainda não
+publicados (nova execução completa excede o orçamento sem autorização):
+- `security`: Gitleaks acusou a impressão digital PÚBLICA da chave GPG da Veracode em `install-srcclr.sh` — exceção por
+  fingerprint em `.gitleaksignore`, validada no probe 37580802980 (sem achados; sem a exceção o mesmo achado volta).
+- `quality`: Quality Gate do código novo com cobertura 86,1% e confiabilidade A, mas segurança B por 1 achado *minor*
+  (S5145, mensagem de erro do coletor) — saída sem CR/LF.
+O `check` reprovou listando exatamente esses jobs/etapas com links. Desequilíbrio a ajustar: g1 335 s × g2 179 s
+(rebalancear pelos tempos medidos, ex.: mover `students.spec.ts` ou `pos.spec.ts` para g2).
+
+Consumo total da tarefa: ≈153 min arredondados de 166 (probes 40, comparação 53, P4 18, P5 8, probe Gitleaks 1, final 32).
 
 ## 5. Evidências dos probes (Actions real)
 
