@@ -39,6 +39,15 @@ describe("entrada da intenção", () => {
     expect(createIntentSchema.safeParse({ ...base, channel: "pix", cardToken: tok("abcdef123") }).success).toBe(false);
   });
 
+  it("documento do pagador: CPF com 11 dígitos, CNPJ com 14; outro tamanho ou tipo é recusado", () => {
+    const card = { ...base, channel: "card", installments: 1, ...brick, cardToken: tok("abcdef123") };
+    const doc = (type: string, number: string) => ({ ...card, payer: { email: "familia@example.test", identification: { type, number } } });
+    expect(createIntentSchema.safeParse(doc("CNPJ", "12345678000195")).success).toBe(true);
+    for (const [type, number] of [["CPF", "123456789012"], ["CNPJ", "12345678909"], ["CPF", "1234567890"], ["RG", "12345678909"]]) {
+      expect(createIntentSchema.safeParse(doc(type!, number!)).success).toBe(false);
+    }
+  });
+
   it("a idempotência ignora o token (de uso único): repetir com token novo é a MESMA operação", () => {
     const a = createIntentSchema.parse({ ...base, channel: "card", installments: 1, ...brick, cardToken: tok("first_0001") });
     const b = createIntentSchema.parse({ ...base, channel: "card", installments: 1, ...brick, cardToken: tok("second_002") });

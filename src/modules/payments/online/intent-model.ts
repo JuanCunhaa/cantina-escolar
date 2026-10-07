@@ -62,7 +62,10 @@ export const createIntentSchema = z.discriminatedUnion("channel", [
       payer: z
         .object({
           email: z.string().email().max(254),
-          identification: z.object({ type: z.enum(["CPF", "CNPJ"]), number: z.string().regex(/^\d{11,14}$/) }).strict(),
+          identification: z.discriminatedUnion("type", [
+            z.object({ type: z.literal("CPF"), number: z.string().regex(/^\d{11}$/) }).strict(),
+            z.object({ type: z.literal("CNPJ"), number: z.string().regex(/^\d{14}$/) }).strict(),
+          ]),
         })
         .strict(),
     })

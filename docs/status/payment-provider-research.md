@@ -72,6 +72,9 @@ Brick (parcelas e meios). Mapeamento implementado:
   mesma chave → 409 → incerto); cartões de teste da API Orders são outros que os da API Payments (Mastercard
   `5480 8328 0103 3311`, titular `APRO`/`OTHE`); no Brick, só crédito via `types.included: ["credit_card"]` (o SDK grafa
   `prepaid-card`) e os campos seguros (`secure-fields.mercadopago.com`) exigem digitação, não preenchimento.
+- Evidência (simulado × sandbox × publicado) e limites: PROGRESS.md, "Recarga online (F18): o que foi provado onde", e PR #25.
+- Produção: NÃO habilitada. Credenciais de produção não foram cadastradas; exigem aceitação comercial por escrito e taxas
+  da conta (itens 2–3) e `APP_ENV=production` + `MERCADOPAGO_ENV=production`.
 - Variáveis: `PAYMENTS_PIX_PROVIDER`/`PAYMENTS_CARD_PROVIDER=mercadopago`, `MERCADOPAGO_ENV` (`sandbox` fora de
   `APP_ENV=production`; `production` só nela), `MERCADOPAGO_ACCESS_TOKEN` (segredo do servidor), `MERCADOPAGO_PUBLIC_KEY`
   (cartão). Falta/combinação proibida = canal indisponível.

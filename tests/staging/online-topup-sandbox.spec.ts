@@ -10,7 +10,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 import { createFamily, type Family } from "../helpers/menu-fixtures.ts";
 import { TEST_PASSWORD, type TestUser } from "../helpers/auth-emulator";
 import { parseDotenv } from "../../scripts/staging/target.ts";
-import { mercadoPagoPix } from "../../src/modules/payments/online/mercadopago.ts";
+import { mercadoPagoCard, mercadoPagoPix } from "../../src/modules/payments/online/mercadopago.ts";
 import { ProviderError } from "../../src/modules/payments/online/provider.ts";
 import { bearer, newKey } from "./helpers";
 
@@ -21,6 +21,9 @@ const tag = Math.random().toString(36).slice(2, 7);
 let fam: Family;
 let sandbox = false;
 let publicKey = "";
+/** Intenções criadas pelos testes de API, reaproveitadas na verificação de "pago no provedor ≠ crédito". */
+let pixIntent: { id: string; createdAt: Date } | null = null;
+const cardIntents: { id: string; createdAt: Date; expected: "processing" | "declined" }[] = [];
 
 type Json = Record<string, unknown> & { error?: string };
 const call = async (request: APIRequestContext, user: TestUser, method: "GET" | "POST", url: string, data?: unknown) => {
@@ -82,6 +85,7 @@ test("sandbox Pix: QR + copia e cola + validade; replay e mesma chave não criam
 
   const intentId = String(first.body.intentId);
   const createdAt = new Date(String(first.body.createdAt));
+  pixIntent = { id: intentId, createdAt };
   const replay = await call(request, fam.guardian, "POST", "/api/topups/online", body);
   expect(replay.body).toMatchObject({ intentId, replayed: true });
 
@@ -117,6 +121,28 @@ test("sandbox cartão 1x: token de teste aprovado = em análise (sem crédito); 
 
   const declined = await send("OTHE");
   expect(declined.body).toMatchObject({ channel: "card", status: "failed", credited: false });
+  cardIntents.push({ id: String(ok.body.intentId), createdAt: new Date(String(ok.body.createdAt)), expected: "processing" }, { id: String(declined.body.intentId), createdAt: new Date(String(declined.body.createdAt)), expected: "declined" });
+});
+
+test("pago no sandbox NÃO credita (F19): Pix aprovado pelo provedor, carteira e livro intactos; conciliação do cartão pelo adapter real", async ({ request }) => {
+  test.setTimeout(240_000);
+  expect(pixIntent, "depende do teste de Pix").not.toBeNull();
+  const pixAdapter = mercadoPagoPix({ accessToken: sandboxAccessToken(), publicKey: "", env: "sandbox" });
+  // O sandbox aprova sozinho o Pix do pagador APRO; a order passa a "processed" (mapeada como "em análise").
+  await expect.poll(async () => (await pixAdapter.findCharge(pixIntent!.id, pixIntent!.createdAt))?.outcome, { timeout: 180_000, intervals: [5_000] }).toBe("processing");
+
+  const intent = await call(request, fam.guardian, "GET", `/api/topups/online/${pixIntent!.id}`);
+  expect(intent.body).toMatchObject({ intentId: pixIntent!.id, credited: false });
+  expect(intent.body.status).not.toBe("credited");
+  const wallet = await call(request, fam.guardian, "GET", `/api/wallets?studentId=${fam.studentId}`);
+  expect(wallet.body).toMatchObject({ balanceCents: 0, entries: [] });
+  const ledger = await call(request, fam.admin, "GET", `/api/wallets/reconcile?studentId=${fam.studentId}`);
+  expect(ledger.body).toMatchObject({ ok: true, entryCount: 0, problems: [] });
+
+  const cardAdapter = mercadoPagoCard({ accessToken: sandboxAccessToken(), publicKey: "", env: "sandbox" });
+  for (const c of cardIntents) {
+    await expect.poll(async () => (await cardAdapter.findCharge(c.id, c.createdAt))?.outcome, { timeout: 30_000, intervals: [2_000] }).toBe(c.expected);
+  }
 });
 
 test("tela: aviso de sandbox, Pix com QR e copia e cola no site; cartão pelo componente oficial, enviado = em análise, sem número/CVV na nossa API", async ({ page }) => {
