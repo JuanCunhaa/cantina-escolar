@@ -105,7 +105,7 @@ export async function main(argv: string[], env: Record<string, string | undefine
     else writeLines(markdown);
     return 0;
   } catch (error) {
-    console.error(`Coleta de métricas falhou: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`Coleta de métricas falhou: ${(error instanceof Error ? error.message : String(error)).replace(/[\r\n]/g, " ")}`);
     return 1;
   }
 }
