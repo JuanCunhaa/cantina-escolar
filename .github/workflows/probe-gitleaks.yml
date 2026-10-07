@@ -1,0 +1,27 @@
+# PROBE TEMPORÁRIO (branch descartável; nunca mesclado): valida a exceção do .gitleaksignore com os MESMOS comandos do
+# job security (histórico e diretório), sem rodar o CI completo.
+name: probe-gitleaks
+on:
+  push:
+    branches: [ci/probe-gitleaks]
+permissions:
+  contents: read
+jobs:
+  gitleaks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Gitleaks (mesmos comandos do job security)
+        run: |
+          bash scripts/ci/tools/install-gitleaks.sh "$RUNNER_TEMP/bin"
+          "$RUNNER_TEMP/bin/gitleaks" git --redact --no-banner -v .
+          "$RUNNER_TEMP/bin/gitleaks" dir --redact --no-banner -v .
+      - name: Controle negativo (sem o .gitleaksignore o achado reaparece)
+        run: |
+          mv .gitleaksignore /tmp/ignore.bak
+          if "$RUNNER_TEMP/bin/gitleaks" dir --redact --no-banner -v scripts/ci/tools; then echo "::error::esperava o achado sem a exceção"; exit 1; fi
+          echo "sem a exceção o achado reaparece (esperado)"
