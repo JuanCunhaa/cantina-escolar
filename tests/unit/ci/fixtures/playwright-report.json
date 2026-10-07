@@ -1,0 +1,165 @@
+{
+ "suites": [
+  {
+   "title": "sample.spec.ts",
+   "file": "sample.spec.ts",
+   "column": 0,
+   "line": 0,
+   "specs": [
+    {
+     "title": "passa",
+     "ok": true,
+     "tags": [],
+     "tests": [
+      {
+       "timeout": 30000,
+       "annotations": [],
+       "expectedStatus": "passed",
+       "projectId": "",
+       "projectName": "",
+       "results": [
+        {
+         "status": "passed",
+         "duration": 4,
+         "errors": [],
+         "retry": 0,
+         "annotations": [],
+         "attachments": []
+        }
+       ],
+       "status": "expected"
+      }
+     ],
+     "id": "b92766bcf73bd5c029a8-0bb85be328c79a574108",
+     "file": "sample.spec.ts",
+     "line": 2,
+     "column": 1
+    },
+    {
+     "title": "pulado",
+     "ok": true,
+     "tags": [],
+     "tests": [
+      {
+       "timeout": 30000,
+       "annotations": [
+        {
+         "type": "skip",
+         "description": "motivo",
+         "location": {
+          "file": "/home/runner/work/app/tests/e2e/sample.spec.ts",
+          "line": 6,
+          "column": 29
+         }
+        }
+       ],
+       "expectedStatus": "skipped",
+       "projectId": "",
+       "projectName": "",
+       "results": [
+        {
+         "status": "skipped",
+         "duration": 2,
+         "errors": [],
+         "retry": 0,
+         "annotations": [
+          {
+           "type": "skip",
+           "description": "motivo",
+           "location": {
+            "file": "/home/runner/work/app/tests/e2e/sample.spec.ts",
+            "line": 6,
+            "column": 29
+           }
+          }
+         ],
+         "attachments": []
+        }
+       ],
+       "status": "skipped"
+      }
+     ],
+     "id": "b92766bcf73bd5c029a8-2d3603698d5fa4c6e750",
+     "file": "sample.spec.ts",
+     "line": 6,
+     "column": 1
+    }
+   ],
+   "suites": [
+    {
+     "title": "grupo",
+     "file": "sample.spec.ts",
+     "line": 3,
+     "column": 6,
+     "specs": [
+      {
+       "title": "falha com erro principal",
+       "ok": false,
+       "tags": [],
+       "tests": [
+        {
+         "timeout": 30000,
+         "annotations": [],
+         "expectedStatus": "passed",
+         "projectId": "",
+         "projectName": "",
+         "results": [
+          {
+           "status": "failed",
+           "duration": 2,
+           "error": {
+            "message": "Error: valor do saldo\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m3\u001b[39m\nReceived: \u001b[31m2\u001b[39m",
+            "location": {
+             "file": "/home/runner/work/app/tests/e2e/sample.spec.ts",
+             "column": 72,
+             "line": 4
+            }
+           },
+           "errors": [
+            {
+             "location": {
+              "file": "/home/runner/work/app/tests/e2e/sample.spec.ts",
+              "column": 72,
+              "line": 4
+             },
+             "message": "Error: valor do saldo\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m3\u001b[39m\nReceived: \u001b[31m2\u001b[39m\n\n  2 | test(\"passa\", () => { expect(1).toBe(1); });\n  3 | test.describe(\"grupo\", () => {\n> 4 |   test(\"falha com erro principal\", () => { expect(2, \"valor do saldo\").toBe(3); });\n    |                                                                        ^\n  5 | });\n  6 | test(\"pulado\", () => { test.skip(true, \"motivo\"); });\n  7 |\n    at /home/runner/work/app/tests/e2e/sample.spec.ts:4:72"
+            }
+           ],
+           "retry": 0,
+           "annotations": [],
+           "attachments": [
+            {
+             "name": "error-context",
+             "contentType": "text/markdown",
+             "path": "/home/runner/work/app/test-results/sample-grupo-falha-com-erro-principal/error-context.md"
+            }
+           ],
+           "errorLocation": {
+            "file": "/home/runner/work/app/tests/e2e/sample.spec.ts",
+            "column": 72,
+            "line": 4
+           }
+          }
+         ],
+         "status": "unexpected"
+        }
+       ],
+       "id": "b92766bcf73bd5c029a8-c9557c09edaf9fe63e19",
+       "file": "sample.spec.ts",
+       "line": 4,
+       "column": 3
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "errors": [],
+ "stats": {
+  "duration": 841.5039999999999,
+  "expected": 1,
+  "skipped": 1,
+  "unexpected": 1,
+  "flaky": 0
+ }
+}
