@@ -200,11 +200,12 @@ jobs:
           node scripts/ci/build-manifest.ts pack --out build-artifact --name "$name" --build-command "npm run build"
           echo "artifact=$name" >> "$GITHUB_OUTPUT"
       # Varre EXATAMENTE o conteúdo que será enviado (pacote extraído à parte), com achados detalhados e segredo mascarado.
+      # Única exceção (revisada): chaves por build do Next exigidas pelo next start (scripts/ci/gitleaks-build.toml).
       - name: Gitleaks no pacote do build
         run: |
           bash scripts/ci/tools/install-gitleaks.sh "$RUNNER_TEMP/bin"
           mkdir -p "$RUNNER_TEMP/pacote" && tar -xzf build-artifact/build.tar.gz -C "$RUNNER_TEMP/pacote"
-          "$RUNNER_TEMP/bin/gitleaks" dir --redact --no-banner -v "$RUNNER_TEMP/pacote"
+          "$RUNNER_TEMP/bin/gitleaks" dir --redact --no-banner -v --config scripts/ci/gitleaks-build.toml "$RUNNER_TEMP/pacote"
       - name: "Artefato: enviar build"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
