@@ -217,3 +217,33 @@ jobs:
     timeout-minutes: 2
     steps:
       - run: exit 1
+  # P4/P5 (recusa): o MESMO scripts/ci/require-config.ts do ci.yml, com os mesmos secrets/variáveis (hoje inexistentes).
+  recusa-config:
+    needs: changes
+    if: contains(github.event.head_commit.message, '[p45]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/ci
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Recusas esperadas (configuração ausente reprova) e presença do Semgrep
+        env:
+          VERACODE_API_ID: ${{ secrets.VERACODE_API_ID }}
+          VERACODE_API_KEY: ${{ secrets.VERACODE_API_KEY }}
+          SRCCLR_API_TOKEN: ${{ secrets.SRCCLR_API_TOKEN }}
+          VERACODE_REGION: ${{ vars.VERACODE_REGION }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        run: |
+          expect_fail() { if node scripts/ci/require-config.ts "$@"; then echo "::error::esperava recusa: $1"; exit 1; else echo "recusado (esperado): $1"; fi; }
+          expect_fail "Veracode Pipeline Scan" VERACODE_API_ID VERACODE_API_KEY VERACODE_REGION=commercial
+          expect_fail "Veracode SCA" SRCCLR_API_TOKEN VERACODE_REGION=commercial
+          expect_fail "SonarQube Cloud" SONAR_TOKEN SONAR_ORGANIZATION SONAR_PROJECT_KEY
+          node scripts/ci/require-config.ts "Semgrep AppSec" SEMGREP_APP_TOKEN
