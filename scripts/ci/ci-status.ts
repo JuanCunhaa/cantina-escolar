@@ -18,7 +18,6 @@ const REPRO: Record<string, string> = {
   build: "npm run build (CI, Turbopack) — nesta máquina Windows: npm run build:webpack",
   e2e: "npm run build:webpack; $env:E2E_SERVER_MODE='start'; npm run test:e2e:group -- <g1|g2>   (sem build: modo dev, npm run test:e2e:group -- <g1|g2>)",
   security: "npm run audit:prod (Gitleaks/Veracode só no CI; Gitleaks é bloqueado nesta máquina)",
-  "semgrep-appsec": "somente no CI (token do Semgrep AppSec)",
   quality: "npm test -- --coverage (o Quality Gate só existe no SonarQube Cloud)",
   check: "node scripts/ci/ci-status.ts --run <id> (o gate só agrega os demais jobs)",
 };

@@ -268,13 +268,13 @@ Regra (expandir → migrar → contrair):
 
 ## Decisões de CI/CD e FinOps (07/10/2026, antes da F19)
 
-- **Jobs**: `changes` → `fast`, `backend`, `build`, `security`, `semgrep-appsec` (transitório) em paralelo → `e2e (g1/g2)` após `build` → `quality` após `fast`+`backend` → `check` (sempre). 9 jobs no `ci` (10 com o Semgrep AppSec) + 1 no `ci-metrics`. Backend continua agrupado (Rules + integração); dividir só com ganho medido.
+- **Jobs**: `changes` → `fast`, `backend`, `build`, `security` em paralelo → `e2e (g1/g2)` após `build` → `quality` após `fast`+`backend` → `check` (sempre). 9 jobs no `ci` + 1 no `ci-metrics`. Backend continua agrupado (Rules + integração); dividir só com ganho medido.
 - **E2E compilado**: comparação 3+3 no mesmo commit (docs/status/ci-baseline.md §4b) — build Turbopack + `next start` custou mediana 338 s × 612 s do `next dev` webpack, 0 × 1 falha; adotado. Muda modo E bundler: ganho é da configuração completa.
 - **Gate `check`** implementado em `scripts/ci/gate.ts`; **não é exigido pelo GitHub** (a `main` não tem proteção; ativar depende do dono/plano).
 - **Classificação documental** por lista explícita (`PROGRESS.md`, `docs/status/*.md`), referência = base do PR ou último run verde no ref (não o `before`: probe P3); dúvida ⇒ fluxo completo. Vercel usa a mesma regra (`ignoreCommand`: 0 ignora, 1 constrói).
 - **Build compartilhado** com manifesto; nomes únicos por tentativa produtora; reexecução consome o artefato original; expirado ⇒ reexecutar o job `build` (novo artefato do mesmo commit). Links relativos do Turbopack para `node_modules/` aceitos e validados (probe P1).
 - **Gitleaks no pacote do build** com UMA exceção revisada: chaves aleatórias por build do Next (preview e Server Actions) exigidas pelo `next start`; controles negativos detectados (probe P1).
-- **Credencial/configuração ausente reprova** (Veracode, Sonar, Semgrep AppSec) por `scripts/ci/require-config.ts` (probe de recusa).
-- **Veracode**: Pipeline Scan (envio do fonte ao motor remoto, sem publicação) e SCA `--no-upload` (não publica; não é offline); Semgrep fica até a substituição ser validada. Suporte documentado: TS ≤ 5 e Node ≤ 22 (projeto: TS 6, Node 24).
+- **Credencial/configuração ausente reprova** (Veracode, Sonar) por `scripts/ci/require-config.ts` (probe de recusa).
+- **Veracode**: Pipeline Scan (envio do fonte ao motor remoto, sem publicação) e SCA `--no-upload` (não publica; não é offline); Semgrep removido do CI em 07/10/2026 (decisão do dono, após a validação do Veracode). Suporte documentado: TS ≤ 5 e Node ≤ 22 (projeto: TS 6, Node 24).
 - **Sonar**: Quality Gate bloqueante (o do plano Free), cobertura real de unit + integração (Rules e e2e não contribuem, por não executarem `src/` instrumentado).
 - **FinOps**: metadados da API como fonte; execução identificada por (nome, runner, início, fim) — a API devolve jobs não reexecutados com ID novo; jobs sem runner fora do consumo; cobrança oficial indisponível (sem ampliar escopo).

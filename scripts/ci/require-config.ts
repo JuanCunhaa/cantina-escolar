@@ -1,4 +1,4 @@
-// Recusa explícita de configuração ausente nos jobs que dependem de serviço externo (Veracode, SonarQube Cloud, Semgrep):
+// Recusa explícita de configuração ausente nos jobs que dependem de serviço externo (Veracode, SonarQube Cloud):
 // credencial/variável ausente REPROVA o passo — nunca vira aprovação silenciosa. Não imprime valores.
 // Uso: node scripts/ci/require-config.ts <rótulo> NOME [NOME=valor-exigido ...]
 import { appendFileSync } from "node:fs";

@@ -9,7 +9,7 @@ Linha de base, medições e orçamento: docs/status/ci-baseline.md.
 changes ─┬─ fast ──────────────┬─ quality ─┐
          ├─ backend ───────────┘           │
          ├─ build ── e2e (g1), e2e (g2) ───┼─ check  (if: always())
-         ├─ security, semgrep-appsec ──────┘
+         ├─ security ──────────────────────┘
 ```
 
 | Job | Faz | Por que separado |
@@ -19,8 +19,7 @@ changes ─┬─ fast ──────────────┬─ quality 
 | `backend` | Rules + integração (emuladores), cobertura da integração | caminho crítico (~7 min de integração); mantido agrupado |
 | `build` | `npm run build` (Turbopack, como a Vercel) com ambiente hermético, Gitleaks no `.next`, pacote + manifesto | um build por run/tentativa, compartilhado |
 | `e2e (g1/g2)` | cada grupo com emuladores, servidor, dados e armazenamento próprios; usa o build compartilhado | divide a etapa mais longa |
-| `security` | Gitleaks, `npm audit` (produção), Semgrep registry, Veracode Pipeline Scan e SCA | independente do código compilado |
-| `semgrep-appsec` | Semgrep AppSec (transitório até o Veracode ser validado) | precisa do token git só neste job |
+| `security` | Gitleaks, `npm audit` (produção), Veracode Pipeline Scan (SAST) e SCA | independente do código compilado |
 | `quality` | LCOV unit+integração mesclado → SonarQube Cloud → Quality Gate efetivo sem condições de segurança | depende das coberturas |
 | `check` | gate final (nome preservado) | sempre roda e decide |
 
@@ -86,7 +85,9 @@ proteção de branch (docs/status/ci-baseline.md); exigir o `check` depende de c
 ## Segurança
 
 - Gitleaks 8.30.1 (SHA-256 fixado), `npm audit --omit=dev --audit-level=high --package-lock-only`.
-- Semgrep (registry + AppSec): mantidos até o Veracode ser validado; depois saem num commit próprio.
+- Semgrep (registry + AppSec) **removido do CI** em 07/10/2026 (decisão do dono): substituído pelo Veracode SAST, validado
+  com achados reais e controles semeados (docs/status/ci-baseline.md §5). Sem cobertura de workflows por SAST: o
+  actionlint no `fast` e as actions fixadas por SHA seguem.
 - **Veracode Pipeline Scan (SAST)**: `git archive` do commit (só `src/`, `package*.json`, `tsconfig.json`,
   `next.config.ts`; sem `.next`, `node_modules`, `.env`, testes) **enviado ao motor remoto da Veracode** para análise; o
   resultado volta ao job e não é publicado na plataforma (sem Upload and Scan, sem importação). Imagem oficial

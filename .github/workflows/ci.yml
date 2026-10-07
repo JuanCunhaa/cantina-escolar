@@ -4,7 +4,7 @@
 #   changes ─┬─ fast ──────────────┬─ quality ─┐
 #            ├─ backend ───────────┘           │
 #            ├─ build ── e2e (g1, g2) ─────────┼─ check (sempre roda; aprova só o esperado para o modo)
-#            ├─ security / semgrep-appsec ─────┘
+#            ├─ security ──────────────────────┘
 #
 # Modo `docs` (só PROGRESS.md/docs/status/*.md): roda changes, fast (JSON estruturado) e security (Gitleaks); o restante
 # fica `skipped` e o check exige exatamente isso. Qualquer dúvida na classificação => modo `full`.
@@ -344,16 +344,6 @@ jobs:
       - name: npm audit (produção, a partir do lockfile)
         if: ${{ !cancelled() && env.MODE == 'full' }}
         run: npm audit --omit=dev --audit-level=high --package-lock-only
-      # Semgrep permanece até o Veracode ser validado (docs/testing/ci.md). Versão fixada; regras do registry podem mudar.
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        if: ${{ !cancelled() && env.MODE == 'full' }}
-        with:
-          python-version: "3.13"
-      - name: Semgrep 1.179.0 (regras do registry)
-        if: ${{ !cancelled() && env.MODE == 'full' }}
-        run: |
-          pip install semgrep==1.179.0
-          semgrep scan --config=auto --error src
       # Veracode Pipeline Scan (SAST): fonte do commit enviado ao motor remoto da Veracode, sem publicação na plataforma.
       - name: Veracode Pipeline Scan (SAST)
         if: ${{ !cancelled() && env.MODE == 'full' }}
@@ -381,31 +371,6 @@ jobs:
             ci-results/veracode-*.json
           if-no-files-found: warn
           retention-days: 30
-
-  # Semgrep AppSec Platform (transitório, até a substituição pelo Veracode ser validada). Job isolado porque o `semgrep ci`
-  # diff-aware busca commits com o GITHUB_TOKEN (contents: read, só neste job). Sem o segredo, REPROVA (não aprova em silêncio).
-  semgrep-appsec:
-    needs: changes
-    if: needs.changes.outputs.mode == 'full'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.13"
-      - name: Semgrep CI (AppSec Platform)
-        env:
-          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
-        run: |
-          node scripts/ci/require-config.ts "Semgrep AppSec" SEMGREP_APP_TOKEN
-          pip install semgrep==1.179.0
-          semgrep ci
 
   # SonarQube Cloud (plano Free, Quality Gate disponível no plano). O scanner ENVIA o código-fonte e a cobertura ao serviço.
   # Cobertura real: LCOV de unit + integração (Rules não executa src/; e2e não é instrumentado). Análise automática do
@@ -458,7 +423,7 @@ jobs:
         run: node scripts/ci/sonar-gate.ts .scannerwork/report-task.txt
 
   check:
-    needs: [changes, fast, backend, build, e2e, security, semgrep-appsec, quality]
+    needs: [changes, fast, backend, build, e2e, security, quality]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

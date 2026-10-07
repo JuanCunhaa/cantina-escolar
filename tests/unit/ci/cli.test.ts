@@ -118,7 +118,7 @@ describe("acesso à API do GitHub", () => {
 });
 
 describe("gate (CLI em processo)", () => {
-  const needsDocs = { changes: { result: "success", outputs: { mode: "docs" } }, fast: { result: "success" }, security: { result: "success" }, backend: { result: "skipped" }, build: { result: "skipped" }, e2e: { result: "skipped" }, "semgrep-appsec": { result: "skipped" }, quality: { result: "skipped" } };
+  const needsDocs = { changes: { result: "success", outputs: { mode: "docs" } }, fast: { result: "success" }, security: { result: "success" }, backend: { result: "skipped" }, build: { result: "skipped" }, e2e: { result: "skipped" }, quality: { result: "skipped" } };
   const silent = () => {};
 
   it("aprova o modo docs e grava o resultado", async () => {
