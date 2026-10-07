@@ -1,0 +1,43 @@
+# Observabilidade FinOps do CI: roda DEPOIS que o workflow `ci` termina (cada tentativa) e só lê metadados da API.
+# Segurança: workflow_run executa a definição e o código da branch padrão (confiáveis); o checkout é esparso (scripts de
+# métricas), sem credenciais persistidas, sem npm, sem baixar ou executar artefatos/código do PR e sem segredos da aplicação.
+# Não dispara outros workflows (sem loop) e não altera o resultado do `ci`. Métricas pequenas retidas por 30 dias.
+name: ci-metrics
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  statuses: read
+
+concurrency:
+  group: ci-metrics-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/ci/metrics
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Coletar métricas do run
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CI_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: node scripts/ci/metrics/collect.ts --repo "$GITHUB_REPOSITORY" --run "$CI_RUN_ID" --out ci-metrics --history 30 --collector-run "$GITHUB_RUN_ID"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-metrics-${{ github.event.workflow_run.id }}-a${{ github.event.workflow_run.run_attempt }}
+          path: ci-metrics/
+          if-no-files-found: error
+          retention-days: 30

@@ -26,6 +26,7 @@
     "build:webpack": "next build --webpack",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
     "ci:precheck": "node scripts/ci/validate-structured.ts && node scripts/ci/e2e-groups.ts verify && npm run lint && npm run typecheck && npm test",
+    "ci:status": "node scripts/ci/ci-status.ts",
     "staging:preflight": "node scripts/staging/run.ts preflight",
     "staging:deploy": "node scripts/staging/run.ts deploy",
     "staging:fixtures": "node scripts/staging/run.ts fixtures",
