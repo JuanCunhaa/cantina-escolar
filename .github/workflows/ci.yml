@@ -26,6 +26,9 @@ jobs:
   changes:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
     outputs:
       mode: ${{ steps.classify.outputs.mode }}
     steps:
@@ -36,15 +39,19 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
+      # Referência = o que já foi validado: base do PR, ou o último run VERDE deste workflow no ref (push). Não usar o
+      # push anterior: seu run pode ter sido cancelado pela concorrência (medido no probe P3).
+      - name: Referência validada
+        id: reference
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/ci/reference-sha.ts
       - name: Classificar mudanças (lista documental explícita)
         id: classify
         env:
-          EVENT: ${{ github.event_name }}
-          PR_BASE: ${{ github.event.pull_request.base.sha }}
-          PUSH_BEFORE: ${{ github.event.before }}
-        run: |
-          if [ "$EVENT" = "pull_request" ]; then base="$PR_BASE"; else base="$PUSH_BEFORE"; fi
-          node scripts/ci/classify-changes.ts --base "$base" --head "$GITHUB_SHA"
+          BASE: ${{ steps.reference.outputs.base }}
+        run: node scripts/ci/classify-changes.ts --base "$BASE" --head "$GITHUB_SHA"
 
   fast:
     needs: changes
@@ -86,7 +93,9 @@ jobs:
         run: npm test -- --coverage --reporter=default --reporter=json --outputFile.json=ci-results/vitest-unit.json
       - name: Resumo da suíte unit
         if: ${{ !cancelled() && env.MODE == 'full' }}
-        run: node scripts/ci/test-report.ts vitest ci-results/vitest-unit.json --suite unit --log-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+        env:
+          JOB_ID: ${{ job.check_run_id }}
+        run: node scripts/ci/test-report.ts vitest ci-results/vitest-unit.json --suite unit --log-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/job/$JOB_ID"
       - name: "Artefato: resumo unit"
         if: ${{ !cancelled() && env.MODE == 'full' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -135,8 +144,10 @@ jobs:
         run: npx firebase emulators:exec --only auth,firestore --project demo-cantina "npx vitest run --config vitest.integration.config.ts --coverage --reporter=default --reporter=json --outputFile.json=ci-results/vitest-integration.json"
       - name: Resumos das suítes
         if: ${{ !cancelled() }}
+        env:
+          JOB_ID: ${{ job.check_run_id }}
         run: |
-          log="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          log="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/job/$JOB_ID"
           status=0
           node scripts/ci/test-report.ts vitest ci-results/vitest-rules.json --suite rules --log-url "$log" || status=1
           node scripts/ci/test-report.ts vitest ci-results/vitest-integration.json --suite integration --log-url "$log" || status=1
@@ -277,7 +288,8 @@ jobs:
           EXPECTED: ${{ matrix.group == 'g1' && steps.list.outputs.expected_g1 || steps.list.outputs.expected_g2 }}
           EXPECTED_TOTAL: ${{ steps.list.outputs.expected_total }}
           GROUP: ${{ matrix.group }}
-        run: node scripts/ci/test-report.ts playwright "ci-results/playwright-$GROUP.json" --suite "e2e-$GROUP" --expected "$EXPECTED" --expected-total "$EXPECTED_TOTAL" --log-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          JOB_ID: ${{ job.check_run_id }}
+        run: node scripts/ci/test-report.ts playwright "ci-results/playwright-$GROUP.json" --suite "e2e-$GROUP" --expected "$EXPECTED" --expected-total "$EXPECTED_TOTAL" --log-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/job/$JOB_ID"
       - name: "Artefato: resumo do grupo"
         if: ${{ !cancelled() && steps.list.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
