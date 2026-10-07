@@ -1,9 +1,9 @@
 import { execFileSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { unsafeEntries, validateManifest, type Manifest } from "../../../scripts/ci/build-manifest.ts";
+import { symlinkEntryProblems, symlinkProblem, unsafeEntries, validateManifest, type Manifest } from "../../../scripts/ci/build-manifest.ts";
 import { E2E_BUILD_ENV } from "../../helpers/e2e-env.ts";
 
 const script = join(process.cwd(), "scripts/ci/build-manifest.ts");
@@ -94,6 +94,33 @@ describe("build compartilhado: pacote, manifesto e validação no consumidor", (
     expect(run(["pack", "--out", "out", "--name", "b"]).out).toContain("chave privada encontrada em .next/server/chunk.js");
   });
 
+  it("links relativos do Turbopack para node_modules/ entram no pacote e no manifesto; link para fora é recusado", () => {
+    // Forma medida no CI (P1): .next/node_modules/firebase-admin-<hash> -> ../../node_modules/firebase-admin.
+    let linked = true;
+    try {
+      mkdirSync(join(dir, ".next/node_modules"), { recursive: true });
+      symlinkSync("../../node_modules/next", join(dir, ".next/node_modules/next-abc123"), "dir");
+    } catch {
+      linked = false; // Windows sem permissão de link: a regra é coberta pelos testes puros abaixo
+    }
+    if (linked) {
+      expect(run(["pack", "--out", "out", "--name", "b"]).status).toBe(0);
+      const m = JSON.parse(readFileSync(join(dir, "out/manifest.json"), "utf8")) as Manifest;
+      expect(m.package.symlinks).toEqual([{ path: ".next/node_modules/next-abc123", target: "../../node_modules/next" }]);
+      rmSync(join(dir, ".next"), { recursive: true });
+      expect(run(["verify", "--dir", "out"]).status).toBe(0);
+      rmSync(join(dir, ".next"), { recursive: true });
+      mkdirSync(join(dir, ".next/node_modules"), { recursive: true });
+      write(".next/BUILD_ID", "abc");
+      symlinkSync("../../../fora", join(dir, ".next/node_modules/fora"), "dir");
+      expect(run(["pack", "--out", "out2", "--name", "b"]).out).toContain("link com alvo fora de node_modules/ do projeto");
+    }
+    expect(symlinkProblem(".next/node_modules/x-1", "../../node_modules/x")).toBeNull();
+    expect(symlinkProblem(".next/node_modules/x-1", "/usr/lib/x")).toContain("alvo absoluto");
+    expect(symlinkProblem(".next/node_modules/x-1", "../../../etc")).toContain("fora de node_modules/");
+    expect(symlinkProblem(".next/node_modules/x-1", "../../src")).toContain("fora de node_modules/");
+  });
+
   it("build ausente não gera pacote", () => {
     rmSync(join(dir, ".next"), { recursive: true });
     expect(run(["pack", "--out", "out", "--name", "b"]).out).toContain(".next não existe");
@@ -115,7 +142,7 @@ describe("regras puras do manifesto", () => {
     mode: "emulator",
     build_env: { ...E2E_BUILD_ENV },
     build_command: "npm run build",
-    package: { file: "build.tar.gz", sha256: "p", size_bytes: 10, files: 1, uncompressed_bytes: 20, excluded: [] },
+    package: { file: "build.tar.gz", sha256: "p", size_bytes: 10, files: 1, uncompressed_bytes: 20, excluded: [], symlinks: [] },
     created_at: "x",
   };
   const actual = { runId: "1", headSha: "c".repeat(40), githubSha: "c".repeat(40), lockfileSha256: "l", nodeVersion: "v24.20.0", packageSha256: "p", packageSize: 10 };
@@ -126,6 +153,14 @@ describe("regras puras do manifesto", () => {
     expect(validateManifest(base, { ...actual, nodeVersion: "v22.1.0" })).toEqual(["Node v24.12.0 no build ≠ v22.1.0 no consumidor"]);
     expect(validateManifest({ ...base, build_env: { ...base.build_env, APP_ENV: "production" } }, actual)).toEqual(["ambiente público do build difere do ambiente hermético do e2e"]);
     expect(validateManifest(base, { ...actual, packageSha256: null, packageSize: null })).toEqual(["pacote build.tar.gz ausente"]);
+  });
+
+  it("links do tar precisam constar do manifesto com o mesmo alvo", () => {
+    const line = "lrwxrwxrwx runner/runner 0 2026-10-07 04:47 .next/node_modules/firebase-admin-a1 -> ../../node_modules/firebase-admin";
+    const declared = [{ path: ".next/node_modules/firebase-admin-a1", target: "../../node_modules/firebase-admin" }];
+    expect(symlinkEntryProblems([line, "-rw-r--r-- runner/runner 3 2026-10-07 04:47 .next/BUILD_ID"], declared)).toEqual([]);
+    expect(symlinkEntryProblems([line], [])).toEqual(["link não declarado no manifesto: .next/node_modules/firebase-admin-a1", "links no pacote (1) ≠ manifesto (0)"]);
+    expect(symlinkEntryProblems([line.replace("../../node_modules/firebase-admin", "/etc")], declared)[0]).toContain("alvo absoluto");
   });
 
   it("entradas fora de .next/, absolutas ou com .. são inseguras", () => {

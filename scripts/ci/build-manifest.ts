@@ -7,8 +7,8 @@
 // dependências com npm ci; nada de node_modules, .env, credenciais, dados ou logs.
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
+import { isAbsolute, join, posix, relative } from "node:path";
 import { E2E_BUILD_ENV } from "../../tests/helpers/e2e-env.ts";
 
 export const PACKAGE_FILE = "build.tar.gz";
@@ -32,16 +32,49 @@ export type Manifest = {
   mode: "emulator";
   build_env: Record<string, string>;
   build_command: string;
-  package: { file: string; sha256: string; size_bytes: number; files: number; uncompressed_bytes: number; excluded: string[] };
+  package: { file: string; sha256: string; size_bytes: number; files: number; uncompressed_bytes: number; excluded: string[]; symlinks: Symlink[] };
   created_at: string;
 };
+
+/** Link simbólico do build (Turbopack: .next/node_modules/<pacote>-<hash> -> ../../node_modules/<pacote>, para os
+ *  serverExternalPackages). Necessário ao next start; o alvo é a dependência instalada pelo npm ci do consumidor. */
+export type Symlink = { path: string; target: string };
+
+/** Só aceita link RELATIVO, dentro de .next/, cujo alvo resolve para node_modules/ do projeto (nunca fora dele). */
+export function symlinkProblem(path: string, target: string): string | null {
+  if (!path.startsWith(".next/") || path.split("/").includes("..")) return `link fora de .next/: ${path}`;
+  if (isAbsolute(target) || /^[A-Za-z]:/.test(target) || target.startsWith("/")) return `link com alvo absoluto: ${path} -> ${target}`;
+  const resolved = posix.normalize(posix.join(posix.dirname(path), target.split("\\").join("/")));
+  if (!resolved.startsWith("node_modules/") || resolved.split("/").includes("..")) return `link com alvo fora de node_modules/ do projeto: ${path} -> ${target}`;
+  return null;
+}
+
+/** Links no tar (listagem -tv): cada um precisa constar do manifesto com o mesmo alvo e passar na regra de alvo. */
+export function symlinkEntryProblems(verboseLines: string[], expected: Symlink[]): string[] {
+  const problems: string[] = [];
+  const found = verboseLines
+    .filter((l) => l.startsWith("l"))
+    .map((l) => {
+      const arrow = l.lastIndexOf(" -> ");
+      const start = l.indexOf(" .next/");
+      return arrow > 0 && start > 0 ? { path: l.slice(start + 1, arrow), target: l.slice(arrow + 4).trim() } : { path: l, target: "" };
+    });
+  for (const link of found) {
+    const problem = symlinkProblem(link.path, link.target);
+    if (problem) problems.push(problem);
+    if (!expected.some((e) => e.path === link.path && e.target === link.target)) problems.push(`link não declarado no manifesto: ${link.path}`);
+  }
+  if (found.length !== expected.length) problems.push(`links no pacote (${found.length}) ≠ manifesto (${expected.length})`);
+  return problems;
+}
 
 export const sha256File = (path: string) => createHash("sha256").update(readFileSync(path)).digest("hex");
 const git = (...args: string[]) => execFileSync("git", args, { encoding: "utf8" }).trim();
 
-export function listBuildFiles(root = ".next"): { files: string[]; bytes: number; problems: string[] } {
+export function listBuildFiles(root = ".next"): { files: string[]; bytes: number; problems: string[]; symlinks: Symlink[] } {
   const files: string[] = [];
   const problems: string[] = [];
+  const symlinks: Symlink[] = [];
   let bytes = 0;
   const walk = (dir: string) => {
     for (const entry of readdirSync(dir)) {
@@ -49,7 +82,13 @@ export function listBuildFiles(root = ".next"): { files: string[]; bytes: number
       const rel = relative(".", full).replace(/\\/g, "/");
       const stat = lstatSync(full);
       if (stat.isSymbolicLink()) {
-        problems.push(`link simbólico não é aceito no pacote: ${rel}`);
+        const target = readlinkSync(full).split("\\").join("/");
+        const problem = symlinkProblem(rel, target);
+        if (problem) problems.push(problem);
+        else {
+          symlinks.push({ path: rel, target });
+          files.push(rel);
+        }
         continue;
       }
       if (stat.isDirectory()) {
@@ -65,7 +104,7 @@ export function listBuildFiles(root = ".next"): { files: string[]; bytes: number
   };
   if (!existsSync(root)) problems.push(`${root} não existe: build ausente`);
   else walk(root);
-  return { files: files.sort(), bytes, problems };
+  return { files: files.sort(), bytes, problems, symlinks: symlinks.sort((a, b) => a.path.localeCompare(b.path)) };
 }
 
 export type Actual = { runId: string; headSha: string; githubSha: string; lockfileSha256: string; nodeVersion: string; packageSha256: string | null; packageSize: number | null };
@@ -105,7 +144,7 @@ function pack() {
   const name = arg("name");
   const command = arg("build-command") ?? "";
   if (!out || !name || !/^[\w.-]+$/.test(name)) throw new Error("pack exige --out <dir> --name <artefato>");
-  const { files, bytes, problems } = listBuildFiles();
+  const { files, bytes, problems, symlinks } = listBuildFiles();
   if (problems.length) throw new Error(`pacote recusado:\n- ${problems.join("\n- ")}`);
   mkdirSync(out, { recursive: true });
   const listPath = join(out, "files.txt");
@@ -139,7 +178,7 @@ function pack() {
     mode: "emulator",
     build_env: { ...E2E_BUILD_ENV },
     build_command: command,
-    package: { file: PACKAGE_FILE, sha256: sha256File(tarPath), size_bytes: lstatSync(tarPath).size, files: files.length, uncompressed_bytes: bytes, excluded: EXCLUDED.map(String) },
+    package: { file: PACKAGE_FILE, sha256: sha256File(tarPath), size_bytes: lstatSync(tarPath).size, files: files.length, uncompressed_bytes: bytes, excluded: EXCLUDED.map(String), symlinks },
     created_at: new Date().toISOString(),
   };
   writeFileSync(join(out, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
@@ -167,6 +206,8 @@ function verify() {
   // Só inspeciona o tar depois que o checksum confere com o manifesto (não abre pacote adulterado).
   if (present && !errors.length) {
     const entries = execFileSync("tar", ["-tzf", tarPath], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 }).split("\n").filter(Boolean);
+    const verbose = execFileSync("tar", ["-tvzf", tarPath], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 }).split("\n").filter(Boolean);
+    errors.push(...symlinkEntryProblems(verbose, manifest.package.symlinks ?? []));
     const unsafe = unsafeEntries(entries);
     if (unsafe.length) errors.push(`entradas inseguras no pacote: ${unsafe.slice(0, 5).join(", ")}`);
     if (entries.filter((e) => !e.endsWith("/")).length !== manifest.package.files) errors.push("número de arquivos do pacote não confere com o manifesto");
