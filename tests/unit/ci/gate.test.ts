@@ -35,6 +35,7 @@ const fullNeeds = (over: Partial<Needs> = {}): Needs => ({
   e2e: { result: "success" },
   security: { result: "success" },
   "semgrep-appsec": { result: "success" },
+  quality: { result: "success" },
   ...over,
 });
 
@@ -77,6 +78,7 @@ describe("gate final (check)", () => {
       build: { result: "skipped" },
       e2e: { result: "skipped" },
       "semgrep-appsec": { result: "skipped" },
+      quality: { result: "skipped" },
     };
     expect(evaluateGate(docs, {}, SHA).ok).toBe(true);
     expect(evaluateGate({ ...docs, e2e: { result: "failure" } }, {}, SHA).problems).toEqual(["e2e: failure (esperado skipped)"]);

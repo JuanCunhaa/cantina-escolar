@@ -1,8 +1,8 @@
 # CI da Cantina Escolar. Nunca usa credencial da aplicação: só emuladores com projeto demo-cantina e dados fictícios.
 # Desenho, comandos de reprodução e reexecução: docs/testing/ci.md. O gate final é o job `check` (scripts/ci/gate.ts).
 #
-#   changes ─┬─ fast ──────────────────────────┐
-#            ├─ backend ───────────────────────┤
+#   changes ─┬─ fast ──────────────┬─ quality ─┐
+#            ├─ backend ───────────┘           │
 #            ├─ build ── e2e (g1, g2) ─────────┼─ check (sempre roda; aprova só o esperado para o modo)
 #            ├─ security / semgrep-appsec ─────┘
 #
@@ -81,9 +81,9 @@ jobs:
       - name: npm run typecheck
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run typecheck
-      - name: npm test (unit)
+      - name: npm test (unit, com cobertura)
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: npm test -- --reporter=default --reporter=json --outputFile.json=ci-results/vitest-unit.json
+        run: npm test -- --coverage --reporter=default --reporter=json --outputFile.json=ci-results/vitest-unit.json
       - name: Resumo da suíte unit
         if: ${{ !cancelled() && env.MODE == 'full' }}
         run: node scripts/ci/test-report.ts vitest ci-results/vitest-unit.json --suite unit --log-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
@@ -95,6 +95,16 @@ jobs:
           path: ci-results/summary-unit.json
           if-no-files-found: error
           retention-days: 30
+      - name: "Artefato: cobertura unit"
+        if: ${{ !cancelled() && env.MODE == 'full' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-unit-${{ github.run_id }}-a${{ github.run_attempt }}
+          path: coverage/unit/lcov.info
+          if-no-files-found: error
+          retention-days: 1
+    outputs:
+      coverage: coverage-unit-${{ github.run_id }}-a${{ github.run_attempt }}
 
   backend:
     needs: changes
@@ -116,13 +126,13 @@ jobs:
       - name: npm ci
         id: install
         run: npm ci
-      # Mesmos comandos de npm run test:rules / test:integration, com relatório JSON.
+      # Mesmos comandos de npm run test:rules / test:integration, com relatório JSON e cobertura (só integração executa src/).
       - name: Rules (emulador)
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npx firebase emulators:exec --only auth,firestore --project demo-cantina "npx vitest run --config vitest.rules.config.ts --reporter=default --reporter=json --outputFile.json=ci-results/vitest-rules.json"
-      - name: Integração (emulador)
+      - name: Integração (emulador, com cobertura)
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: npx firebase emulators:exec --only auth,firestore --project demo-cantina "npx vitest run --config vitest.integration.config.ts --reporter=default --reporter=json --outputFile.json=ci-results/vitest-integration.json"
+        run: npx firebase emulators:exec --only auth,firestore --project demo-cantina "npx vitest run --config vitest.integration.config.ts --coverage --reporter=default --reporter=json --outputFile.json=ci-results/vitest-integration.json"
       - name: Resumos das suítes
         if: ${{ !cancelled() }}
         run: |
@@ -139,6 +149,14 @@ jobs:
           path: ci-results/summary-*.json
           if-no-files-found: error
           retention-days: 30
+      - name: "Artefato: cobertura integração"
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-integration-${{ github.run_id }}-a${{ github.run_attempt }}
+          path: coverage/integration/lcov.info
+          if-no-files-found: error
+          retention-days: 1
       - name: Evidências do backend (logs dos emuladores)
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -149,7 +167,8 @@ jobs:
             *-debug.log
           if-no-files-found: warn
           retention-days: 7
-
+    outputs:
+      coverage: coverage-integration-${{ github.run_id }}-a${{ github.run_attempt }}
 
   build:
     needs: changes
@@ -391,8 +410,63 @@ jobs:
           pip install semgrep==1.179.0
           semgrep ci
 
+  # SonarQube Cloud (plano Free, Quality Gate disponível no plano). O scanner ENVIA o código-fonte e a cobertura ao serviço.
+  # Cobertura real: LCOV de unit + integração (Rules não executa src/; e2e não é instrumentado). Análise automática do
+  # SonarQube Cloud deve ficar DESLIGADA para não duplicar (configuração externa).
+  quality:
+    needs: [changes, fast, backend]
+    if: needs.changes.outputs.mode == 'full'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: "Artefato: cobertura unit"
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ needs.fast.outputs.coverage }}
+          path: coverage/unit
+      - name: "Artefato: cobertura integração"
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ needs.backend.outputs.coverage }}
+          path: coverage/integration
+      - name: Mesclar LCOV (unit + integração)
+        run: node scripts/ci/lcov-merge.ts --out coverage/merged/lcov.info unit=coverage/unit/lcov.info integration=coverage/integration/lcov.info
+      - name: Configuração do SonarQube Cloud
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+        run: |
+          missing=""
+          [ -n "$SONAR_TOKEN" ] || missing="$missing SONAR_TOKEN"
+          [ -n "$SONAR_ORGANIZATION" ] || missing="$missing SONAR_ORGANIZATION"
+          [ -n "$SONAR_PROJECT_KEY" ] || missing="$missing SONAR_PROJECT_KEY"
+          if [ -n "$missing" ]; then echo "::error::Configuração do SonarQube Cloud ausente:$missing — análise não executada, reprovado."; exit 1; fi
+      - name: SonarQube Cloud (análise + espera do Quality Gate)
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=600
+      - name: Resultado efetivo do Quality Gate
+        if: ${{ !cancelled() }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: node scripts/ci/sonar-gate.ts .scannerwork/report-task.txt
+
   check:
-    needs: [changes, fast, backend, build, e2e, security, semgrep-appsec]
+    needs: [changes, fast, backend, build, e2e, security, semgrep-appsec, quality]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

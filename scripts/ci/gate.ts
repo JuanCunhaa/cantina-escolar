@@ -13,13 +13,13 @@ export type Needs = Record<string, { result: string; outputs?: Record<string, st
 
 export const RULES = {
   full: {
-    success: ["changes", "fast", "backend", "build", "e2e", "security", "semgrep-appsec"],
+    success: ["changes", "fast", "backend", "build", "e2e", "security", "semgrep-appsec", "quality"],
     skipped: [] as string[],
     suites: ["unit", "rules", "integration", "e2e-g1", "e2e-g2"],
   },
   docs: {
     success: ["changes", "fast", "security"],
-    skipped: ["backend", "build", "e2e", "semgrep-appsec"],
+    skipped: ["backend", "build", "e2e", "semgrep-appsec", "quality"],
     suites: [] as string[],
   },
 } as const;
