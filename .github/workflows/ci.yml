@@ -363,8 +363,7 @@ jobs:
           VERACODE_API_KEY: ${{ secrets.VERACODE_API_KEY }}
           VERACODE_REGION: ${{ vars.VERACODE_REGION }}
         run: |
-          if [ -z "$VERACODE_API_ID" ] || [ -z "$VERACODE_API_KEY" ]; then echo "::error::Credenciais Veracode ausentes (VERACODE_API_ID/VERACODE_API_KEY): SAST não executado — reprovado."; exit 1; fi
-          if [ "$VERACODE_REGION" != "commercial" ]; then echo "::error::VERACODE_REGION='$VERACODE_REGION' não confirmada para o Pipeline Scan (aceito: commercial). Reprovado até configurar."; exit 1; fi
+          node scripts/ci/require-config.ts "Veracode Pipeline Scan" VERACODE_API_ID VERACODE_API_KEY VERACODE_REGION=commercial
           mkdir -p veracode && git archive --format=zip -o veracode/sast.zip HEAD -- src package.json package-lock.json tsconfig.json next.config.ts
           unzip -l veracode/sast.zip | tail -1
           umask 077 && mkdir -p "$RUNNER_TEMP/veracode" && printf '[default]\nveracode_api_key_id = %s\nveracode_api_key_secret = %s\n' "$VERACODE_API_ID" "$VERACODE_API_KEY" > "$RUNNER_TEMP/veracode/credentials"
@@ -383,8 +382,7 @@ jobs:
           SRCCLR_API_TOKEN: ${{ secrets.SRCCLR_API_TOKEN }}
           VERACODE_REGION: ${{ vars.VERACODE_REGION }}
         run: |
-          if [ -z "$SRCCLR_API_TOKEN" ]; then echo "::error::SRCCLR_API_TOKEN ausente: SCA não executado — reprovado."; exit 1; fi
-          if [ "$VERACODE_REGION" != "commercial" ]; then echo "::error::VERACODE_REGION='$VERACODE_REGION' não confirmada para o SCA (aceito: commercial). Reprovado até configurar."; exit 1; fi
+          node scripts/ci/require-config.ts "Veracode SCA" SRCCLR_API_TOKEN VERACODE_REGION=commercial
           bash scripts/ci/tools/install-srcclr.sh
           mkdir -p veracode
           npm ls --omit=dev --all --json --package-lock-only > veracode/npm-ls-prod.json || true
@@ -414,6 +412,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
@@ -421,7 +422,7 @@ jobs:
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
         run: |
-          if [ -z "$SEMGREP_APP_TOKEN" ]; then echo "::error::SEMGREP_APP_TOKEN indisponível: semgrep ci não executado — reprovado."; exit 1; fi
+          node scripts/ci/require-config.ts "Semgrep AppSec" SEMGREP_APP_TOKEN
           pip install semgrep==1.179.0
           semgrep ci
 
@@ -458,12 +459,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
           SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
-        run: |
-          missing=""
-          [ -n "$SONAR_TOKEN" ] || missing="$missing SONAR_TOKEN"
-          [ -n "$SONAR_ORGANIZATION" ] || missing="$missing SONAR_ORGANIZATION"
-          [ -n "$SONAR_PROJECT_KEY" ] || missing="$missing SONAR_PROJECT_KEY"
-          if [ -n "$missing" ]; then echo "::error::Configuração do SonarQube Cloud ausente:$missing — análise não executada, reprovado."; exit 1; fi
+        run: node scripts/ci/require-config.ts "SonarQube Cloud" SONAR_TOKEN SONAR_ORGANIZATION SONAR_PROJECT_KEY
       - name: SonarQube Cloud (análise + espera do Quality Gate)
         uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
         env:
