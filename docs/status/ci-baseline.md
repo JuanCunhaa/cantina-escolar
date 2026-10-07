@@ -154,6 +154,18 @@ Integração: g1 215 s (180 testes) · g2 204 s (236 testes) + Rules 39 s (56); 
 62,1% (unit 25,9%, integração g1 30%, g2 38,9%); Sonar OK (código novo 85,7%). Caminho crítico agora: `backend (g2)` →
 `quality`; build + e2e (~4,5 min) fica logo abaixo. Uma execução só: não é mediana.
 
+## 4e. Pós-merge (07/10/2026)
+
+- PR #27 mesclado (`6e9945e`). Ruleset 24668643 na branch padrão: `check` (GitHub Actions) obrigatório, `deletion` e
+  `non_fast_forward` bloqueados, sem bypass; `GET rules/branches/main` confirma as 3 regras (o plano permitiu no repositório
+  privado).
+- CI da `main` (run 37664506782): `changes`, `fast`, `build`, `security`, `backend` g1/g2 e `quality` verdes; `e2e` g1/g2
+  presos em `npx playwright install --with-deps chromium` (normal 25–28 s): g1 baixou 32,5 MB do `azure.archive.ubuntu.com`
+  em 13m50s (39 kB/s), g2 parou no `apt-get update`. Cancelado pelo dono após ~15 min. Causa externa (espelho apt), não do
+  código. Correção: `timeout-minutes: 5` no passo; reexecutar só o job falho. Cache do navegador não ajudaria (o lento foi o apt).
+- `ci-metrics` (1ª execução real, run 37666916222): `ERR_MODULE_NOT_FOUND` em `scripts/ci/lib/bin.ts` — checkout esparso só
+  com `scripts/ci/metrics`. Reproduzido localmente (sem `lib` falha; com `lib` carrega) e corrigido.
+
 ## 5. Evidências dos probes (Actions real)
 
 - **Vercel**: 0 status/deploy nos commits de `ci/probe-*` (`git.deploymentEnabled` no `vercel.json`).

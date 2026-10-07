@@ -287,7 +287,11 @@ jobs:
       - name: Listar testes (suíte e grupo)
         id: list
         run: node scripts/ci/e2e-groups.ts verify --list
-      - run: npx playwright install --with-deps chromium
+      # Normal: ~25 s. Limite curto para falhar rápido quando o espelho apt da Azure ou o CDN do Playwright travam
+      # (run 37664506782: 39 kB/s no apt, 15 min parados nos dois grupos); reexecutar só o job falho.
+      - name: Navegador do Playwright (chromium + dependências do sistema)
+        timeout-minutes: 5
+        run: npx playwright install --with-deps chromium
       - name: Recursos do runner (início do e2e)
         continue-on-error: true
         run: |
