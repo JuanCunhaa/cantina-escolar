@@ -16,7 +16,7 @@ export function requiredSpecs(dir = "tests/e2e"): string[] {
   return (readdirSync(dir, { recursive: true }) as string[])
     .map((f) => relative(dir, join(dir, f)).replace(/\\/g, "/"))
     .filter((f) => /\.spec\.ts$/.test(f) && !/\.propagation\.spec\.ts$/.test(f))
-    .sort();
+    .sort((a, b) => a.localeCompare(b));
 }
 
 export function verifyPartition(groups: GroupsFile, specs: string[]): string[] {
@@ -53,7 +53,7 @@ export function listTests(group?: string): string[] {
     for (const child of suite.suites ?? []) walk(child, child.title && !child.file?.endsWith(child.title) ? [...path, child.title] : path);
   };
   for (const s of report.suites) walk(s, []);
-  return ids.sort();
+  return ids.sort((a, b) => a.localeCompare(b));
 }
 
 export function verifyTestUnion(all: string[], perGroup: Record<string, string[]>): string[] {
@@ -70,39 +70,51 @@ export function verifyTestUnion(all: string[], perGroup: Record<string, string[]
   return errors;
 }
 
-function main() {
-  const [command, arg] = process.argv.slice(2);
-  const groups = loadGroups();
-  if (command === "verify") {
-    const errors = verifyPartition(groups, requiredSpecs());
-    if (process.argv.includes("--list")) {
-      const all = listTests();
-      const perGroup = Object.fromEntries(Object.keys(groups.groups).map((g) => [g, listTests(g)]));
-      errors.push(...verifyTestUnion(all, perGroup));
-      const counts = { expected_total: all.length, ...Object.fromEntries(Object.entries(perGroup).map(([g, ids]) => [`expected_${g}`, ids.length])) };
-      mkdirSync("ci-results", { recursive: true });
-      writeFileSync("ci-results/e2e-expected.json", `${JSON.stringify({ ...counts, tests: perGroup }, null, 2)}\n`);
-      console.log(Object.entries(counts).map(([k, v]) => `${k}=${v}`).join(" "));
-      if (process.env.GITHUB_OUTPUT && !errors.length) appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(counts).map(([k, v]) => `${k}=${v}\n`).join(""));
-    }
-    if (errors.length) {
-      console.error(`Partição e2e inválida:\n- ${errors.join("\n- ")}`);
-      process.exit(1);
-    }
-    console.log(`Partição e2e OK: ${Object.entries(groups.groups).map(([g, f]) => `${g}=${f.length} arquivos`).join(", ")}`);
-    return;
-  }
-  if (command === "run" && arg && groups.groups[arg]) {
-    const playwright = `node ${join("node_modules", "@playwright", "test", "cli.js")} test`;
-    const result = spawnSync(
-      process.execPath,
-      [join("node_modules", "firebase-tools", "lib", "bin", "firebase.js"), "emulators:exec", "--only", "auth,firestore", "--project", "demo-cantina", playwright],
-      { stdio: "inherit", env: { ...process.env, E2E_GROUP: arg } },
-    );
-    process.exit(result.status ?? 1);
-  }
-  console.error("Uso: node scripts/ci/e2e-groups.ts verify [--list] | run <grupo>");
-  process.exit(2);
+/** Comando do grupo como no CI: emuladores Auth/Firestore próprios + Playwright (o grupo vai por E2E_GROUP). */
+export function groupCommand(): string[] {
+  const playwright = `node ${join("node_modules", "@playwright", "test", "cli.js")} test`;
+  return [join("node_modules", "firebase-tools", "lib", "bin", "firebase.js"), "emulators:exec", "--only", "auth,firestore", "--project", "demo-cantina", playwright];
 }
 
-if (import.meta.main) main();
+type Deps = {
+  root?: string;
+  list?: (group?: string) => string[];
+  run?: (args: string[], env: Record<string, string | undefined>) => number;
+  log?: (text: string) => void;
+};
+
+/** CLI testável: devolve o código de saída. */
+export function main(argv: string[], env: Record<string, string | undefined>, deps: Deps = {}): number {
+  const [command, arg] = argv;
+  const root = deps.root ?? ".";
+  const log = deps.log ?? console.log;
+  const groups = loadGroups(join(root, "scripts/ci/e2e-groups.json"));
+  if (command === "verify") {
+    const errors = verifyPartition(groups, requiredSpecs(join(root, "tests/e2e")));
+    if (argv.includes("--list")) {
+      const list = deps.list ?? listTests;
+      const all = list();
+      const perGroup = Object.fromEntries(Object.keys(groups.groups).map((g) => [g, list(g)]));
+      errors.push(...verifyTestUnion(all, perGroup));
+      const counts = { expected_total: all.length, ...Object.fromEntries(Object.entries(perGroup).map(([g, ids]) => [`expected_${g}`, ids.length])) };
+      mkdirSync(join(root, "ci-results"), { recursive: true });
+      writeFileSync(join(root, "ci-results/e2e-expected.json"), `${JSON.stringify({ ...counts, tests: perGroup }, null, 2)}\n`);
+      log(Object.entries(counts).map(([k, v]) => `${k}=${v}`).join(" "));
+      if (env.GITHUB_OUTPUT && !errors.length) appendFileSync(env.GITHUB_OUTPUT, Object.entries(counts).map(([k, v]) => `${k}=${v}\n`).join(""));
+    }
+    if (errors.length) {
+      log(`Partição e2e inválida:\n- ${errors.join("\n- ")}`);
+      return 1;
+    }
+    log(`Partição e2e OK: ${Object.entries(groups.groups).map(([g, f]) => `${g}=${f.length} arquivos`).join(", ")}`);
+    return 0;
+  }
+  if (command === "run" && arg && groups.groups[arg]) {
+    const run = deps.run ?? ((args, childEnv) => spawnSync(process.execPath, args, { stdio: "inherit", env: childEnv as NodeJS.ProcessEnv }).status ?? 1);
+    return run(groupCommand(), { ...env, E2E_GROUP: arg });
+  }
+  log("Uso: node scripts/ci/e2e-groups.ts verify [--list] | run <grupo>");
+  return 2;
+}
+
+if (import.meta.main) process.exitCode = main(process.argv.slice(2), process.env);

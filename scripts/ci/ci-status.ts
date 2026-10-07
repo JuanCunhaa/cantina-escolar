@@ -8,6 +8,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fetchRunMetrics } from "./metrics/collect.ts";
 import { ghCliFetcher } from "./metrics/github.ts";
+import { bin } from "./lib/bin.ts";
 
 const REPRO: Record<string, string> = {
   changes: "node scripts/ci/classify-changes.ts --base origin/main --head HEAD",
@@ -19,12 +20,6 @@ const REPRO: Record<string, string> = {
   "semgrep-appsec": "somente no CI (token do Semgrep AppSec)",
   quality: "npm test -- --coverage (o Quality Gate só existe no SonarQube Cloud)",
   check: "node scripts/ci/ci-status.ts --run <id> (o gate só agrega os demais jobs)",
-};
-
-const gh = (...args: string[]) => execFileSync("gh", args, { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
-const arg = (name: string) => {
-  const i = process.argv.indexOf(`--${name}`);
-  return i >= 0 ? process.argv[i + 1] : undefined;
 };
 
 export function extractFailures(log: string): string[] {
@@ -39,24 +34,36 @@ export function extractFailures(log: string): string[] {
   return [...new Set(picked)].slice(0, 40);
 }
 
-async function main() {
+export type Gh = (...args: string[]) => string;
+const defaultGh: Gh = (...args) => execFileSync(bin("gh"), args, { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
+
+/** Status de um run (texto para a IA/dev). `gh` e diretório de logs injetáveis. */
+export async function status(argv: string[], deps: { gh?: Gh; logDir?: string } = {}): Promise<string> {
+  const gh = deps.gh ?? defaultGh;
+  const arg = (name: string) => {
+    const i = argv.indexOf(`--${name}`);
+    return i >= 0 ? argv[i + 1] : undefined;
+  };
   const repo = gh("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner").trim();
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) throw new Error("repositório não identificado");
   let runId = arg("run");
   if (!runId) {
     const pr = arg("pr");
-    const branch = arg("branch") ?? (pr ? JSON.parse(gh("pr", "view", pr, "--json", "headRefName")).headRefName : gh("branch", "--show-current").trim());
+    const branch = arg("branch") ?? (pr ? (JSON.parse(gh("pr", "view", pr, "--json", "headRefName")) as { headRefName: string }).headRefName : gh("branch", "--show-current").trim());
     const runs = JSON.parse(gh("run", "list", "--workflow", "ci.yml", "--branch", branch, "-L", "1", "--json", "databaseId")) as { databaseId: number }[];
     if (!runs[0]) throw new Error(`nenhuma execução do ci para ${branch}`);
     runId = String(runs[0].databaseId);
   }
-  const m = await fetchRunMetrics(ghCliFetcher(), repo, Number(runId));
+  if (!/^\d+$/.test(runId)) throw new Error("id de run inválido");
+  const m = await fetchRunMetrics(ghCliFetcher((args) => gh(...args)), repo, Number(runId));
   const out: string[] = [];
   out.push(`ci run ${m.run.id} · ${m.run.event} · ${m.run.branch} · ${m.run.head_sha.slice(0, 7)} · tentativas ${m.run.attempts} · ${m.run.status}/${m.run.conclusion ?? "—"}`);
   out.push(m.run.url);
   out.push(`espera 1ª tentativa ${m.timing.first_attempt_wait_s ?? "—"} s · runners ${m.consumption.runner_raw_min} min brutos / ${m.consumption.rounded_estimate_min} min arredondados (estimativa)`);
   const lastByName = new Map<string, (typeof m.jobs)[number]>();
   for (const j of m.jobs) lastByName.set(j.name, j);
-  mkdirSync(".agent-logs", { recursive: true });
+  const logDir = deps.logDir ?? ".agent-logs";
+  mkdirSync(logDir, { recursive: true });
   for (const j of lastByName.values()) {
     const failedSteps = j.steps.filter((s) => s.conclusion === "failure" || s.conclusion === "cancelled").map((s) => s.name);
     out.push(`- ${j.name} [tentativa ${j.attempt}] ${j.conclusion ?? j.status} ${j.duration_s}s${failedSteps.length ? ` · etapa: ${failedSteps.join(" | ")}` : ""}`);
@@ -64,7 +71,7 @@ async function main() {
     const jobId = j.job_ids[j.job_ids.length - 1]!;
     try {
       const log = gh("api", "--allow-escape-sequences", `repos/${repo}/actions/jobs/${jobId}/logs`);
-      const path = join(".agent-logs", `ci-${m.run.id}-${jobId}.log`);
+      const path = join(logDir, `ci-${m.run.id}-${jobId}.log`);
       writeFileSync(path, log);
       for (const line of extractFailures(log)) out.push(`    ${line}`);
       out.push(`    log completo: ${path} · ${j.url ?? ""}`);
@@ -79,12 +86,14 @@ async function main() {
     out.push("artefatos:");
     for (const a of m.artifacts) out.push(`  ${a.name} (${(a.size_bytes / 1_048_576).toFixed(1)} MB${a.expired ? ", expirado" : ""}) → gh run download ${m.run.id} -n ${a.name}`);
   }
-  console.log(out.join("\n"));
+  return out.join("\n");
 }
 
 if (import.meta.main) {
-  main().catch((error: unknown) => {
+  try {
+    console.log(await status(process.argv.slice(2)));
+  } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  });
+    process.exitCode = 1;
+  }
 }

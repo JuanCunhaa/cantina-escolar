@@ -4,13 +4,18 @@
 // Node antigo ou qualquer exceção => saída 1 (constrói normalmente).
 import { classifyRange } from "./classify-changes.ts";
 
-try {
-  const previous = process.env.VERCEL_GIT_PREVIOUS_SHA;
-  const current = process.env.VERCEL_GIT_COMMIT_SHA;
-  const result = classifyRange(previous, current);
-  console.log(`[ignored-build-step] ${previous?.slice(0, 7) ?? "?"}..${current?.slice(0, 7) ?? "?"}: modo=${result.mode} — ${result.reason}`);
-  process.exit(result.mode === "docs" ? 0 : 1);
-} catch (error) {
-  console.log(`[ignored-build-step] falha na classificação (${error instanceof Error ? error.message : String(error)}): build normal`);
-  process.exit(1);
+export function decide(env: Record<string, string | undefined>, deps: { cwd?: string; log?: (text: string) => void } = {}): 0 | 1 {
+  const log = deps.log ?? console.log;
+  try {
+    const previous = env.VERCEL_GIT_PREVIOUS_SHA;
+    const current = env.VERCEL_GIT_COMMIT_SHA;
+    const result = classifyRange(previous, current, deps.cwd);
+    log(`[ignored-build-step] ${previous?.slice(0, 7) || "?"}..${current?.slice(0, 7) || "?"}: modo=${result.mode} — ${result.reason}`);
+    return result.mode === "docs" ? 0 : 1;
+  } catch (error) {
+    log(`[ignored-build-step] falha na classificação (${error instanceof Error ? error.message : String(error)}): build normal`);
+    return 1;
+  }
 }
+
+if (import.meta.main) process.exitCode = decide(process.env);
