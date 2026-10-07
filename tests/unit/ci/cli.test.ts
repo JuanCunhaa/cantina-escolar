@@ -94,8 +94,14 @@ describe("acesso à API do GitHub", () => {
     await tokenFetcher("t", fake)("repos/o/r");
     expect(seen).toEqual(["https://api.github.com/repos/o/r"]);
     const failing = (async () => ({ ok: false, status: 403 }) as Response) as typeof fetch;
-    await expect(tokenFetcher("t", failing)("repos/o/r")).rejects.toThrow("GitHub API 403 em repos/o/r");
-    expect(await ghCliFetcher((args) => JSON.stringify({ args }))("repos/o/r")).toEqual({ args: ["api", "repos/o/r"] });
+    await expect(tokenFetcher("t", failing)("repos/o/r")).rejects.toThrow("GitHub API 403 em /repos/o/r");
+    const auth: string[] = [];
+    const viaGh = ghCliFetcher(() => "tok-local", (async (url: string | URL, init?: RequestInit) => {
+      auth.push(String((init?.headers as Record<string, string>).authorization));
+      return { ok: true, json: async () => ({ url: String(url) }) } as Response;
+    }) as typeof fetch);
+    expect(await viaGh("repos/o/r/actions/workflows/ci.yml/runs?branch=ci%2Fprobe&created=%3E%3D2026-10-01")).toEqual({ url: "https://api.github.com/repos/o/r/actions/workflows/ci.yml/runs?branch=ci%2Fprobe&created=%3E%3D2026-10-01" });
+    expect(auth).toEqual(["Bearer tok-local"]);
     const pages = await paginate<number>(async (p) => ({ items: p.endsWith("page=1") ? Array(100).fill(1) : [2], total_count: 101 }), "repos/o/r/x", "items");
     expect(pages).toHaveLength(101);
     await expect(paginate(async () => ({ items: Array(100).fill(1) }), "repos/o/r/x", "items", 2)).rejects.toThrow("Paginação excedeu 2 páginas");
@@ -232,7 +238,7 @@ describe("classificação, referência, Vercel e JSON estruturado (CLIs em proce
     const logs: string[] = [];
     await referenceMain({ GITHUB_EVENT_NAME: "push", GITHUB_REPOSITORY: R, GITHUB_WORKFLOW_REF: "o/r/.github/workflows/ci.yml@refs/heads/main", GITHUB_REF_NAME: "main", GITHUB_OUTPUT: output }, { fetcher: async () => Promise.reject(new Error("x")), log: (t) => logs.push(t) });
     expect(readFileSync(output, "utf8")).toBe(`base=${sha}\nbase=\n`);
-    expect(logs[0]).toContain("(nenhuma — fluxo completo)");
+    expect(logs[0]).toBe("sem referência validada (sem referência validada): fluxo completo");
   });
 });
 

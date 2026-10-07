@@ -25,6 +25,14 @@ export async function referenceSha(input: { event: string; prBase?: string; repo
   return last ? { sha: last.head_sha, reason: `último run verde ${last.id}` } : { sha: "", reason: "nenhum run verde anterior neste ref" };
 }
 
+/** Mensagens fixas por desfecho: o log não reproduz conteúdo vindo de entrada externa. */
+export function describeReference(reason: string): string {
+  if (reason === "base do PR") return "base do PR";
+  if (reason.startsWith("último run verde ")) return `último run verde ${Number(reason.slice("último run verde ".length)) || "?"}`;
+  if (reason === "nenhum run verde anterior neste ref") return "nenhum run verde anterior neste ref";
+  return "sem referência validada";
+}
+
 /** CLI testável. Falha de consulta => sem referência (fluxo completo), nunca aprovação documental. */
 export async function main(env: Record<string, string | undefined>, deps: { fetcher?: Fetcher; log?: (text: string) => void } = {}): Promise<number> {
   const log = deps.log ?? console.log;
@@ -40,11 +48,10 @@ export async function main(env: Record<string, string | undefined>, deps: { fetc
       fetcher: deps.fetcher ?? tokenFetcher(env.GITHUB_TOKEN ?? ""),
     });
   } catch {
-    result = { sha: "", reason: "falha ao consultar a referência" };
+    result = { sha: "", reason: "falha" };
   }
-  // Só SHA validado e texto fixo vão para o log/saída (nada de conteúdo externo bruto).
   const sha = SHA.test(result.sha) ? result.sha : "";
-  log(`referência: ${sha || "(nenhuma — fluxo completo)"} — ${result.reason.replace(/[^\w ÀÁÂÃÇÉÊÍÓÔÕÚàáâãçéêíóôõú—-]/g, "")}`);
+  log(sha ? `referência validada: ${sha} (${describeReference(result.reason)})` : `sem referência validada (${describeReference(result.reason)}): fluxo completo`);
   if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `base=${sha}\n`);
   return 0;
 }

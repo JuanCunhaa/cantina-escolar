@@ -101,7 +101,9 @@ describe("ci:status para a IA (gh falso)", () => {
   };
 
   it("mostra job/etapa, teste:linha, erro principal, log completo salvo, reprodução e reexecução do job falho", async () => {
-    const text = await status(["--pr", "12"], { gh, logDir: join(dir, "logs") });
+    // Metadados pela API (fetcher com as fixtures); o gh falso só responde repositório, PR, runs e logs.
+    const fetcher = async (path: string) => JSON.parse(gh("api", path));
+    const text = await status(["--pr", "12"], { gh, logDir: join(dir, "logs"), fetcher });
     expect(text).toContain("tentativas 2");
     expect(text).toContain("- check [tentativa 2] failure 988s · etapa: npm run test:e2e");
     expect(text).toContain("✘  59 tests/e2e/students.spec.ts:25:1");
@@ -110,7 +112,7 @@ describe("ci:status para a IA (gh falso)", () => {
     expect(text).toMatch(/reexecutar só este job \(mesmo commit\): gh run rerun 37552886769 --job \d+/);
     expect(text).toContain("gh run download 37552886769 -n e2e-evidencias-37552886769-2");
     expect(readdirSync(join(dir, "logs"))).toHaveLength(1);
-    await expect(status(["--run", "abc"], { gh, logDir: dir })).rejects.toThrow("id de run inválido");
+    await expect(status(["--run", "abc"], { gh, logDir: dir, fetcher })).rejects.toThrow("id de run inválido");
   });
 
   it("extrai falhas sem cores e sem duplicar", () => {
