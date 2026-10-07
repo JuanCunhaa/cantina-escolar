@@ -247,3 +247,21 @@ describe("consulta confirmatória e conta recebedora (F19)", () => {
     expect(failed.kind).toBe("uncertain");
   });
 });
+
+describe("provedor de cartão e demonstração na consulta confirmatória (F19)", () => {
+  it("o provedor de cartão consulta a mesma order e a mesma conta recebedora", async () => {
+    const http = fakeHttp([{ status: 200, body: { id: 3745150346 } }, { status: 404 }]);
+    const card = mercadoPagoCard({ ...cfg(http.fetchFn), accessToken: credential("card-account") });
+    expect(await card.accountId()).toBe("3745150346");
+    expect(await card.getOrder("ORDINEXISTENTE")).toBeNull();
+    expect(http.calls.map((c) => c.url.replace(/^https?:\/\/[^/]+/, ""))).toEqual(["/users/me", "/v1/orders/ORDINEXISTENTE"]);
+  });
+
+  it("a demonstração NUNCA confirma pagamento: nenhuma order paga existe para consultar", async () => {
+    const { demoCardProvider, demoPixProvider } = await import("@/modules/payments/online/demo-provider");
+    for (const provider of [demoPixProvider, demoCardProvider]) {
+      expect(await provider.getOrder("qualquer")).toBeNull();
+      expect(await provider.accountId()).toBe("demo");
+    }
+  });
+});

@@ -37,7 +37,7 @@ let cantina: TestUser;
 let guardianA: TestUser;
 let guardianB: TestUser;
 
-const SECRET = "segredo-do-webhook-de-teste-0123456789";
+const SECRET = `wh-teste-${randomUUID()}`; // gerado a cada execução: nenhum literal com cara de segredo no repositório
 const tag = randomUUID().slice(0, 6);
 let seq = 0;
 
@@ -146,7 +146,7 @@ describe("webhook: autenticidade (A05)", () => {
     const intent = await newIntent(p, student);
     p.pay(intent);
     const calls = p.calls.getOrder;
-    for (const bad of [{ sign: false }, { secret: "chave-errada-qualquer-0123456789" }, { ts: Date.now() - 48 * 3_600_000 }, { signFor: "ORDOUTRO" }]) {
+    for (const bad of [{ sign: false }, { secret: `outra-${randomUUID()}` }, { ts: Date.now() - 48 * 3_600_000 }, { signFor: "ORDOUTRO" }]) {
       const r = await notify(p, intent, bad);
       expect(r.status).toBe(401);
       expect(r.body).toEqual({ error: "invalid_signature" });
@@ -597,7 +597,7 @@ describe("timeout de criação e pagamento depois da expiração local (A06)", (
   it("rotina agendada: exige CRON_SECRET (503 sem, 401 errado) e executa a varredura com o segredo correto", async () => {
     delete process.env.CRON_SECRET;
     expect((await call(cronRoute, null, "GET", "/api/cron/payments-reconcile")).status).toBe(503);
-    process.env.CRON_SECRET = "segredo-do-cron-de-teste-0123456789";
+    process.env.CRON_SECRET = `cron-teste-${randomUUID()}`;
     try {
       expect((await call(cronRoute, null, "GET", "/api/cron/payments-reconcile")).status).toBe(401);
       expect((await call(cronRoute, null, "GET", "/api/cron/payments-reconcile", undefined, "", { authorization: "Bearer errado" })).status).toBe(401);
@@ -839,5 +839,121 @@ describe("isolamento e dados expostos", () => {
     await expect(intents.getTopupIntent(db(), actor(guardianB), intent)).rejects.toThrow();
     const list = await intents.listTopupIntents(db(), actor(guardianA), { studentId: student });
     expect(list.intents.find((i) => i.intentId === intent)).toMatchObject({ credited: true });
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------- outros caminhos */
+
+describe("outros caminhos: cartão, conciliação manual, erros e acúmulo de pendência", () => {
+  it("cartão 1x aprovado pelo provedor é creditado como 'cartão de crédito', uma vez, pelo mesmo caminho do Pix", async () => {
+    const student = await newStudent();
+    const p = fakeMercadoPago();
+    const v = await intents.createTopupIntent(
+      db(),
+      actor(guardianA),
+      { key: randomUUID(), studentId: student, amountCents: 5000, channel: "card", installments: 1, cardToken: `tok_${randomUUID().slice(0, 12)}`, paymentMethodId: "visa", payer: { email: "pagador@example.test", identification: { type: "CPF", number: "12345678909" } } },
+      { providers: p.providers },
+    );
+    expect(v).toMatchObject({ status: "processing", credited: false });
+    p.pay(v.intentId);
+    const results = await Promise.all([notify(p, v.intentId), notify(p, v.intentId)]);
+    expect(results.every((r) => r.status === 200)).toBe(true);
+    const entries = await entriesOf(student);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ type: "topup", amountCents: 5000, method: "card_credit" });
+    expect(await intentDoc(v.intentId)).toMatchObject({ status: "confirmed", channel: "card" });
+    await ledgerOk(student);
+  });
+
+  it("conciliação manual pela administração (rota): família 403; varredura ou uma recarga; entrada inválida 400", async () => {
+    const adminReconcile = (await import("@/app/api/admin/payments/reconcile/route")).POST as unknown as Handler;
+    const url = "/api/admin/payments/reconcile";
+    expect((await call(adminReconcile, guardianA, "POST", url, {})).status).toBe(403);
+    expect((await call(adminReconcile, null, "POST", url, {})).status).toBe(401);
+    const sweep = await call(adminReconcile, admin, "POST", url, { limit: 5 });
+    expect(sweep.status).toBe(200);
+    expect(sweep.body.sweep).toMatchObject({ checked: expect.any(Number), credited: 0 });
+    const one = await call(adminReconcile, admin, "POST", url, { intentId: "tpi_00000000000000000000" });
+    expect(one).toMatchObject({ status: 200, body: { result: { outcome: "unknown_order" } } });
+    for (const bad of [{ limit: 0 }, { limit: 1000 }, { intentId: "x" }, { outro: 1 }]) expect((await call(adminReconcile, admin, "POST", url, bad)).status).toBe(400);
+  });
+
+  it("sem provedor configurado a confirmação é indisponível (503) e nada é gravado", async () => {
+    await expect(confirmation.confirmFromProvider(db(), { providers: { pix: null, card: null } }, "ORDX", { source: "admin" })).rejects.toMatchObject({ code: "payment_unavailable", status: 503 });
+  });
+
+  it("order do provedor com referência válida mas sem intenção, e entregas idênticas: 200, um único evento", async () => {
+    const student = await newStudent();
+    const p = fakeMercadoPago();
+    const intent = await newIntent(p, student);
+    const base = p.orders.get(p.orderIdOf(intent))!;
+    p.orders.set("ORDGHOST1", { ...base, orderId: "ORDGHOST1", externalReference: "tpi_ffffffffffffffffffff", state: "paid", paidCents: base.totalCents });
+    const T = Date.now();
+    for (let i = 0; i < 2; i += 1) expect(await notify(p, "ORDGHOST1", { requestId: "rq-ghost", ts: T })).toMatchObject({ status: 200, body: { outcome: "unknown_order" } });
+    expect(await eventsOf("ORDGHOST1")).toHaveLength(1);
+    // order que o provedor não conhece, entregue duas vezes com a mesma assinatura: um evento só
+    for (let i = 0; i < 2; i += 1) expect(await notify(p, "ORDNAOEXISTE2", { requestId: "rq-x", ts: T })).toMatchObject({ status: 200, body: { outcome: "unknown_order" } });
+    expect(await eventsOf("ORDNAOEXISTE2")).toHaveLength(1);
+    await untouched(student);
+  });
+
+  it("reversão que se soma a pendência já aberta: acumula, não cria outra e mantém a carteira bloqueada", async () => {
+    const student = await newStudent();
+    const other = await newStudent();
+    const p = fakeMercadoPago();
+    const intent = await credited(p, student);
+    await walletCommands.transferBetweenWallets(db(), actor(guardianA), { key: randomUUID(), fromStudentId: student, toStudentId: other, amountCents: 5000, reason: "Consumo simulado" });
+    p.set(intent, { state: "partially_refunded", providerStatus: "processed/partially_refunded", reversedCents: 2000 });
+    expect((await notify(p, intent, { action: "order.refunded", version: 60 })).body.outcome).toBe("reversal_applied");
+    expect((await db().doc(`paymentPendencies/${intent}`).get()).data()).toMatchObject({ status: "open", openedCents: 2000, outstandingCents: 2000 });
+    expect(await walletOf(student)).toMatchObject({ balance: 0, pending: 2000 });
+    p.set(intent, { state: "refunded", providerStatus: "refunded/refunded", reversedCents: 5000 });
+    expect((await notify(p, intent, { action: "order.refunded", version: 61 })).body.outcome).toBe("reversal_applied");
+    expect((await db().doc(`paymentPendencies/${intent}`).get()).data()).toMatchObject({ status: "open", openedCents: 5000, outstandingCents: 5000, cause: "refund" });
+    expect(await walletOf(student)).toMatchObject({ balance: 0, pending: 5000 });
+    expect((await intentDoc(intent)).reversal).toMatchObject({ accountedCents: 5000, recoveredCents: 0, pendingCents: 5000 });
+    expect((await entriesOf(student)).filter((e) => e.type === "topup_reversal")).toHaveLength(0); // sem saldo, nenhum lançamento negativo
+    await ledgerOk(student);
+  });
+
+  it("regularização PARCIAL pela administração e valor acima do possível", async () => {
+    const student = await newStudent();
+    const other = await newStudent();
+    const p = fakeMercadoPago();
+    const intent = await credited(p, student);
+    await walletCommands.transferBetweenWallets(db(), actor(guardianA), { key: randomUUID(), fromStudentId: student, toStudentId: other, amountCents: 5000, reason: "Consumo simulado" });
+    p.refund(intent);
+    await notify(p, intent, { action: "order.refunded", version: 70 });
+    await topupCommands.registerManualTopup(db(), actor(secretaria, "secretaria"), { key: randomUUID(), studentId: student, amountCents: 2000, method: "cash", receivedConfirmed: true });
+    const base = { action: "recover", expectedOutstandingCents: 5000, reason: "Regularização parcial autorizada", pendencyId: intent };
+    await expect(pendenciesMod.resolvePendency(db(), actor(admin, "admin"), { ...base, key: randomUUID(), amountCents: 3000 })).rejects.toMatchObject({ code: "exceeds_available", details: { maxCents: 2000 } });
+    const part = await pendenciesMod.resolvePendency(db(), actor(admin, "admin"), { ...base, key: randomUUID(), amountCents: 500 });
+    expect(part).toMatchObject({ appliedCents: 500, outstandingCents: 4500, status: "open", wallet: { balanceCents: 1500, pendingReversalCents: 4500 } });
+    await expect(pendenciesMod.resolvePendency(db(), actor(admin, "admin"), { ...base, key: randomUUID() })).rejects.toMatchObject({ code: "stale_pendency" });
+    await expect(pendenciesMod.resolvePendency(db(), actor(admin, "admin"), { ...base, key: randomUUID(), pendencyId: "tpi_00000000000000000000" })).rejects.toMatchObject({ code: "pendency_not_found" });
+    await ledgerOk(student);
+  });
+
+  it("falha na consulta de uma intenção NÃO interrompe a varredura; erro inesperado do provedor na conciliação pela tela é propagado", async () => {
+    const student = await newStudent();
+    const p = fakeMercadoPago();
+    const intent = await newIntent(p, student);
+    p.pay(intent);
+    p.script.failGet = 10_000;
+    const summary = await confirmation.sweepIntents(db(), deps(p), { limit: 300 });
+    expect(summary.lookupFailed).toBeGreaterThanOrEqual(1);
+    expect(summary.credited).toBe(0);
+    p.script.failGet = 0;
+    await untouched(student);
+    const flaky = {
+      ...p.pix,
+      getOrder: async () => {
+        throw new TypeError("falha inesperada");
+      },
+    };
+    await expect(reconcileMod.reconcileAndConfirm(db(), actor(guardianA), intent, {}, { providers: { pix: flaky, card: null } })).rejects.toThrow("falha inesperada");
+    await untouched(student);
+    expect((await confirmation.sweepIntents(db(), deps(p), { limit: 300 })).credited).toBeGreaterThanOrEqual(1);
+    expect(await entriesOf(student)).toHaveLength(1);
   });
 });

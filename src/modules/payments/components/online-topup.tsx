@@ -332,7 +332,7 @@ export function OnlineTopup({ user }: { user: User }) {
   );
 }
 
-function IntentPanel({ intent, checking, copied, onCopy, onReconcile, wallet }: { intent: IntentView; checking: boolean; copied: boolean; onCopy: (text: string) => void; onReconcile: (resend: boolean) => void; wallet?: WalletSlot }) {
+export function IntentPanel({ intent, checking, copied, onCopy, onReconcile, wallet }: { intent: IntentView; checking: boolean; copied: boolean; onCopy: (text: string) => void; onReconcile: (resend: boolean) => void; wallet?: WalletSlot }) {
   const status = intent.displayStatus;
   return (
     <section aria-labelledby="topup-intent-title" data-testid="topup-intent" data-status={status} data-intent={intent.intentId}>

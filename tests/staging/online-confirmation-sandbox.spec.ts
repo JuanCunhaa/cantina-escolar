@@ -173,7 +173,8 @@ test("reembolso REAL no sandbox: lançamento negativo, carteira regularizada, se
     .poll(async () => (await call(request, fam.guardian, "POST", `/api/topups/online/${pixIntent}/reconcile`, {})).body.status, { timeout: 120_000, intervals: [5_000] })
     .toBe("reversed");
   expect(await wallet(request)).toMatchObject({ balanceCents: 0, version: 2, pendingReversalCents: 0 });
-  expect((await wallet(request)).entries.map((e) => [e.type, e.amountCents])).toEqual([["topup", 1234], ["topup_reversal", -1234]]);
+  // A API devolve o extrato do mais novo para o mais antigo.
+  expect((await wallet(request)).entries.map((e) => [e.type, e.amountCents])).toEqual([["topup_reversal", -1234], ["topup", 1234]]);
   expect(await ledgerOk(request)).toMatchObject({ entryCount: 2, balanceCents: 0 });
   expect((await intentDoc(pixIntent))?.reversal).toMatchObject({ accountedCents: 1234, recoveredCents: 1234, pendingCents: 0, cause: "refund" });
   await Promise.all([1, 2, 3].map(() => call(request, fam.guardian, "POST", `/api/topups/online/${pixIntent}/reconcile`, {})));

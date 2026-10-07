@@ -8,7 +8,8 @@ import { useServerQuery } from "@/modules/orders/use-operations";
 import { usePosSubmit } from "@/modules/pos/use-pos";
 import type { PendencyView, ResolveResult, ReviewItemView } from "../online/pendencies";
 
-type Message = { kind: "ok" | "error"; text: string };
+export type Message = { kind: "ok" | "error"; text: string };
+export type OpenResolve = { id: string; action: "recover" | "write_off" };
 type Review = { pendencies: PendencyView[]; reviews: ReviewItemView[] };
 type Sweep = { checked: number; credited: number; reversals: number; reviews: number; closed: number; unchanged: number; lookupFailed: number; noCharge: number };
 
@@ -59,8 +60,41 @@ export function PaymentsReview({ user }: { user: User }) {
 
   if (review.status === "loading") return <p role="status" className="muted">Carregando…</p>;
   if (!review.data) return <p role="alert" className="notice notice-error">{errorText(review.errorCode ?? "internal")}</p>;
-  const { pendencies, reviews } = review.data;
+  return (
+    <PaymentsReviewView
+      pendencies={review.data.pendencies}
+      reviews={review.data.reviews}
+      message={message}
+      uncertain={submit.uncertain}
+      locked={locked}
+      sweeping={sweeping}
+      open={open}
+      reason={reason}
+      onOpen={setOpen}
+      onReason={setReason}
+      onResolve={(p, action) => void resolve(p, action)}
+      onReconcile={(intentId) => void reconcileNow(intentId)}
+    />
+  );
+}
 
+export type ReviewViewProps = {
+  pendencies: PendencyView[];
+  reviews: ReviewItemView[];
+  message: Message | null;
+  uncertain: boolean;
+  locked: boolean;
+  sweeping: boolean;
+  open: OpenResolve | null;
+  reason: string;
+  onOpen: (open: OpenResolve | null) => void;
+  onReason: (reason: string) => void;
+  onResolve: (pendency: PendencyView, action: "recover" | "write_off") => void;
+  onReconcile: (intentId?: string) => void;
+};
+
+/** Parte visual da revisão (sem estado nem rede): testável por renderização. */
+export function PaymentsReviewView({ pendencies, reviews, message, uncertain, locked, sweeping, open, reason, onOpen, onReason, onResolve, onReconcile }: ReviewViewProps) {
   return (
     <section>
       <h1>Pagamentos online</h1>
@@ -69,7 +103,7 @@ export function PaymentsReview({ user }: { user: User }) {
         casos que pedem decisão.
       </p>
       <p>
-        <button type="button" disabled={locked} onClick={() => void reconcileNow()}>
+        <button type="button" disabled={locked} onClick={() => onReconcile()}>
           {sweeping ? "Conciliando…" : "Conciliar com o provedor agora"}
         </button>
       </p>
@@ -78,7 +112,7 @@ export function PaymentsReview({ user }: { user: User }) {
           {message.text}
         </p>
       )}
-      {submit.uncertain && <p role="alert" className="notice">Sem resposta do servidor. Repita a regularização para conferir: a mesma operação é reaproveitada, sem débito duplicado.</p>}
+      {uncertain && <p role="alert" className="notice">Sem resposta do servidor. Repita a regularização para conferir: a mesma operação é reaproveitada, sem débito duplicado.</p>}
 
       <h2>Pendências abertas ({pendencies.length})</h2>
       {pendencies.length === 0 && <p className="muted">Nenhuma pendência aberta.</p>}
@@ -89,10 +123,10 @@ export function PaymentsReview({ user }: { user: User }) {
             {p.createdAt && <span className="muted"> · desde {timeFmt.format(new Date(p.createdAt))}</span>}
             <span className="muted"> · a carteira está bloqueada para novas compras</span>
             <div>
-              <button type="button" className="secondary" disabled={locked || p.walletBalanceCents <= 0} onClick={() => setOpen({ id: p.intentId, action: "recover" })}>
+              <button type="button" className="secondary" disabled={locked || p.walletBalanceCents <= 0} onClick={() => onOpen({ id: p.intentId, action: "recover" })}>
                 Descontar do saldo atual
               </button>{" "}
-              <button type="button" className="secondary" disabled={locked} onClick={() => setOpen({ id: p.intentId, action: "write_off" })}>
+              <button type="button" className="secondary" disabled={locked} onClick={() => onOpen({ id: p.intentId, action: "write_off" })}>
                 Absorver o valor
               </button>
             </div>
@@ -102,11 +136,11 @@ export function PaymentsReview({ user }: { user: User }) {
                   {open.action === "recover" ? `Será debitado do saldo o menor valor entre o saldo atual e ${formatBRL(p.outstandingCents)}, com novo lançamento no livro.` : `A escola absorve ${formatBRL(p.outstandingCents)}: nada é debitado do aluno e não há lançamento no livro.`}
                 </p>
                 <label htmlFor={`reason-${p.intentId}`}>Motivo</label>
-                <input id={`reason-${p.intentId}`} type="text" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} autoComplete="off" />{" "}
-                <button type="button" disabled={locked} onClick={() => void resolve(p, open.action)}>
+                <input id={`reason-${p.intentId}`} type="text" value={reason} onChange={(e) => onReason(e.target.value)} maxLength={200} autoComplete="off" />{" "}
+                <button type="button" disabled={locked} onClick={() => onResolve(p, open.action)}>
                   Confirmar
                 </button>{" "}
-                <button type="button" className="secondary" onClick={() => setOpen(null)}>
+                <button type="button" className="secondary" onClick={() => onOpen(null)}>
                   Cancelar
                 </button>
               </div>
@@ -123,7 +157,7 @@ export function PaymentsReview({ user }: { user: User }) {
             <strong>{r.studentName}</strong> · {formatBRL(r.amountCents)} · {r.channel === "pix" ? "Pix" : "Cartão"} · {r.label}
             {r.createdAt && <span className="muted"> · {timeFmt.format(new Date(r.createdAt))}</span>}
             <span className="muted"> · nenhum crédito foi lançado</span>{" "}
-            <button type="button" className="secondary" disabled={locked} onClick={() => void reconcileNow(r.intentId)}>
+            <button type="button" className="secondary" disabled={locked} onClick={() => onReconcile(r.intentId)}>
               Consultar de novo
             </button>
           </li>

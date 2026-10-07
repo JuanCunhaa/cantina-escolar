@@ -21,7 +21,9 @@ export default defineConfig({
   // pelo fluxo normal e saldo real no livro, é staging/topups-hml.spec.ts.
   // Confirmação de pagamento online (F19): e2e usa fixtures de carteira/pendência por escrita direta no emulador; o equivalente na
   // homologação, com o sandbox real do Mercado Pago, é staging/online-confirmation-sandbox.spec.ts.
-  testIgnore: ["e2e/payments-confirmation*.spec.ts", "e2e/wallet*.spec.ts", "e2e/policies*.spec.ts", "e2e/checkout*.spec.ts", "e2e/my-orders*.spec.ts", "e2e/fulfillment*.spec.ts", "e2e/cancellation*.spec.ts", "e2e/pos*.spec.ts", "e2e/amend*.spec.ts", "e2e/topups*.spec.ts"],
+  // Recarga online (F18): o e2e usa o provedor de DEMONSTRAÇÃO e escreve no emulador (127.0.0.1:8080), então não roda contra a HML
+  // (achado da suíte publicada completa de 07/10/2026: ECONNREFUSED); o equivalente é staging/online-topup-sandbox.spec.ts.
+  testIgnore: ["e2e/online-topup*.spec.ts", "e2e/payments-confirmation*.spec.ts", "e2e/wallet*.spec.ts", "e2e/policies*.spec.ts", "e2e/checkout*.spec.ts", "e2e/my-orders*.spec.ts", "e2e/fulfillment*.spec.ts", "e2e/cancellation*.spec.ts", "e2e/pos*.spec.ts", "e2e/amend*.spec.ts", "e2e/topups*.spec.ts"],
   timeout: 120000,
   fullyParallel: false,
   workers: 1,

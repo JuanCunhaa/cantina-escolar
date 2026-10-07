@@ -4,13 +4,14 @@
 // decisão única (crédito só com pago + identidade + conta + moeda + valor; nada regride; divergência vai para revisão;
 // estado desconhecido nunca credita); recuperação limitada ao saldo (nunca negativo). A integração com o emulador está em
 // tests/integration/online-confirmation-api.test.ts.
+import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { amountProblem, decide, identityProblem, splitRecovery, type DecisionContext, type IntentFacts } from "@/modules/payments/online/confirmation-model";
 import { classifyOrder, normalizeOrder, toCents } from "@/modules/payments/online/mercadopago";
 import { computeSignature, parseNotification, parseSignatureHeader, signatureManifest, verifyWebhookSignature, WEBHOOK_TOLERANCE_MS } from "@/modules/payments/online/mercadopago-webhook";
 import type { ProviderOrder } from "@/modules/payments/online/provider";
 
-const SECRET = "segredo-de-teste-do-webhook-0123456789";
+const SECRET = `wh-teste-${randomUUID()}`; // gerado a cada execução
 const NOW = Date.UTC(2026, 9, 7, 15, 0, 0);
 
 function signed(over: { dataId?: string | null; requestId?: string | null; ts?: number; secret?: string } = {}) {
