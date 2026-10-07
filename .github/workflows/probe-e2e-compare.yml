@@ -1,0 +1,162 @@
+# COMPARAÇÃO TEMPORÁRIA (branch descartável ci/probe-e2e-comparacao; nunca mesclada; Vercel desligada para ci/probe-*).
+# Mesmo commit, mesmos testes/asserções/timeouts, mesmo runner (ubuntu-24.04), suíte e2e COMPLETA, 1 worker.
+#   dev:       configuração atual — next dev --webpack (compilação sob demanda) dentro do job.
+#   compilado: next build (Turbopack, como a Vercel) num job produtor -> artefato -> next start no consumidor.
+# ATENÇÃO: muda DUAS variáveis (modo dev×produção e webpack×Turbopack); compara as configurações completas.
+# 3 repetições de cada, intercaladas (cada modo com max-parallel 1, os dois modos ao mesmo tempo). Falha é dado, sem rerun.
+name: probe-e2e-compare
+
+on:
+  push:
+    branches: [ci/probe-e2e-comparacao]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: probe-e2e-compare
+  cancel-in-progress: false
+
+jobs:
+  dev:
+    name: dev r${{ matrix.rep }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        rep: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Listar testes
+        id: list
+        run: node scripts/ci/e2e-groups.ts verify --list
+      - name: e2e completo (dev)
+        id: e2e
+        run: |
+          mkdir -p ci-results
+          (vmstat -n 5 > ci-results/vmstat.txt) & echo $! > "$RUNNER_TEMP/vmstat.pid"
+          status=0; npm run test:e2e || status=$?
+          kill "$(cat "$RUNNER_TEMP/vmstat.pid")" || true
+          exit $status
+      - name: Resumo
+        if: ${{ !cancelled() }}
+        env:
+          EXPECTED: ${{ steps.list.outputs.expected_total }}
+        run: node scripts/ci/test-report.ts playwright ci-results/playwright-all.json --suite "dev-r${{ matrix.rep }}" --expected "$EXPECTED" || true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: comparacao-dev-r${{ matrix.rep }}
+          path: |
+            ci-results/summary-*.json
+            ci-results/server-ready-*.json
+            ci-results/vmstat.txt
+          retention-days: 7
+
+  compiled-build:
+    name: compilado build r${{ matrix.rep }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        rep: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node scripts/ci/build-manifest.ts env >> "$GITHUB_ENV"
+      - run: npm run build
+      - name: Empacotar build + manifesto
+        run: node scripts/ci/build-manifest.ts pack --out build-artifact --name "build-${GITHUB_RUN_ID}-a${GITHUB_RUN_ATTEMPT}-r${{ matrix.rep }}" --build-command "npm run build"
+      - name: Gitleaks no pacote do build
+        run: |
+          bash scripts/ci/tools/install-gitleaks.sh "$RUNNER_TEMP/bin"
+          mkdir -p "$RUNNER_TEMP/pacote" && tar -xzf build-artifact/build.tar.gz -C "$RUNNER_TEMP/pacote"
+          "$RUNNER_TEMP/bin/gitleaks" dir --redact --no-banner -v --config scripts/ci/gitleaks-build.toml "$RUNNER_TEMP/pacote"
+      - name: "Artefato: enviar build"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-${{ github.run_id }}-a${{ github.run_attempt }}-r${{ matrix.rep }}
+          path: build-artifact/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  compiled:
+    name: compilado r${{ matrix.rep }}
+    needs: compiled-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        rep: [1, 2, 3]
+    env:
+      E2E_SERVER_MODE: start
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - name: "Artefato: baixar build"
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: build-${{ github.run_id }}-a${{ github.run_attempt }}-r${{ matrix.rep }}
+          path: build-artifact
+      - name: Validar manifesto e extrair
+        run: node scripts/ci/build-manifest.ts verify --dir build-artifact
+      - run: npx playwright install --with-deps chromium
+      - name: Listar testes
+        id: list
+        run: node scripts/ci/e2e-groups.ts verify --list
+      - name: e2e completo (compilado)
+        id: e2e
+        run: |
+          mkdir -p ci-results
+          (vmstat -n 5 > ci-results/vmstat.txt) & echo $! > "$RUNNER_TEMP/vmstat.pid"
+          status=0; npm run test:e2e || status=$?
+          kill "$(cat "$RUNNER_TEMP/vmstat.pid")" || true
+          exit $status
+      - name: Resumo
+        if: ${{ !cancelled() }}
+        env:
+          EXPECTED: ${{ steps.list.outputs.expected_total }}
+        run: node scripts/ci/test-report.ts playwright ci-results/playwright-all.json --suite "compilado-r${{ matrix.rep }}" --expected "$EXPECTED" || true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: comparacao-compilado-r${{ matrix.rep }}
+          path: |
+            ci-results/summary-*.json
+            ci-results/server-ready-*.json
+            ci-results/vmstat.txt
+          retention-days: 7
