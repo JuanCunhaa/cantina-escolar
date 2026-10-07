@@ -80,7 +80,22 @@ jobs:
       - name: Gitleaks no pacote do build
         run: |
           mkdir -p "$RUNNER_TEMP/pacote" && tar -xzf build-artifact/build.tar.gz -C "$RUNNER_TEMP/pacote"
-          "$RUNNER_TEMP/bin/gitleaks" dir --redact --no-banner -v "$RUNNER_TEMP/pacote"
+          "$RUNNER_TEMP/bin/gitleaks" dir --redact --no-banner -v --config scripts/ci/gitleaks-build.toml "$RUNNER_TEMP/pacote"
+      - name: Controle negativo da exceção (segredo injetado numa CÓPIA precisa reprovar)
+        run: |
+          for caso in outro-arquivo mesma-chave-outro-arquivo; do
+            rm -rf "$RUNNER_TEMP/neg" && cp -r "$RUNNER_TEMP/pacote" "$RUNNER_TEMP/neg"
+            if [ "$caso" = outro-arquivo ]; then
+              jq -n --arg v "$(openssl rand -hex 24)" '{apiKey: $v}' > "$RUNNER_TEMP/neg/.next/server/injetado.json"
+            else
+              jq -n --arg v "$(openssl rand -base64 32)" '{encryptionKey: $v}' > "$RUNNER_TEMP/neg/.next/server/outro-manifest.json"
+            fi
+            if "$RUNNER_TEMP/bin/gitleaks" dir --redact --no-banner --config scripts/ci/gitleaks-build.toml "$RUNNER_TEMP/neg"; then
+              echo "::error::controle negativo '$caso' NÃO foi detectado"; exit 1
+            else
+              echo "controle negativo '$caso': detectado (esperado)"
+            fi
+          done
       - name: "Artefato: enviar build"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
