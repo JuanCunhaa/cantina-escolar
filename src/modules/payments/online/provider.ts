@@ -35,10 +35,13 @@ export type ProviderCharge = {
  * Estado NORMALIZADO da order/cobrança no provedor, lido pelo servidor (nunca o que veio na notificação):
  * - `paid`: recebimento confirmado pelo provedor (única base de crédito);
  * - `pending`: ainda a pagar/em análise; `failed`/`expired`: encerrada sem pagamento;
- * - `refunded`/`partially_refunded`/`chargeback`: valor devolvido ou contestado (`reversedCents` acumulado, ≤ total);
+ * - `refunded`/`partially_refunded`: valor devolvido ao pagador (`reversedCents` acumulado, ≤ total);
+ * - `chargeback`: contestação PERDIDA, valor efetivamente debitado pelo provedor (`charged_back/settled`; `reversedCents` = valor
+ *   contestado); `dispute_open`: contestação em andamento (`charged_back/in_process`), AINDA sem perda definitiva; `dispute_won`:
+ *   contestação ganha pelo vendedor (`charged_back/reimbursed`);
  * - `unknown`: status que o adapter não reconhece — NUNCA credita nem muda uma intenção por isso (falha segura).
  */
-export type ProviderOrderState = "pending" | "paid" | "failed" | "expired" | "refunded" | "partially_refunded" | "chargeback" | "unknown";
+export type ProviderOrderState = "pending" | "paid" | "failed" | "expired" | "refunded" | "partially_refunded" | "chargeback" | "dispute_open" | "dispute_won" | "unknown";
 
 export type ProviderOrder = {
   orderId: string;

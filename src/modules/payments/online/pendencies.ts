@@ -36,11 +36,21 @@ export type ReviewItemView = { intentId: string; studentId: string; studentName:
 
 const iso = (value: unknown): string | null => (value instanceof Timestamp ? value.toDate().toISOString() : null);
 
-export async function listPaymentReview(db: Firestore, actor: Actor): Promise<{ pendencies: PendencyView[]; reviews: ReviewItemView[] }> {
+export type DisputeItemView = { intentId: string; studentId: string; studentName: string; amountCents: number; dispute: "open" | "won_after_reversal"; label: string; since: string | null };
+export type OrphanItemView = { eventId: string; orderId: string; reference: string; amountCents: number; receivedAt: string | null };
+
+const DISPUTE_LABEL = {
+  open: "Contestação em andamento no provedor: nada foi retirado da carteira até a decisão",
+  won_after_reversal: "Contestação ganha DEPOIS de a carteira já ter sido debitada: decidir se o valor volta (nenhuma devolução é automática)",
+} as const;
+
+export async function listPaymentReview(db: Firestore, actor: Actor): Promise<{ pendencies: PendencyView[]; reviews: ReviewItemView[]; disputes: DisputeItemView[]; orphans: OrphanItemView[] }> {
   authorize(actor, "payments.review");
-  const [pendencySnap, reviewSnap] = await Promise.all([
+  const [pendencySnap, reviewSnap, disputeSnap, orphanSnap] = await Promise.all([
     db.collection("paymentPendencies").where("status", "==", "open").limit(100).get(),
     db.collection("topupIntents").where("status", "==", "in_review").limit(100).get(),
+    db.collection("topupIntents").where("dispute.status", "in", ["open", "won_after_reversal"]).limit(100).get(),
+    db.collection("paymentEvents").where("outcome", "==", "orphan_payment").limit(50).get(),
   ]);
   const wallets = pendencySnap.docs.length ? await db.getAll(...pendencySnap.docs.map((d) => db.doc(`wallets/${d.get("studentId")}`))) : [];
   const pendencies = pendencySnap.docs
@@ -69,7 +79,17 @@ export async function listPaymentReview(db: Firestore, actor: Actor): Promise<{ 
       return { intentId: x.intentId, studentId: x.studentId, studentName: x.studentName, amountCents: x.amountCents, channel: x.channel, reason, label: REVIEW_LABEL[reason], providerStatus: x.charge?.providerStatus ?? null, createdAt: iso(x.createdAt) };
     })
     .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
-  return { pendencies, reviews };
+  const disputes = disputeSnap.docs
+    .map((d): DisputeItemView => {
+      const x = d.data() as IntentDoc;
+      const status = x.dispute!.status === "won_after_reversal" ? "won_after_reversal" : "open";
+      return { intentId: x.intentId, studentId: x.studentId, studentName: x.studentName, amountCents: x.amountCents, dispute: status, label: DISPUTE_LABEL[status], since: iso(x.dispute!.at) };
+    })
+    .sort((a, b) => (b.since ?? "").localeCompare(a.since ?? ""));
+  const orphans = orphanSnap.docs
+    .map((d): OrphanItemView => ({ eventId: d.id, orderId: String(d.get("orderId") ?? ""), reference: String(d.get("reference") ?? ""), amountCents: Number(d.get("amountCents") ?? 0), receivedAt: iso(d.get("receivedAt")) }))
+    .sort((a, b) => (b.receivedAt ?? "").localeCompare(a.receivedAt ?? ""));
+  return { pendencies, reviews, disputes, orphans };
 }
 
 export const resolvePendencySchema = z

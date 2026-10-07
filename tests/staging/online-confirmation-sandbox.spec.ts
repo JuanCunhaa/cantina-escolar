@@ -181,6 +181,51 @@ test("reembolso REAL no sandbox: lançamento negativo, carteira regularizada, se
   expect(await wallet(request)).toMatchObject({ balanceCents: 0, version: 2 });
 });
 
+test("reembolso PARCIAL REAL acumulado no sandbox (contrato observado): cada parcela vira um lançamento; acima do restante o provedor recusa; o restante fecha como 'revertida'", async ({ request }) => {
+  test.setTimeout(420_000);
+  const intentId = await createPix(request, fam.studentId, 1000);
+  await waitConfirmed(request, intentId);
+  const doc = await intentDoc(intentId);
+  const confirmation = doc?.confirmation as { orderId: string; paymentId: string };
+  const before = await wallet(request);
+
+  const refund = async (label: string, body: unknown) =>
+    fetch(`${MP_API}/v1/orders/${confirmation.orderId}/refund`, { method: "POST", headers: { authorization: `Bearer ${sandboxToken()}`, "content-type": "application/json", "x-idempotency-key": `f19-${label}-${tag}-${intentId.slice(4, 12)}` }, body: JSON.stringify(body) });
+  const reconcileUntil = async (accountedCents: number) =>
+    expect
+      .poll(async () => ((await call(request, fam.guardian, "POST", `/api/topups/online/${intentId}/reconcile`, {})).body.reversal as { accountedCents: number } | null)?.accountedCents ?? 0, { timeout: 120_000, intervals: [5_000] })
+      .toBe(accountedCents);
+
+  // 1ª parcela: R$ 1,00 → order e pagamento `processed/partially_refunded`, `refunded_amount` acumulado.
+  expect((await refund("p1", { transactions: [{ id: confirmation.paymentId, amount: "1.00" }] })).status).toBeLessThan(300);
+  await reconcileUntil(100);
+  expect(await wallet(request)).toMatchObject({ balanceCents: before.balanceCents - 100, pendingReversalCents: 0 });
+  expect((await call(request, fam.guardian, "GET", `/api/topups/online/${intentId}`)).body).toMatchObject({ status: "confirmed", credited: true, reversal: { accountedCents: 100, recoveredCents: 100, pendingCents: 0, cause: "refund" } });
+
+  // 2ª parcela: R$ 2,50 (acumulado R$ 3,50).
+  expect((await refund("p2", { transactions: [{ id: confirmation.paymentId, amount: "2.50" }] })).status).toBeLessThan(300);
+  await reconcileUntil(350);
+  expect(await wallet(request)).toMatchObject({ balanceCents: before.balanceCents - 350 });
+
+  // Acima do restante: o PROVEDOR recusa (400 refund_amount_exceeds) e nada muda aqui.
+  const exceeds = await refund("excede", { transactions: [{ id: confirmation.paymentId, amount: "9.00" }] });
+  expect(exceeds.status).toBe(400);
+  expect(JSON.stringify(await exceeds.json())).toContain("refund_amount_exceeds");
+  await call(request, fam.guardian, "POST", `/api/topups/online/${intentId}/reconcile`, {});
+  expect(await wallet(request)).toMatchObject({ balanceCents: before.balanceCents - 350 });
+
+  // Restante (R$ 6,50) por reembolso total: a recarga fecha como 'revertida'.
+  expect((await refund("resto", {})).status).toBeLessThan(300);
+  await expect
+    .poll(async () => (await call(request, fam.guardian, "POST", `/api/topups/online/${intentId}/reconcile`, {})).body.status, { timeout: 120_000, intervals: [5_000] })
+    .toBe("reversed");
+  expect(await wallet(request)).toMatchObject({ balanceCents: before.balanceCents - 1000, pendingReversalCents: 0 });
+  const entries = (await wallet(request)).entries.map((e) => [e.type, e.amountCents]);
+  expect(entries.slice(0, 3)).toEqual([["topup_reversal", -650], ["topup_reversal", -250], ["topup_reversal", -100]]);
+  expect((await intentDoc(intentId))?.reversal).toMatchObject({ accountedCents: 1000, recoveredCents: 1000, pendingCents: 0 });
+  expect(await ledgerOk(request)).toMatchObject({ balanceCents: before.balanceCents - 1000 });
+});
+
 test("reembolso REAL com o crédito já consumido: recupera o saldo, abre pendência, bloqueia a carteira e a administração regulariza", async ({ request }) => {
   test.setTimeout(420_000);
   const intentId = await createPix(request, fam.studentId, 1000);

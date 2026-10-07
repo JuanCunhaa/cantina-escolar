@@ -95,7 +95,10 @@ export async function confirmFromProvider(db: Firestore, deps: ConfirmDeps, orde
   }
   const intentId = order.externalReference;
   if (!intentId || !INTENT_ID.test(intentId) || (trigger.expectIntentId && trigger.expectIntentId !== intentId)) {
-    if (eventId && eventBase) await recordEventOnly(db, eventId, { ...eventBase, intentId: null, outcome: "unknown_order" });
+    // Dinheiro (ou devolução/contestação) numa order da NOSSA conta cuja referência não é de nenhuma recarga: nada a creditar nem
+    // a revisar numa intenção, mas a administração precisa VER (lista “pagamentos sem recarga”); as demais ficam só no evento.
+    const moneyMoved = ["paid", "refunded", "partially_refunded", "chargeback", "dispute_open", "dispute_won"].includes(order.state);
+    if (eventId && eventBase) await recordEventOnly(db, eventId, { ...eventBase, intentId: null, outcome: moneyMoved ? "orphan_payment" : "unknown_order", reference: (order.externalReference ?? "").slice(0, 60), amountCents: order.paidCents });
     return noResult("unknown_order", "reference_not_ours");
   }
   const ctx: DecisionContext = { accountId, providerId: provider.id };
@@ -132,6 +135,8 @@ async function applyOrder(db: Firestore, a: ApplyArgs): Promise<ConfirmResult> {
       providerId: data.provider.id,
       accountedReversalCents: data.reversal?.accountedCents ?? 0,
       reviewReason: data.review?.reason ?? null,
+      dispute: data.dispute?.status ?? null,
+      reversalCause: data.reversal && data.reversal.accountedCents > 0 ? data.reversal.cause : null,
     };
     let decision: Decision = decide(facts, order, ctx);
     if (decision.kind === "credit" && walletState.balanceCents + data.amountCents > MAX_BALANCE_CENTS) decision = { kind: "review", reason: "balance_limit" };
@@ -192,6 +197,14 @@ async function applyOrder(db: Firestore, a: ApplyArgs): Promise<ConfirmResult> {
         return { outcome: "credited", reason: null, intentId, status: "confirmed", wallet: { studentId: data.studentId, balanceCents: wallet.balanceCents, version: wallet.version } };
       }
 
+      case "dispute": {
+        // Contestação em andamento / ganha: SÓ sinaliza para a administração; nenhum lançamento, nenhuma pendência, nenhum bloqueio.
+        tx.update(intentRef, { dispute: { status: decision.status, at: nowTs }, version, updatedAt: nowTs });
+        event("dispute", decision.status);
+        audit(`${intentId}__v${version}`, "topup.online.dispute", { dispute: decision.status, orderId: order.orderId, providerStatus: order.providerStatus });
+        return noResult("noop", `dispute_${decision.status}`, intentId, data.status);
+      }
+
       case "review": {
         const bind = !data.charge && BINDS_CHARGE.includes(decision.reason);
         tx.update(intentRef, { status: "in_review", review: { reason: decision.reason, at: nowTs }, ...(bind ? { charge } : {}), version, updatedAt: nowTs });
@@ -238,6 +251,7 @@ async function applyOrder(db: Firestore, a: ApplyArgs): Promise<ConfirmResult> {
         tx.set(walletRef, { balanceCents: wallet.balanceCents, version: wallet.version, pendingReversalCents: pendingReversalOf(walletSnap!.data()) + pendingCents, updatedAt: stamp }, { merge: true });
         const fullyReversed = decision.targetCents >= data.amountCents;
         tx.update(intentRef, {
+          ...(decision.cause === "chargeback" ? { dispute: { status: "lost", at: nowTs } } : {}),
           status: fullyReversed ? "reversed" : "confirmed",
           reversal: { accountedCents: decision.targetCents, recoveredCents: prev.recoveredCents + recoveredCents, pendingCents: prev.pendingCents + pendingCents, cause: decision.cause, lastEntryId: recoveredCents > 0 ? entryId : prev.lastEntryId },
           version,

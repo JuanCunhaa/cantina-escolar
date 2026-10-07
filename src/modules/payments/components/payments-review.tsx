@@ -6,11 +6,11 @@ import { api, errorText } from "@/lib/api-client";
 import { formatBRL } from "@/lib/money/format";
 import { useServerQuery } from "@/modules/orders/use-operations";
 import { usePosSubmit } from "@/modules/pos/use-pos";
-import type { PendencyView, ResolveResult, ReviewItemView } from "../online/pendencies";
+import type { DisputeItemView, OrphanItemView, PendencyView, ResolveResult, ReviewItemView } from "../online/pendencies";
 
 export type Message = { kind: "ok" | "error"; text: string };
 export type OpenResolve = { id: string; action: "recover" | "write_off" };
-type Review = { pendencies: PendencyView[]; reviews: ReviewItemView[] };
+type Review = { pendencies: PendencyView[]; reviews: ReviewItemView[]; disputes: DisputeItemView[]; orphans: OrphanItemView[] };
 type Sweep = { checked: number; credited: number; reversals: number; reviews: number; closed: number; unchanged: number; lookupFailed: number; noCharge: number };
 
 const timeFmt = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -64,6 +64,8 @@ export function PaymentsReview({ user }: { user: User }) {
     <PaymentsReviewView
       pendencies={review.data.pendencies}
       reviews={review.data.reviews}
+      disputes={review.data.disputes}
+      orphans={review.data.orphans}
       message={message}
       uncertain={submit.uncertain}
       locked={locked}
@@ -81,6 +83,8 @@ export function PaymentsReview({ user }: { user: User }) {
 export type ReviewViewProps = {
   pendencies: PendencyView[];
   reviews: ReviewItemView[];
+  disputes: DisputeItemView[];
+  orphans: OrphanItemView[];
   message: Message | null;
   uncertain: boolean;
   locked: boolean;
@@ -94,7 +98,7 @@ export type ReviewViewProps = {
 };
 
 /** Parte visual da revisão (sem estado nem rede): testável por renderização. */
-export function PaymentsReviewView({ pendencies, reviews, message, uncertain, locked, sweeping, open, reason, onOpen, onReason, onResolve, onReconcile }: ReviewViewProps) {
+export function PaymentsReviewView({ pendencies, reviews, disputes, orphans, message, uncertain, locked, sweeping, open, reason, onOpen, onReason, onResolve, onReconcile }: ReviewViewProps) {
   return (
     <section>
       <h1>Pagamentos online</h1>
@@ -160,6 +164,28 @@ export function PaymentsReviewView({ pendencies, reviews, message, uncertain, lo
             <button type="button" className="secondary" disabled={locked} onClick={() => onReconcile(r.intentId)}>
               Consultar de novo
             </button>
+          </li>
+        ))}
+      </ul>
+
+      <h2>Contestações (chargeback) para acompanhar ({disputes.length})</h2>
+      {disputes.length === 0 && <p className="muted">Nenhuma contestação aberta.</p>}
+      <ul className="plain-list" data-testid="payments-disputes">
+        {disputes.map((d) => (
+          <li key={d.intentId} data-dispute={d.intentId}>
+            <strong>{d.studentName}</strong> · {formatBRL(d.amountCents)} · {d.label}
+            {d.since && <span className="muted"> · desde {timeFmt.format(new Date(d.since))}</span>}
+          </li>
+        ))}
+      </ul>
+
+      <h2>Pagamentos sem recarga correspondente ({orphans.length})</h2>
+      {orphans.length === 0 && <p className="muted">Nenhum pagamento sem recarga.</p>}
+      <ul className="plain-list" data-testid="payments-orphans">
+        {orphans.map((o) => (
+          <li key={o.eventId} data-orphan={o.orderId}>
+            Order <strong>{o.orderId}</strong> · {formatBRL(o.amountCents)} · referência “{o.reference || "—"}” não pertence a nenhuma recarga: conferir no painel do Mercado Pago
+            {o.receivedAt && <span className="muted"> · {timeFmt.format(new Date(o.receivedAt))}</span>}
           </li>
         ))}
       </ul>

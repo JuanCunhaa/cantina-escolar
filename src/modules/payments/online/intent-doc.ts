@@ -1,5 +1,5 @@
 import type { Timestamp } from "firebase-admin/firestore";
-import type { ReviewReason } from "./confirmation-model";
+import type { DisputeStatus, ReviewReason } from "./confirmation-model";
 import type { Channel, IntentStatus } from "./intent-model";
 import type { PixData } from "./provider";
 
@@ -37,6 +37,8 @@ export type IntentDoc = {
   /** Reversões externas contabilizadas (F19): `accountedCents` = recuperado da carteira + pendente. */
   reversal?: { accountedCents: number; recoveredCents: number; pendingCents: number; cause: "refund" | "chargeback"; lastEntryId: string | null };
   review?: { reason: ReviewReason; at: Timestamp };
+  /** Contestação no provedor (F19): `open` não mexe na carteira; `lost` gerou a reversão; `won_after_reversal` pede decisão humana. */
+  dispute?: { status: DisputeStatus; at: Timestamp };
   /** Taxa do provedor e liquidação: a conta ainda não é consultada (F20); nunca altera o crédito (bruto integral). */
   fee?: { status: "pending"; cents: null; source: "provider" };
   settlement?: { status: "pending"; expectedOn: null; settledOn: null };

@@ -40,7 +40,18 @@ export type IntentFacts = {
   accountedReversalCents: number;
   /** Motivo de revisão já registrado (evita reescrever a mesma revisão). */
   reviewReason: ReviewReason | null;
+  /** Sinal de contestação já registrado na intenção (F19). */
+  dispute: DisputeStatus | null;
+  /** Causa da última reversão contabilizada (reembolso × chargeback perdido). */
+  reversalCause: "refund" | "chargeback" | null;
 };
+
+/**
+ * Contestação (chargeback) no provedor: `open` = em andamento (`charged_back/in_process`), SEM débito; `lost` = perdida
+ * (`settled`, valor debitado — vira reversão); `won` = ganha (`reimbursed`); `won_after_reversal` = o provedor informa que a
+ * contestação foi ganha DEPOIS de já termos debitado a carteira: nenhuma devolução automática, vai para a administração.
+ */
+export type DisputeStatus = "open" | "lost" | "won" | "won_after_reversal";
 
 /**
  * `accountId` (conta das credenciais) e `providerId` vêm da configuração do servidor. Nada vem do corpo da notificação: a
@@ -55,6 +66,7 @@ export type Decision =
   | { kind: "fail"; code: string }
   | { kind: "expire" }
   | { kind: "reverse"; targetCents: number; cause: "refund" | "chargeback" }
+  | { kind: "dispute"; status: DisputeStatus }
   | { kind: "noop"; reason: string };
 
 const noop = (reason: string): Decision => ({ kind: "noop", reason });
@@ -80,7 +92,8 @@ export function amountProblem(intent: IntentFacts, order: ProviderOrder): Review
  * ambiente, order, moeda e valor.
  */
 export function decide(intent: IntentFacts, order: ProviderOrder, ctx: DecisionContext): Decision {
-  if (intent.status === "reversed") return noop("already_reversed");
+  // Revertida: nada mais muda, EXCETO uma contestação ganha depois do débito (a administração precisa saber).
+  if (intent.status === "reversed" && order.state !== "dispute_won") return noop("already_reversed");
   const problem = identityProblem(intent, order, ctx);
 
   switch (order.state) {
@@ -99,6 +112,20 @@ export function decide(intent: IntentFacts, order: ProviderOrder, ctx: DecisionC
     case "expired": {
       if (problem || !OPEN_FOR_FAILURE.includes(intent.status)) return noop("no_transition");
       return order.state === "expired" ? { kind: "expire" } : { kind: "fail", code: "provider_rejected" };
+    }
+    case "dispute_open":
+    case "dispute_won": {
+      if (problem) return noop("identity_mismatch");
+      if (intent.status === "confirmed" || intent.status === "reversed") {
+        if (order.state === "dispute_open") return intent.dispute === "open" || intent.dispute === "lost" || intent.accountedReversalCents > 0 ? noop("dispute_already_known") : { kind: "dispute", status: "open" };
+        // ganha: se já debitamos por perda (chargeback), só a administração decide; senão limpa o sinal
+        const status: DisputeStatus = intent.reversalCause === "chargeback" && intent.accountedReversalCents > 0 ? "won_after_reversal" : "won";
+        return intent.dispute === status ? noop("dispute_already_known") : { kind: "dispute", status };
+      }
+      if (intent.status === "in_review") return noop("in_review");
+      if (!CREDITABLE.includes(intent.status)) return noop("not_creditable");
+      // Pagamento disputado e ainda sem crédito: nenhuma decisão automática (nem crédito nem devolução) — revisão humana.
+      return { kind: "review", reason: "reversal_before_credit" };
     }
     case "refunded":
     case "partially_refunded":

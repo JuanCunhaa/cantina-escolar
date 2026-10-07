@@ -113,7 +113,18 @@ describe("mapeamento da order do Mercado Pago", () => {
     expect(classifyOrder({ status: "failed", status_detail: "failed", transactions: { payments: [{ status: "failed", status_detail: "failed" }] } }, 5000).state).toBe("failed");
     expect(classifyOrder({ status: "expired", status_detail: "expired", transactions: { payments: [{ status: "expired", status_detail: "expired" }] } }, 5000).state).toBe("expired");
     expect(classifyOrder({ status: "refunded", status_detail: "refunded", transactions: { payments: [{ status: "refunded", status_detail: "refunded" }] } }, 5000)).toEqual({ state: "refunded", reversedCents: 5000 });
-    expect(classifyOrder({ status: "processed", status_detail: "charged_back", transactions: { payments: [{ status: "charged_back" }] } }, 5000)).toEqual({ state: "chargeback", reversedCents: 5000 });
+    // Chargeback — contrato oficial da API Orders (docs "Status da transação" e "Notificações de chargeback"; NÃO provado em
+    // integração real, o sandbox não gera chargeback): `charged_back/in_process` = disputa EM ANDAMENTO (sem perda definitiva);
+    // `settled` = perdida (valor da contestação); `reimbursed` = ganha pelo vendedor; detalhe desconhecido = não debita.
+    const cb = (detail: string, chargebacks?: unknown[]) => ({ status: "charged_back", status_detail: detail, transactions: { payments: [{ status: "charged_back", status_detail: detail, amount: "50.00" }], ...(chargebacks ? { chargebacks } : {}) } });
+    expect(classifyOrder(cb("in_process", [{ status: "opened", amount: "50.00" }]), 5000)).toEqual({ state: "dispute_open", reversedCents: 0 });
+    expect(classifyOrder(cb("reimbursed", [{ status: "reimbursed", amount: "50.00" }]), 5000)).toEqual({ state: "dispute_won", reversedCents: 0 });
+    expect(classifyOrder(cb("settled", [{ id: "CBK1", case_id: "123", status: "settled", amount: "50.00" }]), 5000)).toEqual({ state: "chargeback", reversedCents: 5000 });
+    expect(classifyOrder(cb("settled", [{ status: "settled", amount: "20.00" }, { status: "opened", amount: "30.00" }]), 5000)).toEqual({ state: "chargeback", reversedCents: 2000 });
+    expect(classifyOrder(cb("settled", [{ status: "settled", amount: "999.00" }]), 5000)).toEqual({ state: "chargeback", reversedCents: 5000 });
+    expect(classifyOrder(cb("settled"), 5000).state).toBe("unknown"); // perdida sem valor confiável: não debita
+    expect(classifyOrder(cb("settled", [{ status: "settled", amount: "abc" }]), 5000).state).toBe("unknown");
+    expect(classifyOrder(cb("algo_novo", [{ status: "settled", amount: "50.00" }]), 5000).state).toBe("unknown");
     // Reembolso real do sandbox (07/10/2026): order e pagamento "refunded", `refunded_amount` e `transactions.refunds[]`.
     const sandboxRefund = { status: "refunded", status_detail: "refunded", transactions: { payments: [{ status: "refunded", status_detail: "refunded", amount: "50.00", paid_amount: "50.00", refunded_amount: "50.00" }], refunds: [{ id: "REF1", status: "processed", amount: "50.00" }] } };
     expect(classifyOrder(sandboxRefund, 5000)).toEqual({ state: "refunded", reversedCents: 5000 });
@@ -137,7 +148,7 @@ describe("mapeamento da order do Mercado Pago", () => {
 
 describe("decisão de confirmação (A05/A06/A31)", () => {
   const ctx: DecisionContext = { accountId: "3745150346", providerId: "mercadopago" };
-  const facts = (over: Partial<IntentFacts> = {}): IntentFacts => ({ intentId: "tpi_0123456789abcdef0123", status: "awaiting_payment", amountCents: 5000, chargeId: "ORD1", providerId: "mercadopago", accountedReversalCents: 0, reviewReason: null, ...over });
+  const facts = (over: Partial<IntentFacts> = {}): IntentFacts => ({ intentId: "tpi_0123456789abcdef0123", status: "awaiting_payment", amountCents: 5000, chargeId: "ORD1", providerId: "mercadopago", accountedReversalCents: 0, reviewReason: null, dispute: null, reversalCause: null, ...over });
   const order = (over: Partial<ProviderOrder> = {}): ProviderOrder => ({ orderId: "ORD1", externalReference: "tpi_0123456789abcdef0123", accountId: "3745150346", currency: "BRL", totalCents: 5000, paidCents: 5000, state: "paid", providerStatus: "processed/accredited", reversedCents: 0, paymentId: "PAY1", updatedAt: null, ...over });
 
   it("credita só pago + identidade + conta + moeda + valor; vale para pendente, incerta, falha e expirada (A06)", () => {
@@ -188,6 +199,26 @@ describe("decisão de confirmação (A05/A06/A31)", () => {
     expect(decide(facts({ status: "confirmed" }), order({ state: "refunded", reversedCents: 5000 }), { ...ctx, accountId: "999" }).kind).toBe("noop");
   });
 
+  it("contestação: aberta só SINALIZA (nenhum débito); perdida debita; ganha limpa o sinal; ganha depois de debitada vai para a administração", () => {
+    const confirmed = (over: Partial<IntentFacts> = {}) => facts({ status: "confirmed", ...over });
+    expect(decide(confirmed(), order({ state: "dispute_open" }), ctx)).toEqual({ kind: "dispute", status: "open" });
+    expect(decide(confirmed({ dispute: "open" }), order({ state: "dispute_open" }), ctx)).toEqual({ kind: "noop", reason: "dispute_already_known" });
+    // aberta depois de perdida/debitada não regride nada
+    expect(decide(confirmed({ dispute: "lost", accountedReversalCents: 5000, reversalCause: "chargeback" }), order({ state: "dispute_open" }), ctx).kind).toBe("noop");
+    expect(decide(confirmed(), order({ state: "chargeback", reversedCents: 5000 }), ctx)).toEqual({ kind: "reverse", targetCents: 5000, cause: "chargeback" });
+    expect(decide(confirmed({ dispute: "open" }), order({ state: "dispute_won" }), ctx)).toEqual({ kind: "dispute", status: "won" });
+    expect(decide(confirmed({ dispute: "won" }), order({ state: "dispute_won" }), ctx).kind).toBe("noop");
+    // ganha DEPOIS de já termos debitado: nenhuma devolução automática
+    expect(decide(confirmed({ accountedReversalCents: 5000, reversalCause: "chargeback", dispute: "lost" }), order({ state: "dispute_won" }), ctx)).toEqual({ kind: "dispute", status: "won_after_reversal" });
+    expect(decide(confirmed({ accountedReversalCents: 5000, reversalCause: "chargeback", dispute: "won_after_reversal" }), order({ state: "dispute_won" }), ctx).kind).toBe("noop");
+    // pagamento disputado SEM crédito: revisão humana (nem crédito nem devolução); identidade divergente = ignora
+    expect(decide(facts({ status: "awaiting_payment" }), order({ state: "dispute_open" }), ctx)).toEqual({ kind: "review", reason: "reversal_before_credit" });
+    expect(decide(facts({ status: "in_review" }), order({ state: "dispute_won" }), ctx).kind).toBe("noop");
+    expect(decide(confirmed(), order({ state: "dispute_open", accountId: "999" }), ctx).kind).toBe("noop");
+    // reembolso (não chargeback) debitado não conta como 'perdida'
+    expect(decide(confirmed({ accountedReversalCents: 2000, reversalCause: "refund" }), order({ state: "dispute_won" }), ctx)).toEqual({ kind: "dispute", status: "won" });
+  });
+
   it("reembolso/chargeback ANTES do crédito: total = sem crédito; parcial ou chargeback = revisão humana", () => {
     expect(decide(facts({ status: "awaiting_payment" }), order({ state: "refunded", reversedCents: 5000 }), ctx)).toEqual({ kind: "fail", code: "refunded_before_credit" });
     expect(decide(facts({ status: "awaiting_payment" }), order({ state: "partially_refunded", reversedCents: 1000 }), ctx)).toEqual({ kind: "review", reason: "reversal_before_credit" });
@@ -210,5 +241,17 @@ describe("decisão de confirmação (A05/A06/A31)", () => {
       expect(r.recoveredCents).toBeLessThanOrEqual(balance);
       expect(r.pendingCents).toBeGreaterThanOrEqual(0);
     }
+  });
+});
+
+describe("contestação ganha depois de a recarga ser totalmente revertida", () => {
+  it("vai para a administração (nenhum crédito automático) mesmo com a intenção 'revertida'", () => {
+    const f: IntentFacts = { intentId: "tpi_0123456789abcdef0123", status: "reversed", amountCents: 5000, chargeId: "ORD1", providerId: "mercadopago", accountedReversalCents: 5000, reviewReason: null, dispute: "lost", reversalCause: "chargeback" };
+    const won = { orderId: "ORD1", externalReference: "tpi_0123456789abcdef0123", accountId: "3745150346", currency: "BRL", totalCents: 5000, paidCents: 5000, state: "dispute_won", providerStatus: "charged_back/reimbursed", reversedCents: 0, paymentId: "P", updatedAt: null } as const;
+    const c = { accountId: "3745150346", providerId: "mercadopago" };
+    expect(decide(f, won, c)).toEqual({ kind: "dispute", status: "won_after_reversal" });
+    expect(decide({ ...f, dispute: "won_after_reversal" }, won, c).kind).toBe("noop");
+    expect(decide(f, { ...won, state: "dispute_open" }, c).kind).toBe("noop");
+    expect(decide(f, { ...won, state: "paid" }, c).kind).toBe("noop");
   });
 });

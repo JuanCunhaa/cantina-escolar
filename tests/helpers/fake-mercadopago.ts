@@ -99,7 +99,11 @@ export function fakeMercadoPago(options: { accountId?: string } = {}) {
     expire: (intentId: string) => patch(intentId, { state: "expired", providerStatus: "expired/expired" }),
     pending: (intentId: string) => patch(intentId, { state: "pending", paidCents: 0, providerStatus: "action_required/waiting_transfer" }),
     refund: (intentId: string, cents?: number) => patch(intentId, { state: "refunded", providerStatus: "refunded/refunded", reversedCents: cents ?? orders.get(orderIdOf(intentId))!.totalCents }),
-    chargeback: (intentId: string) => patch(intentId, { state: "chargeback", providerStatus: "processed/charged_back", reversedCents: orders.get(orderIdOf(intentId))!.totalCents }),
+    /** Contestação PERDIDA (`charged_back/settled`): valor efetivamente debitado pelo provedor. */
+    chargeback: (intentId: string, cents?: number) => patch(intentId, { state: "chargeback", providerStatus: "charged_back/settled", reversedCents: cents ?? orders.get(orderIdOf(intentId))!.totalCents }),
+    /** Contestação em andamento (`charged_back/in_process`) e ganha (`charged_back/reimbursed`): sem perda definitiva. */
+    disputeOpen: (intentId: string) => patch(intentId, { state: "dispute_open", providerStatus: "charged_back/in_process", reversedCents: 0 }),
+    disputeWon: (intentId: string) => patch(intentId, { state: "dispute_won", providerStatus: "charged_back/reimbursed", reversedCents: 0 }),
     unknownStatus: (intentId: string) => patch(intentId, { state: "unknown", providerStatus: "novo/novo" }),
     set: patch,
     /** Uma order de OUTRA cobrança com o mesmo `external_reference` (duplicidade/forjada): nunca deve creditar. */

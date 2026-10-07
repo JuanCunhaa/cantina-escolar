@@ -161,7 +161,21 @@ export function classifyOrder(order: Json, totalCents: number): { state: Provide
   const text = [order.status, order.status_detail, payment?.status, payment?.status_detail].map((v) => String(v ?? "").toLowerCase());
   const status = text[0]!;
   if (!payment) return { state: "unknown", reversedCents: 0 };
-  if (text.some((t) => /charged?_?back|chargeback/.test(t))) return { state: "chargeback", reversedCents: totalCents };
+  if (text.some((t) => /charged?_?back/.test(t))) {
+    // Contrato oficial (Orders, "Status da transação" e "Notificações de chargeback"): `charged_back` + `in_process` = disputa
+    // em andamento (sem perda definitiva); `settled` = perdida, valor devolvido ao comprador; `reimbursed` = ganha pelo vendedor.
+    // Qualquer outro detalhe = desconhecido (nunca debita).
+    const detail = [order.status_detail, payment?.status_detail].map((v) => String(v ?? "").toLowerCase());
+    if (detail.includes("in_process")) return { state: "dispute_open", reversedCents: 0 };
+    if (detail.includes("reimbursed")) return { state: "dispute_won", reversedCents: 0 };
+    if (detail.includes("settled")) {
+      const settled = ((transactions?.chargebacks as Json[] | undefined) ?? []).filter((c) => String(c.status).toLowerCase() === "settled").map((c) => toCents(c.amount));
+      const lost = settled.length > 0 && settled.every((v) => v !== null) ? (settled as number[]).reduce((n, v) => n + v, 0) : null;
+      if (lost === null || lost <= 0) return { state: "unknown", reversedCents: 0 }; // perdida sem valor confiável: não debita
+      return { state: "chargeback", reversedCents: Math.min(lost, totalCents) };
+    }
+    return { state: "unknown", reversedCents: 0 };
+  }
   if (text.some((t) => t.includes("refund"))) {
     // Valor devolvido REAL (sandbox 07/10/2026: `payments[].refunded_amount`; `transactions.refunds[]` com status `processed`).
     const direct = toCents(payment.refunded_amount);

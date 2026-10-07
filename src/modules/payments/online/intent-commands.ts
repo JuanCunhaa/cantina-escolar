@@ -66,6 +66,8 @@ export type IntentView = {
   review: { reason: ReviewReason; label: string } | null;
   /** Pagamento ainda sem desfecho (Pix aguardando / cartão em análise): a tela consulta o servidor até decidir. */
   awaitingConfirmation: boolean;
+  /** Contestação (chargeback) em andamento no provedor: nada foi retirado da carteira até a decisão. */
+  contested: boolean;
 };
 
 const FAILURE_MESSAGE: Record<string, string> = {
@@ -101,6 +103,7 @@ export function intentView(data: IntentDoc, now: Date): IntentView {
     reversal: data.reversal && data.reversal.accountedCents > 0 ? { accountedCents: data.reversal.accountedCents, recoveredCents: data.reversal.recoveredCents, pendingCents: data.reversal.pendingCents, cause: data.reversal.cause } : null,
     review: data.status === "in_review" && data.review ? { reason: data.review.reason, label: REVIEW_LABEL[data.review.reason] } : null,
     awaitingConfirmation: data.status === "awaiting_payment" || data.status === "processing",
+    contested: data.dispute?.status === "open",
   };
 }
 

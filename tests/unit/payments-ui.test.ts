@@ -36,6 +36,7 @@ function intent(over: Partial<IntentView> = {}): IntentView {
     reversal: null,
     review: null,
     awaitingConfirmation: status === "awaiting_payment" || status === "processing",
+    contested: false,
     ...over,
   };
 }
@@ -96,6 +97,14 @@ describe("recarga online: processamento × crédito lançado", () => {
     expect(render(intent({ ...base, reversal: null }))).toContain("saiu da carteira");
   });
 
+  it("contestação em andamento: avisa que nada foi retirado da carteira até a decisão", () => {
+    const credit = { amountCents: 5000, walletEntryId: "x_credit", walletSeq: 1, balanceAfterCents: 5000, confirmedAt: "2026-10-07T15:10:00.000Z", afterExpiry: false };
+    const open = render(intent({ status: "confirmed", credited: true, credit, awaitingConfirmation: false, contested: true }));
+    expect(open).toContain("em contestação (chargeback)");
+    expect(open).toContain("Nada foi retirado da carteira até a decisão");
+    expect(render(intent({ status: "confirmed", credited: true, credit, awaitingConfirmation: false }))).not.toContain("contestação");
+  });
+
   it("em revisão: deixa claro que NENHUM crédito foi lançado e o motivo", () => {
     const html = render(intent({ status: "in_review", awaitingConfirmation: false, review: { reason: "amount_mismatch", label: "Valor pago diferente do valor da recarga" } }));
     expect(html).toContain("Valor pago diferente do valor da recarga");
@@ -125,6 +134,8 @@ describe("revisão administrativa dos pagamentos online", () => {
   const props = (over: Partial<ReviewViewProps> = {}): ReviewViewProps => ({
     pendencies: [pendency],
     reviews: [review],
+    disputes: [],
+    orphans: [],
     message: null,
     uncertain: false,
     locked: false,
@@ -161,6 +172,20 @@ describe("revisão administrativa dos pagamentos online", () => {
     expect(writeOff).toContain("A escola absorve");
     expect(writeOff).toContain("não há lançamento no livro");
     expect(html({ open: { id: "outra", action: "recover" } })).not.toContain("payments-resolve");
+  });
+
+  it("contestações abertas e pagamentos sem recarga aparecem para a administração, sem ação automática", () => {
+    const dispute = { intentId: "tpi_d", studentId: "stu_3", studentName: "Caio Teste", amountCents: 5000, dispute: "open" as const, label: "Contestação em andamento no provedor: nada foi retirado da carteira até a decisão", since: "2026-10-07T13:00:00.000Z" };
+    const orphan = { eventId: "pev_1", orderId: "ORDTST01ABC", reference: "pedido-de-outro-sistema", amountCents: 1234, receivedAt: "2026-10-07T12:00:00.000Z" };
+    const out = html({ disputes: [dispute, { ...dispute, intentId: "tpi_e", dispute: "won_after_reversal" as const, label: "Contestação ganha DEPOIS de a carteira já ter sido debitada" }], orphans: [orphan] });
+    expect(out).toContain("Contestações (chargeback) para acompanhar (2)");
+    expect(out).toContain("nada foi retirado da carteira até a decisão");
+    expect(out).toContain("ganha DEPOIS de a carteira já ter sido debitada");
+    expect(out).toContain("Pagamentos sem recarga correspondente (1)");
+    expect(out).toContain("pedido-de-outro-sistema");
+    expect(out).toContain("conferir no painel do Mercado Pago");
+    expect(html()).toContain("Nenhuma contestação aberta.");
+    expect(html()).toContain("Nenhum pagamento sem recarga.");
   });
 
   it("estado vazio, mensagens, resposta perdida e bloqueio de botões durante o envio", () => {

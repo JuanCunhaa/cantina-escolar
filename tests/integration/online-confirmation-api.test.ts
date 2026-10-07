@@ -957,3 +957,116 @@ describe("outros caminhos: cartão, conciliação manual, erros e acúmulo de pe
     expect(await entriesOf(student)).toHaveLength(1);
   });
 });
+
+/* ------------------------------------------------------------------------------------------------- contestações */
+
+describe("contestação (chargeback): em andamento ≠ perdida; pagamento sem recarga fica visível", () => {
+  type Review = { disputes: { intentId: string; dispute: string }[]; orphans: { orderId: string; reference: string; amountCents: number }[] };
+  const reviewList = async () => (await call(listRoute, admin, "GET", "/api/admin/payments")).body as unknown as Review;
+
+  it("contestação ABERTA não debita, não abre pendência nem bloqueia; fica visível; repetir não cria versões; a família é avisada", async () => {
+    const student = await newStudent();
+    const p = fakeMercadoPago();
+    const intent = await credited(p, student);
+    p.disputeOpen(intent);
+    expect(await notify(p, intent, { action: "order.charged_back", version: 80 })).toMatchObject({ status: 200, body: { outcome: "noop" } });
+    expect(await walletOf(student)).toEqual({ balance: 5000, version: 1, pending: 0 });
+    expect((await db().doc(`paymentPendencies/${intent}`).get()).exists).toBe(false);
+    const doc = await intentDoc(intent);
+    expect(doc).toMatchObject({ status: "confirmed", dispute: { status: "open" }, reversal: { accountedCents: 0 } });
+    const version = doc.version as number;
+    await notify(p, intent, { action: "order.charged_back", version: 81 });
+    expect((await intentDoc(intent)).version).toBe(version);
+    expect(await intents.getTopupIntent(db(), actor(guardianA), intent)).toMatchObject({ status: "confirmed", credited: true, contested: true });
+    expect((await reviewList()).disputes).toEqual(expect.arrayContaining([expect.objectContaining({ intentId: intent, dispute: "open" })]));
+    // a carteira continua livre para gastar
+    const other = await newStudent();
+    await walletCommands.transferBetweenWallets(db(), actor(guardianA), { key: randomUUID(), fromStudentId: student, toStudentId: other, amountCents: 100, reason: "Gasto durante a disputa" });
+    await ledgerOk(student);
+  });
+
+  it("contestação aberta e depois PERDIDA (settled): só então debita, até o saldo, com pendência do restante; 'aberta' tardia não regride", async () => {
+    const student = await newStudent();
+    const other = await newStudent();
+    const p = fakeMercadoPago();
+    const intent = await credited(p, student);
+    p.disputeOpen(intent);
+    await notify(p, intent, { action: "order.charged_back", version: 90 });
+    await walletCommands.transferBetweenWallets(db(), actor(guardianA), { key: randomUUID(), fromStudentId: student, toStudentId: other, amountCents: 3800, reason: "Consumo durante a disputa" });
+    p.chargeback(intent);
+    expect((await notify(p, intent, { action: "order.charged_back", version: 91 })).body.outcome).toBe("reversal_applied");
+    expect(await walletOf(student)).toEqual({ balance: 0, version: 3, pending: 3800 });
+    expect(await intentDoc(intent)).toMatchObject({ status: "reversed", dispute: { status: "lost" }, reversal: { accountedCents: 5000, recoveredCents: 1200, pendingCents: 3800, cause: "chargeback" } });
+    // notificação atrasada de 'em andamento' depois de perdida: nada muda
+    p.disputeOpen(intent);
+    await notify(p, intent, { action: "order.charged_back", version: 92 });
+    expect(await walletOf(student)).toEqual({ balance: 0, version: 3, pending: 3800 });
+    expect((await intentDoc(intent)).dispute).toMatchObject({ status: "lost" });
+    await ledgerOk(student);
+  });
+
+  it("contestação PERDIDA parcial usa o valor contestado (não o total) e mantém a recarga confirmada", async () => {
+    const student = await newStudent();
+    const p = fakeMercadoPago();
+    const intent = await credited(p, student);
+    p.chargeback(intent, 2000);
+    expect((await notify(p, intent, { action: "order.charged_back", version: 95 })).body.outcome).toBe("reversal_applied");
+    expect(await walletOf(student)).toEqual({ balance: 3000, version: 2, pending: 0 });
+    expect(await intentDoc(intent)).toMatchObject({ status: "confirmed", reversal: { accountedCents: 2000, cause: "chargeback" } });
+  });
+
+  it("contestação GANHA (reimbursed): limpa o sinal sem tocar na carteira; ganha DEPOIS de debitada vai para a administração sem devolução automática", async () => {
+    const student = await newStudent();
+    const p = fakeMercadoPago();
+    const intent = await credited(p, student);
+    p.disputeOpen(intent);
+    await notify(p, intent, { action: "order.charged_back", version: 100 });
+    p.disputeWon(intent);
+    await notify(p, intent, { action: "order.charged_back", version: 101 });
+    expect(await walletOf(student)).toEqual({ balance: 5000, version: 1, pending: 0 });
+    expect((await intentDoc(intent)).dispute).toMatchObject({ status: "won" });
+    expect((await reviewList()).disputes.some((d) => d.intentId === intent)).toBe(false);
+    expect(await intents.getTopupIntent(db(), actor(guardianA), intent)).toMatchObject({ contested: false });
+
+    const s2 = await newStudent();
+    const p2 = fakeMercadoPago();
+    const i2 = await credited(p2, s2);
+    p2.chargeback(i2);
+    await notify(p2, i2, { action: "order.charged_back", version: 110 });
+    expect(await walletOf(s2)).toMatchObject({ balance: 0, pending: 0 });
+    p2.disputeWon(i2);
+    expect((await notify(p2, i2, { action: "order.charged_back", version: 111 })).body.outcome).toBe("noop");
+    expect((await intentDoc(i2)).dispute).toMatchObject({ status: "won_after_reversal" });
+    expect(await walletOf(s2)).toMatchObject({ balance: 0, pending: 0 }); // nenhum crédito automático de volta
+    expect((await entriesOf(s2)).map((e) => e.type)).toEqual(["topup", "topup_reversal"]);
+    expect((await reviewList()).disputes).toEqual(expect.arrayContaining([expect.objectContaining({ intentId: i2, dispute: "won_after_reversal" })]));
+    await ledgerOk(s2);
+  });
+
+  it("pagamento disputado SEM crédito: revisão humana (nem crédito nem devolução automática)", async () => {
+    const student = await newStudent();
+    const p = fakeMercadoPago();
+    const intent = await newIntent(p, student);
+    p.disputeOpen(intent);
+    expect((await notify(p, intent, { action: "order.charged_back", version: 120 })).body.outcome).toBe("review");
+    await untouched(student);
+    expect((await intentDoc(intent)).review).toMatchObject({ reason: "reversal_before_credit" });
+  });
+
+  it("pagamento PAGO numa order da nossa conta cuja referência não é de nenhuma recarga fica visível para a administração; order pendente de outro sistema, não", async () => {
+    const student = await newStudent();
+    const p = fakeMercadoPago();
+    const intent = await newIntent(p, student);
+    const base = p.orders.get(p.orderIdOf(intent))!;
+    const paidId = `ORDORFA${randomUUID().slice(0, 8).toUpperCase()}`;
+    const pendingId = `ORDPEND${randomUUID().slice(0, 8).toUpperCase()}`;
+    p.orders.set(paidId, { ...base, orderId: paidId, externalReference: "venda-externa-123", state: "paid", paidCents: 777, totalCents: 777 });
+    p.orders.set(pendingId, { ...base, orderId: pendingId, externalReference: "venda-externa-456", state: "pending" });
+    expect(await notify(p, paidId)).toMatchObject({ status: 200, body: { outcome: "unknown_order" } });
+    expect(await notify(p, pendingId)).toMatchObject({ status: 200, body: { outcome: "unknown_order" } });
+    const list = await reviewList();
+    expect(list.orphans).toEqual(expect.arrayContaining([expect.objectContaining({ orderId: paidId, reference: "venda-externa-123", amountCents: 777 })]));
+    expect(list.orphans.some((o) => o.orderId === pendingId)).toBe(false);
+    await untouched(student);
+  });
+});

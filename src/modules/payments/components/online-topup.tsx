@@ -386,6 +386,11 @@ export function IntentPanel({ intent, checking, copied, onCopy, onReconcile, wal
           </p>
           {intent.credit.afterExpiry && <p className="muted">O pagamento chegou depois da validade (ou da falha registrada) e foi creditado mesmo assim, uma única vez.</p>}
           {intent.reversal && <p role="status">Parte do pagamento foi devolvida: {formatBRL(intent.reversal.accountedCents)}.</p>}
+          {intent.contested && (
+            <p role="status" data-testid="topup-contested">
+              Este pagamento está em contestação (chargeback) no provedor. Nada foi retirado da carteira até a decisão; a escola acompanha.
+            </p>
+          )}
         </div>
       )}
       {status === "reversed" && (
