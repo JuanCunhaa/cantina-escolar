@@ -247,3 +247,119 @@ jobs:
           expect_fail "Veracode SCA" SRCCLR_API_TOKEN VERACODE_REGION=commercial
           expect_fail "SonarQube Cloud" SONAR_TOKEN SONAR_ORGANIZATION SONAR_PROJECT_KEY
           node scripts/ci/require-config.ts "Semgrep AppSec" SEMGREP_APP_TOKEN
+  # P4: Veracode com credenciais — os MESMOS scripts do ci.yml; pacote real e pacote com arquivo semeado (só no ZIP).
+  p4-veracode:
+    needs: changes
+    if: contains(github.event.head_commit.message, '[p4]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Pipeline Scan — pacote real
+        env:
+          VERACODE_API_ID: ${{ secrets.VERACODE_API_ID }}
+          VERACODE_API_KEY: ${{ secrets.VERACODE_API_KEY }}
+          VERACODE_REGION: ${{ vars.VERACODE_REGION }}
+          VERACODE_OUT: veracode-real
+        run: bash scripts/ci/veracode-sast.sh
+      - name: Pipeline Scan — pacote com vulnerabilidade semeada (só no ZIP)
+        if: ${{ !cancelled() }}
+        env:
+          VERACODE_API_ID: ${{ secrets.VERACODE_API_ID }}
+          VERACODE_API_KEY: ${{ secrets.VERACODE_API_KEY }}
+          VERACODE_REGION: ${{ vars.VERACODE_REGION }}
+          VERACODE_OUT: veracode-seed
+        run: |
+          seed="$RUNNER_TEMP/seed/src/app/api/probe-semeado"
+          mkdir -p "$seed"
+          cat > "$seed/route.ts" <<'TS'
+          import { exec } from "node:child_process";
+          import type { NextRequest } from "next/server";
+
+          type Comando = { cmd: string; expr: string };
+
+          export async function GET(request: NextRequest) {
+            const params = request.nextUrl.searchParams;
+            const entrada = { cmd: params.get("cmd") ?? "", expr: params.get("expr") ?? "0" } satisfies Comando;
+            exec(entrada.cmd);
+            return new Response(String(eval(entrada.expr)));
+          }
+          TS
+          VERACODE_SEED_DIR="$RUNNER_TEMP/seed" bash scripts/ci/veracode-sast.sh || true
+          node -e '
+            const r = require("./veracode-seed/results.json");
+            const hits = (r.findings || []).filter((f) => JSON.stringify(f.files || {}).includes("probe-semeado"));
+            console.log("achados no arquivo semeado:", JSON.stringify(hits.map((f) => ({ sev: f.severity, cwe: f.cwe_id, title: f.title || f.issue_type }))));
+            if (!hits.length) { console.log("::error::vulnerabilidade semeada NÃO detectada"); process.exit(1); }
+          '
+      - name: SCA — agente, --no-upload
+        if: ${{ !cancelled() }}
+        env:
+          SRCCLR_API_TOKEN: ${{ secrets.SRCCLR_API_TOKEN }}
+          VERACODE_REGION: ${{ vars.VERACODE_REGION }}
+          VERACODE_OUT: veracode-sca
+        run: bash scripts/ci/veracode-sca.sh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: p4-veracode-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            veracode-real/*.json
+            veracode-seed/*.json
+            veracode-sca/*.json
+            ci-results/veracode-*.json
+          retention-days: 7
+
+  # P5: análise INICIAL da main no SonarQube Cloud (referência para os PRs). A main ainda não tem a instrumentação de
+  # cobertura (vem neste PR), então esta análise é SEM cobertura — registrado; as próximas análises da main terão LCOV real.
+  p5-sonar-main:
+    needs: changes
+    if: contains(github.event.head_commit.message, '[p5main]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/ci
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          path: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Configuração do SonarQube Cloud
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+        run: node scripts/ci/require-config.ts "SonarQube Cloud" SONAR_TOKEN SONAR_ORGANIZATION SONAR_PROJECT_KEY
+      - name: SonarQube Cloud — main (sem cobertura)
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          projectBaseDir: main
+          args: >
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
+            -Dsonar.branch.name=main
+            -Dsonar.sources=src,scripts
+            -Dsonar.exclusions=**/*.d.ts
+            -Dsonar.tests=tests
+            -Dsonar.test.inclusions=tests/**/*.ts,tests/**/*.tsx
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=600
+      - name: Resultado efetivo do Quality Gate
+        if: ${{ !cancelled() }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: node scripts/ci/sonar-gate.ts main/.scannerwork/report-task.txt
