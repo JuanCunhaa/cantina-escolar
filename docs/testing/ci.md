@@ -21,7 +21,7 @@ changes ─┬─ fast ──────────────┬─ quality 
 | `e2e (g1/g2)` | cada grupo com emuladores, servidor, dados e armazenamento próprios; usa o build compartilhado | divide a etapa mais longa |
 | `security` | Gitleaks, `npm audit` (produção), Semgrep registry, Veracode Pipeline Scan e SCA | independente do código compilado |
 | `semgrep-appsec` | Semgrep AppSec (transitório até o Veracode ser validado) | precisa do token git só neste job |
-| `quality` | LCOV unit+integração mesclado → SonarQube Cloud → Quality Gate efetivo | depende das coberturas |
+| `quality` | LCOV unit+integração mesclado → SonarQube Cloud → Quality Gate efetivo sem condições de segurança | depende das coberturas |
 | `check` | gate final (nome preservado) | sempre roda e decide |
 
 `needs` só onde há dependência real. Integração, Rules e scanners usam o fonte/manifestos, nunca o bundle do Next.
@@ -105,8 +105,12 @@ proteção de branch (docs/status/ci-baseline.md); exigir o `check` depende de c
 Fonte original (`src`, `scripts`), testes à parte (`tests`), `.d.ts` excluídos, cobertura LCOV real mesclada de **unit +
 integração** (`scripts/ci/lcov-merge.ts`: uma entrada por linha/ramo/função, contagens somadas, só arquivos instrumentados).
 **Rules não entra** (exercita `firestore.rules` no emulador, sem código de `src/`); **e2e não entra** (servidor em outro
-processo, sem instrumentação). O scanner **envia o código-fonte** ao SonarQube Cloud. `sonar.qualitygate.wait=true` e
-`scripts/ci/sonar-gate.ts` confirmam o status efetivo do gate (Sonar way, o disponível no plano) depois do processamento.
+processo, sem instrumentação). O scanner **envia o código-fonte** ao SonarQube Cloud. `scripts/ci/sonar-gate.ts`
+espera o processamento e decide o gate (Sonar way, o disponível no plano) **sem as condições de segurança**
+(vulnerabilidades, hotspots, ratings de segurança): o Sonar não é gate de segurança (decisão do dono, 07/10/2026; segurança
+fica no job `security` — Gitleaks, Veracode). Essas condições aparecem no resumo como informativas. Aprova só com ao menos
+uma condição fora de segurança e todas OK. O check "SonarCloud Code Analysis" que o próprio serviço publica no PR segue o
+gate do serviço (com segurança) e não é o gate do CI: não exigi-lo na proteção de branch.
 Análise automática do serviço deve ficar desligada.
 
 ## FinOps (`ci-metrics`)

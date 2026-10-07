@@ -1,12 +1,29 @@
 // Confere o resultado EFETIVO do Quality Gate no SonarQube Cloud depois do processamento (não basta o envio do relatório).
-// Lê report-task.txt, espera a tarefa de processamento e consulta o status do gate DA ANÁLISE. Status diferente de OK
-// (inclusive NONE, quando não há condição avaliada) reprova: análise sem gate efetivo não vira aprovação.
+// Lê report-task.txt, espera a tarefa de processamento e consulta o status do gate DA ANÁLISE. O Sonar NÃO é gate de
+// segurança (decisão do dono; segurança é o job `security`): condições de segurança (vulnerabilidades, hotspots, ratings
+// de segurança) são só informativas. Aprova quando há ao menos uma condição fora de segurança e todas estão OK; NONE,
+// gate ausente ou só condições de segurança reprovam: análise sem gate efetivo não vira aprovação.
 // Uso: SONAR_TOKEN=... node scripts/ci/sonar-gate.ts .scannerwork/report-task.txt
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { basename, relative, resolve } from "node:path";
 
 /** Destino fixo: só SonarQube Cloud. O serverUrl do relatório é conferido, nunca usado como destino. */
 export const SONAR_URL = "https://sonarcloud.io";
+
+/** Métricas de segurança do Sonar (modelos clássico e MQR): `security_rating`, `new_vulnerabilities`, `new_security_hotspots_reviewed`, `software_quality_security_rating`... */
+export function isSecurityMetric(metricKey: string): boolean {
+  return /(^|_)(security|vulnerabilities)(_|$)/.test(metricKey);
+}
+
+type Condition = { status: string; metricKey: string; actualValue?: string; comparator?: string; errorThreshold?: string };
+
+/** Status efetivo do gate sem as condições de segurança. */
+export function effectiveStatus(serviceStatus: string, conditions: Condition[]): string {
+  if (serviceStatus === "NONE" || serviceStatus === "AUSENTE") return serviceStatus;
+  const quality = conditions.filter((c) => !isSecurityMetric(c.metricKey));
+  if (quality.length === 0) return "NONE";
+  return quality.every((c) => c.status === "OK") ? "OK" : "ERROR";
+}
 
 export function parseReportTask(text: string): Record<string, string> {
   return Object.fromEntries(
@@ -56,12 +73,15 @@ export async function checkGate(file: string, token: string, env: Record<string,
   }
   if (!analysisId) throw new Error("processamento da análise não terminou no prazo");
   const gate = (await get("/api/qualitygates/project_status", { analysisId })) as {
-    projectStatus?: { status?: string; conditions?: { status: string; metricKey: string; actualValue?: string; comparator?: string; errorThreshold?: string }[] };
+    projectStatus?: { status?: string; conditions?: Condition[] };
   };
-  const status = gate.projectStatus?.status ?? "AUSENTE";
+  const serviceStatus = gate.projectStatus?.status ?? "AUSENTE";
   const conditions = gate.projectStatus?.conditions ?? [];
-  const note = status === "NONE" ? "\n\nNenhuma condição avaliada (ex.: 1ª análise sem código novo): não conta como aprovação.\n" : "";
-  const markdown = `### ${status === "OK" ? "✅" : "❌"} SonarQube Cloud — Quality Gate: ${status}\n\n${conditions.map((c) => `- ${c.status} ${c.metricKey}: ${c.actualValue ?? "—"} (${c.comparator ?? ""} ${c.errorThreshold ?? ""})`).join("\n")}${note}\n\nPainel: ${task.dashboardUrl ?? "—"}\n`;
+  const status = effectiveStatus(serviceStatus, conditions);
+  const note = status === "NONE" ? "\n\nNenhuma condição fora de segurança avaliada (ex.: 1ª análise sem código novo): não conta como aprovação.\n" : "";
+  const line = (c: Condition) =>
+    `- ${c.status} ${c.metricKey}: ${c.actualValue ?? "—"} (${c.comparator ?? ""} ${c.errorThreshold ?? ""})${isSecurityMetric(c.metricKey) ? " — informativo (segurança é o job security)" : ""}`;
+  const markdown = `### ${status === "OK" ? "✅" : "❌"} SonarQube Cloud — Quality Gate sem segurança: ${status} (serviço: ${serviceStatus})\n\n${conditions.map(line).join("\n")}${note}\n\nPainel: ${task.dashboardUrl ?? "—"}\n`;
   if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, markdown);
   return { status, markdown };
 }

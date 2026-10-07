@@ -441,7 +441,9 @@ jobs:
           SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
           SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
         run: node scripts/ci/require-config.ts "SonarQube Cloud" SONAR_TOKEN SONAR_ORGANIZATION SONAR_PROJECT_KEY
-      - name: SonarQube Cloud (análise + espera do Quality Gate)
+      # Sem sonar.qualitygate.wait: o scanner reprovaria também por condições de segurança. O gate é decidido no passo
+      # seguinte, que ignora as condições de segurança (Sonar não é gate de segurança; segurança é o job `security`).
+      - name: SonarQube Cloud (análise)
         uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -449,9 +451,7 @@ jobs:
           args: >
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
             -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
-            -Dsonar.qualitygate.wait=true
-            -Dsonar.qualitygate.timeout=600
-      - name: Resultado efetivo do Quality Gate
+      - name: Quality Gate sem condições de segurança
         if: ${{ !cancelled() }}
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

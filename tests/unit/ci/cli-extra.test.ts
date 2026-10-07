@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { main as buildMain } from "../../../scripts/ci/build-manifest.ts";
 import { extractFailures, status } from "../../../scripts/ci/ci-status.ts";
-import { checkGate, main as sonarMain, parseReportTask, safeReportPath, SONAR_URL } from "../../../scripts/ci/sonar-gate.ts";
+import { checkGate, effectiveStatus, isSecurityMetric, main as sonarMain, parseReportTask, safeReportPath, SONAR_URL } from "../../../scripts/ci/sonar-gate.ts";
 import { serverArgs, startServer } from "../../../scripts/ci/timed-server.ts";
 import { E2E_BUILD_ENV } from "../../helpers/e2e-env.ts";
 
@@ -30,7 +30,7 @@ describe("Quality Gate efetivo do SonarQube Cloud", () => {
       const url = new URL(String(input));
       urls.push(url.toString());
       if (url.pathname === "/api/ce/task") return { ok: true, json: async () => ({ task: { status: taskStatuses[Math.min(i++, taskStatuses.length - 1)], analysisId: "an-1", errorMessage: "erro" } }) } as Response;
-      return { ok: true, json: async () => ({ projectStatus: { status: gate, conditions: [{ status: "ERROR", metricKey: "new_coverage", actualValue: "43.6", comparator: "LT", errorThreshold: "80" }] } }) } as Response;
+      return { ok: true, json: async () => ({ projectStatus: { status: gate, conditions: [{ status: gate === "OK" ? "OK" : "ERROR", metricKey: "new_coverage", actualValue: "43.6", comparator: "LT", errorThreshold: "80" }] } }) } as Response;
     }) as typeof fetch;
     return { impl, urls };
   };
@@ -49,6 +49,34 @@ describe("Quality Gate efetivo do SonarQube Cloud", () => {
     const none = fakeFetch("NONE");
     expect((await checkGate(".scannerwork/report-task.txt", "t", {}, deps(none.impl))).markdown).toContain("não conta como aprovação");
     expect(await sonarMain([".scannerwork/report-task.txt"], { SONAR_TOKEN: "t" }, deps(none.impl))).toBe(1);
+  });
+
+  it("condições de segurança são só informativas; as demais decidem", async () => {
+    const cond = (metricKey: string, status = "OK") => ({ status, metricKey });
+    for (const key of ["new_security_rating", "security_rating", "new_vulnerabilities", "new_security_hotspots_reviewed", "new_security_review_rating", "new_software_quality_security_rating", "software_quality_security_issues"]) {
+      expect(isSecurityMetric(key)).toBe(true);
+    }
+    for (const key of ["new_coverage", "new_reliability_rating", "new_maintainability_rating", "new_duplicated_lines_density", "new_software_quality_reliability_rating"]) {
+      expect(isSecurityMetric(key)).toBe(false);
+    }
+    // Caso da execução final do PR #27: só a segurança reprovou -> aprovado.
+    expect(effectiveStatus("ERROR", [cond("new_coverage"), cond("new_reliability_rating"), cond("new_security_rating", "ERROR"), cond("new_security_hotspots_reviewed", "ERROR")])).toBe("OK");
+    expect(effectiveStatus("ERROR", [cond("new_coverage", "ERROR"), cond("new_security_rating")])).toBe("ERROR");
+    expect(effectiveStatus("ERROR", [cond("new_security_rating", "ERROR")])).toBe("NONE");
+    expect(effectiveStatus("OK", [])).toBe("NONE");
+    expect(effectiveStatus("NONE", [cond("new_coverage")])).toBe("NONE");
+
+    writeTask();
+    const impl = (async (input: string | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/api/ce/task") return { ok: true, json: async () => ({ task: { status: "SUCCESS", analysisId: "an-1" } }) } as Response;
+      return { ok: true, json: async () => ({ projectStatus: { status: "ERROR", conditions: [cond("new_coverage"), { status: "ERROR", metricKey: "new_security_rating", actualValue: "2", comparator: "GT", errorThreshold: "1" }] } }) } as Response;
+    }) as typeof fetch;
+    const result = await checkGate(".scannerwork/report-task.txt", "t", {}, deps(impl));
+    expect(result.status).toBe("OK");
+    expect(result.markdown).toContain("(serviço: ERROR)");
+    expect(result.markdown).toContain("- ERROR new_security_rating: 2 (GT 1) — informativo");
+    expect(await sonarMain([".scannerwork/report-task.txt"], { SONAR_TOKEN: "t" }, deps(impl))).toBe(0);
   });
 
   it("recusa: token ausente, relatório ausente/fora do diretório, servidor estranho, processamento falho ou sem fim", async () => {
