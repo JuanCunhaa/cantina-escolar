@@ -62,8 +62,33 @@ export function blankUnrelatedKeys(defined: Dict, cwd = process.cwd()): Dict {
     if (!existsSync(path)) continue;
     for (const key of Object.keys(parseDotenv(readFileSync(path, "utf8")))) blanks[key] = "";
   }
-  for (const key of Object.keys(process.env)) if (key.startsWith("R2_") || key.startsWith("FIREBASE_") || key.startsWith("NEXT_PUBLIC_")) blanks[key] = "";
+  for (const key of Object.keys(process.env)) if (/^(R2_|FIREBASE_|NEXT_PUBLIC_|MERCADOPAGO_|PAYMENTS_)/.test(key)) blanks[key] = "";
   return { ...blanks, ...defined };
+}
+
+/**
+ * Recarga online na homologação (F18): opcional. Sem `PAYMENTS_*_PROVIDER` no arquivo, os canais ficam indisponíveis. Com
+ * `mercadopago`, SÓ sandbox: `MERCADOPAGO_ENV=sandbox` obrigatório e as credenciais de TESTE do arquivo local (nunca o `.env`).
+ * Valores nunca são impressos; só os nomes faltantes aparecem no erro.
+ */
+export function stagingPayments(file: Dict): Dict {
+  const pix = file.PAYMENTS_PIX_PROVIDER?.trim() ?? "";
+  const card = file.PAYMENTS_CARD_PROVIDER?.trim() ?? "";
+  for (const [name, value] of [["PAYMENTS_PIX_PROVIDER", pix], ["PAYMENTS_CARD_PROVIDER", card]] as const) {
+    if (value !== "" && value !== "none" && value !== "mercadopago") throw new Error(`${name}: na homologação só "mercadopago" (sandbox) ou vazio.`);
+  }
+  if (pix !== "mercadopago" && card !== "mercadopago") return { PAYMENTS_PIX_PROVIDER: "", PAYMENTS_CARD_PROVIDER: "" };
+  if (file.MERCADOPAGO_ENV?.trim() !== "sandbox") throw new Error("MERCADOPAGO_ENV deve ser sandbox na homologação (nenhuma credencial de produção).");
+  const required = ["MERCADOPAGO_ACCESS_TOKEN", ...(card === "mercadopago" ? ["MERCADOPAGO_PUBLIC_KEY"] : [])];
+  const missing = required.filter((k) => !file[k]?.trim());
+  if (missing.length) throw new Error(`Faltam em .env.staging.local: ${missing.join(", ")} (credenciais de TESTE do Mercado Pago).`);
+  return {
+    PAYMENTS_PIX_PROVIDER: pix,
+    PAYMENTS_CARD_PROVIDER: card,
+    MERCADOPAGO_ENV: "sandbox",
+    MERCADOPAGO_ACCESS_TOKEN: file.MERCADOPAGO_ACCESS_TOKEN!.trim(),
+    MERCADOPAGO_PUBLIC_KEY: file.MERCADOPAGO_PUBLIC_KEY?.trim() ?? "",
+  };
 }
 
 const sha = (value: string) => createHash("sha256").update(value).digest("hex").slice(0, 10);
@@ -152,6 +177,7 @@ function stagingTarget(): Target {
     NEXT_PUBLIC_FIREBASE_APP_ID: need(file, "NEXT_PUBLIC_FIREBASE_APP_ID"),
     ...r2,
     R2_ENDPOINT: file.R2_ENDPOINT?.trim() ?? "",
+    ...stagingPayments(file),
   };
   // Mesmas validações fechadas que a aplicação aplica em runtime (falha aqui, antes de subir qualquer coisa).
   parseServerEnv({ ...appEnv, FIREBASE_AUTH_EMULATOR_HOST: undefined, FIRESTORE_EMULATOR_HOST: undefined });

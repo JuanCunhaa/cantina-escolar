@@ -8,9 +8,10 @@ import { parseBRLToCents } from "@/lib/money/parse";
 import { useFamilyStudents } from "@/modules/guardians/use-family-students";
 import { executeWithRetry } from "@/modules/wallet/operation";
 import type { IntentView } from "../online/intent-commands";
+import { MercadoPagoCardBrick, type CardSubmission } from "./mercadopago-card-brick";
 
 type ChannelInfo = { available: boolean; mode: "demo" | "live" | null };
-type Config = { pix: ChannelInfo; card: ChannelInfo & { installments: 1 } };
+type Config = { providerEnv: "sandbox" | "production" | null; pix: ChannelInfo; card: ChannelInfo & { installments: 1; publicConfig: Record<string, string> | null } };
 type Channel = "pix" | "card";
 
 type Op =
@@ -118,17 +119,19 @@ export function OnlineTopup({ user }: { user: User }) {
     if (cents > 200_000) return setOp({ phase: "refused", text: "O valor máximo por recarga é R$ 2.000,00." });
     if (!selected) return setOp({ phase: "refused", text: "Escolha o aluno." });
     if (!config?.[effective].available) return setOp({ phase: "refused", text: errorText("payment_unavailable") });
-    // O cartão real só existe com o componente de tokenização do provedor escolhido (ainda não integrado): nunca dados em claro.
-    if (effective === "card" && config.card.mode !== "demo") return setOp({ phase: "refused", text: errorText("payment_unavailable") });
+    // Cartão real só pelo componente oficial do provedor (chave pública necessária): nunca dados de cartão em claro.
+    if (effective === "card" && config.card.mode === "live" && !config.card.publicConfig?.publicKey) return setOp({ phase: "refused", text: errorText("payment_unavailable") });
     setOp({ phase: "review", studentId: selected, cents, channel: effective });
   }
 
-  async function confirm() {
+  async function confirm(card?: CardSubmission) {
     if (op.phase !== "review" || inFlight.current) return;
     const { studentId: sid, cents, channel: ch } = op;
     const sig = `${sid}|${cents}|${ch}`;
     if (attempt.current?.sig !== sig) attempt.current = { sig, key: newKey() };
-    const body = ch === "pix" ? { key: attempt.current.key, studentId: sid, amountCents: cents, channel: "pix" } : { key: attempt.current.key, studentId: sid, amountCents: cents, channel: "card", installments: 1, cardToken: demoCard };
+    // Demonstração (só emulador): token fictício; real: token, bandeira e pagador do componente do Mercado Pago.
+    const cardData = card ?? { cardToken: demoCard, paymentMethodId: "visa", payer: { email: "demo@example.test", identification: { type: "CPF" as const, number: "12345678909" } } };
+    const body = ch === "pix" ? { key: attempt.current.key, studentId: sid, amountCents: cents, channel: "pix" } : { key: attempt.current.key, studentId: sid, amountCents: cents, channel: "card", installments: 1, ...cardData };
     inFlight.current = true;
     setOp({ phase: "pending" });
     const outcome = await executeWithRetry(async () => definitiveUnavailable(await api<IntentView & { replayed: boolean }>(user, "POST", "/api/topups/online", body, { timeoutMs: 30000 })));
@@ -176,6 +179,11 @@ export function OnlineTopup({ user }: { user: User }) {
         O saldo só aumenta depois que o pagamento é <strong>confirmado</strong> pelo provedor. Gerar o Pix ou enviar o cartão ainda não credita nada. O valor
         pago é creditado integralmente; não há taxa para a família.
       </p>
+      {config?.providerEnv === "sandbox" && (
+        <p className="notice" data-testid="topup-sandbox">
+          <strong>Ambiente de teste do Mercado Pago (sandbox)</strong>: nenhum valor real é cobrado. Use só dados de teste.
+        </p>
+      )}
       {demo && (
         <p className="notice" data-testid="topup-demo">
           <strong>Demonstração</strong>: ambiente de teste, sem provedor real. Nenhum valor é cobrado e nenhuma recarga desta tela é confirmada.
@@ -253,9 +261,13 @@ export function OnlineTopup({ user }: { user: User }) {
             <dt>Crédito na carteira</dt>
             <dd>{formatBRL(op.cents)}, depois da confirmação do pagamento</dd>
           </dl>
-          <button type="button" onClick={() => void confirm()}>
-            {op.channel === "pix" ? "Gerar Pix" : "Pagar com cartão"}
-          </button>{" "}
+          {op.channel === "card" && config?.card.mode === "live" && config.card.publicConfig?.publicKey ? (
+            <MercadoPagoCardBrick amountCents={op.cents} publicKey={config.card.publicConfig.publicKey} onSubmit={(card) => confirm(card)} />
+          ) : (
+            <button type="button" onClick={() => void confirm()}>
+              {op.channel === "pix" ? "Gerar Pix" : "Pagar com cartão"}
+            </button>
+          )}{" "}
           <button type="button" className="secondary" onClick={() => setOp({ phase: "idle" })}>
             Voltar
           </button>

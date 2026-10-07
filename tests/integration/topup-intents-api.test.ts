@@ -130,7 +130,7 @@ function scripted(script?: Script) {
 }
 
 const pixBody = (studentId: string, over: Record<string, unknown> = {}) => ({ key: randomUUID(), studentId, amountCents: 5000, channel: "pix", ...over });
-const cardBody = (studentId: string, over: Record<string, unknown> = {}) => ({ key: randomUUID(), studentId, amountCents: 5000, channel: "card", installments: 1, cardToken: `tok_secret_${randomUUID().slice(0, 8)}`, ...over });
+const cardBody = (studentId: string, over: Record<string, unknown> = {}) => ({ key: randomUUID(), studentId, amountCents: 5000, channel: "card", installments: 1, cardToken: `tok_secret_${randomUUID().slice(0, 8)}`, paymentMethodId: "visa", payer: { email: "pagador@example.test", identification: { type: "CPF", number: "12345678909" } }, ...over });
 
 async function walletUntouched(studentId: string) {
   const w = await db().doc(`wallets/${studentId}`).get();
@@ -416,5 +416,77 @@ describe("autorização atual e limites", () => {
     const rich = await newStudent();
     await writeDemoDoc(targetFromEnv(), `wallets/${rich}`, { balanceCents: MAX_BALANCE_CENTS - 100, version: 1 });
     await expect(commands.createTopupIntent(db(), actor(guardianA), pixBody(rich, { amountCents: 200 }), deps)).rejects.toMatchObject({ code: "balance_limit" });
+  });
+});
+
+/* ------------------------------------------- adapter Mercado Pago com HTTP SIMULADO (não é sandbox) no fluxo real */
+
+describe("adapter Mercado Pago no fluxo da intenção (HTTP simulado no formato da API Orders; não é sandbox)", () => {
+  /** "Mercado Pago" em memória: guarda orders por external_reference, responde 409 a chave repetida e busca por referência. */
+  function fakeMercadoPago(plan: { failFirstCreate?: "timeout_after_create" | "500_before_create" }) {
+    const orders = new Map<string, Record<string, unknown>>();
+    const keys = new Set<string>();
+    const log: string[] = [];
+    let creates = 0;
+    const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
+    const fetchFn = (async (url: string, init: RequestInit) => {
+      const u = new URL(url);
+      if (init.method === "POST" && u.pathname === "/v1/orders") {
+        creates += 1;
+        const key = (init.headers as Record<string, string>)["x-idempotency-key"]!;
+        log.push(`POST ${key}`);
+        if (keys.has(key)) return json(409, { errors: [{ code: "idempotency_key_already_used" }] });
+        const body = JSON.parse(String(init.body)) as { external_reference: string };
+        if (creates === 1 && plan.failFirstCreate === "500_before_create") return json(500, { errors: [{ code: "internal_error" }] });
+        keys.add(key);
+        const order = { id: `ORD${orders.size + 1}`, status: "action_required", status_detail: "waiting_transfer", external_reference: body.external_reference, transactions: { payments: [{ id: "PAY1", date_of_expiration: new Date(Date.now() + 1_800_000).toISOString(), payment_method: { id: "pix", type: "bank_transfer", qr_code: `00020126MP${body.external_reference}`, qr_code_base64: "iVBORw0KGgo=" } }] } };
+        orders.set(body.external_reference, order);
+        if (creates === 1 && plan.failFirstCreate === "timeout_after_create") throw new Error("timeout");
+        return json(201, order);
+      }
+      if (init.method === "GET" && u.pathname === "/v1/orders") {
+        log.push("SEARCH");
+        if (!u.searchParams.get("begin_date") || !u.searchParams.get("end_date")) return json(400, { errors: [{ code: "required_search_params" }] });
+        const order = orders.get(u.searchParams.get("external_reference") ?? "");
+        return json(200, { data: order ? [{ id: order.id, external_reference: order.external_reference }] : [], paging: { total: order ? "1" : "0" } });
+      }
+      if (init.method === "GET" && u.pathname.startsWith("/v1/orders/")) {
+        const order = [...orders.values()].find((o) => o.id === u.pathname.split("/").pop());
+        return order ? json(200, order) : json(404, { errors: [{ code: "not_found" }] });
+      }
+      return json(404, {});
+    }) as unknown as typeof fetch;
+    return { fetchFn, orders, log };
+  }
+  const mpConfig = (fetchFn: typeof fetch) => ({ accessToken: ["APP", "USR", "simulado", "0".repeat(24)].join("-"), publicKey: "", env: "sandbox" as const, fetch: fetchFn });
+
+  it("resposta perdida depois de criar: 'verificando' → busca acha a order → QR do provedor; nenhuma segunda order", async () => {
+    const { mercadoPagoPix } = await import("@/modules/payments/online/mercadopago");
+    const student = await newStudent();
+    const mp = fakeMercadoPago({ failFirstCreate: "timeout_after_create" });
+    const deps = { providers: { pix: mercadoPagoPix(mpConfig(mp.fetchFn)), card: null } };
+    const v = await commands.createTopupIntent(db(), actor(guardianA), pixBody(student), deps);
+    expect(v.status).toBe("creation_uncertain");
+    const r = await commands.reconcileTopupIntent(db(), actor(guardianA), v.intentId, {}, deps);
+    expect(r).toMatchObject({ reconcile: "found", status: "awaiting_payment" });
+    expect(r.pix?.copyPaste).toBe(`00020126MP${v.intentId}`);
+    expect(mp.orders.size).toBe(1);
+    expect(mp.log).toEqual([`POST ${v.intentId}`, "SEARCH"]);
+    await walletUntouched(student);
+  });
+
+  it("5xx antes de criar: busca não acha; reenvio explícito com a MESMA chave cria UMA order; novo reenvio recebe 409 e a busca mantém 1", async () => {
+    const { mercadoPagoPix } = await import("@/modules/payments/online/mercadopago");
+    const student = await newStudent();
+    const mp = fakeMercadoPago({ failFirstCreate: "500_before_create" });
+    const deps = { providers: { pix: mercadoPagoPix(mpConfig(mp.fetchFn)), card: null } };
+    const v = await commands.createTopupIntent(db(), actor(guardianA), pixBody(student), deps);
+    expect(v.status).toBe("creation_uncertain");
+    expect(await commands.reconcileTopupIntent(db(), actor(guardianA), v.intentId, {}, deps)).toMatchObject({ reconcile: "not_found" });
+    expect(mp.orders.size).toBe(0);
+    expect(await commands.reconcileTopupIntent(db(), actor(guardianA), v.intentId, { resend: true }, deps)).toMatchObject({ reconcile: "resent", status: "awaiting_payment" });
+    expect(mp.orders.size).toBe(1);
+    expect(mp.log.filter((l) => l.startsWith("POST"))).toEqual([`POST ${v.intentId}`, `POST ${v.intentId}`]);
+    await walletUntouched(student);
   });
 });

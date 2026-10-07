@@ -49,13 +49,33 @@ const amountCents = z.number().int().min(MIN_TOPUP_CENTS).max(MAX_TOPUP_CENTS);
  */
 export const createIntentSchema = z.discriminatedUnion("channel", [
   z.object({ key, studentId, amountCents, channel: z.literal("pix") }).strict(),
-  z.object({ key, studentId, amountCents, channel: z.literal("card"), installments: z.literal(1), cardToken: z.string().regex(/^[A-Za-z0-9_.:-]{8,512}$/) }).strict(),
+  z
+    .object({
+      key,
+      studentId,
+      amountCents,
+      channel: z.literal("card"),
+      installments: z.literal(1),
+      cardToken: z.string().regex(/^[A-Za-z0-9_.:-]{8,512}$/),
+      // Bandeira e pagador vêm do componente do provedor (não são dados do cartão); documento nunca é persistido.
+      paymentMethodId: z.string().regex(/^[a-z_]{2,30}$/),
+      payer: z
+        .object({
+          email: z.string().email().max(254),
+          identification: z.discriminatedUnion("type", [
+            z.object({ type: z.literal("CPF"), number: z.string().regex(/^\d{11}$/) }).strict(),
+            z.object({ type: z.literal("CNPJ"), number: z.string().regex(/^\d{14}$/) }).strict(),
+          ]),
+        })
+        .strict(),
+    })
+    .strict(),
 ]);
 export type CreateIntentInput = z.infer<typeof createIntentSchema>;
 
 export const reconcileSchema = z.object({ resend: z.boolean().optional() }).strict();
 
-/** Payload que identifica a operação para idempotência: SEM o token do cartão (curto e de uso único; nunca persistido). */
+/** Payload que identifica a operação para idempotência: SEM token, bandeira nem documento (vêm do componente; nunca persistidos). */
 export function idempotentPayload(input: CreateIntentInput) {
   return { studentId: input.studentId, amountCents: input.amountCents, channel: input.channel, installments: 1 };
 }
@@ -68,8 +88,8 @@ export function checkCharge(channel: Channel, charge: ProviderCharge): string | 
   if (!/^[A-Za-z0-9_.:-]{1,128}$/.test(charge.chargeId)) return "invalid_charge_id";
   if (typeof charge.providerStatus !== "string" || charge.providerStatus.length > 64) return "invalid_provider_status";
   if (channel === "card") return charge.outcome === "awaiting_payment" ? "unexpected_outcome" : null;
-  if (charge.outcome === "processing") return "unexpected_outcome";
-  if (charge.outcome === "declined") return null;
+  // Pix já informado como pago pelo provedor (ex.: consulta depois do pagamento): "em análise" até a confirmação (F19).
+  if (charge.outcome === "processing" || charge.outcome === "declined") return null;
   const pix = charge.pix;
   if (!pix || typeof pix.copyPaste !== "string" || pix.copyPaste.length < 10 || pix.copyPaste.length > 1024) return "invalid_pix_payload";
   if (pix.qrImagePngBase64 !== null && (pix.qrImagePngBase64.length > PIX_IMAGE_MAX || !BASE64.test(pix.qrImagePngBase64))) return "invalid_pix_image";

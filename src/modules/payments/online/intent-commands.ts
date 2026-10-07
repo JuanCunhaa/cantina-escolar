@@ -20,7 +20,6 @@ import {
   reconcileSchema,
   STATUS_LABEL,
   type Channel,
-  type CreateIntentInput,
   type DisplayStatus,
   type IntentStatus,
 } from "./intent-model";
@@ -182,7 +181,10 @@ export async function createTopupIntent(db: Firestore, actor: Actor, raw: unknow
   );
 
   // Só a execução que CRIOU a intenção chama o provedor (o callback pode ter rodado mais de uma vez; o efeito vem depois).
-  if (!result.replayed && created.payer) await attemptCreation(db, intentId, input, created.payer, deps, clock);
+  if (!result.replayed && created.payer) {
+    const card = input.channel === "card" ? { cardToken: input.cardToken, paymentMethodId: input.paymentMethodId, payer: input.payer } : undefined;
+    await attemptCreation(db, intentId, { channel: input.channel, amountCents: input.amountCents, card }, created.payer, deps, clock);
+  }
   const view = intentView((await intentRef(db, intentId).get()).data() as IntentDoc, clock());
   return { ...view, replayed: result.replayed };
 }
@@ -197,7 +199,7 @@ function request(intentId: string, amountCents: number, payer: ChargeRequest["pa
 async function attemptCreation(
   db: Firestore,
   intentId: string,
-  input: Pick<CreateIntentInput, "channel" | "amountCents"> & { cardToken?: string },
+  input: { channel: Channel; amountCents: number; card?: { cardToken: string; paymentMethodId: string; payer: { email: string; identification: { type: "CPF" | "CNPJ"; number: string } } } },
   payer: ChargeRequest["payer"],
   deps: IntentDeps,
   clock: () => Date,
@@ -208,7 +210,13 @@ async function attemptCreation(
     const charge =
       input.channel === "pix"
         ? await deps.providers.pix!.createPixCharge({ ...base, expiresAt: new Date(clock().getTime() + PIX_TTL_MS) })
-        : await deps.providers.card!.createCardCharge({ ...base, cardToken: input.cardToken!, installments: 1 });
+        : await deps.providers.card!.createCardCharge({
+            ...base,
+            payer: { name: payer.name, email: input.card!.payer.email, identification: input.card!.payer.identification },
+            cardToken: input.card!.cardToken,
+            paymentMethodId: input.card!.paymentMethodId,
+            installments: 1,
+          });
     outcome = { type: "charge", charge };
   } catch (error) {
     outcome = error instanceof ProviderError && error.kind === "rejected" ? { type: "rejected", code: error.code } : { type: "uncertain", code: error instanceof ProviderError ? error.code : "provider_error" };
@@ -306,7 +314,7 @@ export async function reconcileTopupIntent(
 
   let found: ProviderCharge | null;
   try {
-    found = await provider.findCharge(intentId);
+    found = await provider.findCharge(intentId, data.createdAt.toDate());
   } catch {
     return view("lookup_failed");
   }
