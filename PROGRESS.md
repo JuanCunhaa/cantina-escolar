@@ -145,3 +145,4 @@ Data de referência: 06/10/2026. Este arquivo descreve código entregue, não ap
 <!-- probe P3: alteração só documental -->
 <!-- probe P3 b -->
 <!-- probe P3 c -->
+<!-- probe P3 d -->
