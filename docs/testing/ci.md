@@ -101,7 +101,7 @@ proteção de branch (docs/status/ci-baseline.md); exigir o `check` depende de c
   `next.config.ts`; sem `.next`, `node_modules`, `.env`, testes) **enviado ao motor remoto da Veracode** para análise; o
   resultado volta ao job e não é publicado na plataforma (sem Upload and Scan, sem importação). Imagem oficial
   `veracode/pipeline-scan:cmd-26.9.0` fixada por digest. Bloqueia: Very High/High; `scan_status` ≠ SUCCESS; relatório ausente.
-- **Veracode SCA (agente `srcclr` 3.8.120, `--no-upload`)**: não publica resultados, mas **não é offline** (consulta a base
+- **Veracode SCA (agente `srcclr` 3.8.121, `--no-upload`)**: não publica resultados, mas **não é offline** (consulta a base
   da Veracode). Instalação com cadeia de integridade (impressão digital da chave, assinatura do índice, SHA-256 do pacote).
   Bloqueia: CVSS ≥ 7 em pacote da árvore de produção (`npm ls --omit=dev`); lista os de desenvolvimento sem bloquear;
   nenhuma biblioteca identificada ou estrutura desconhecida reprova.

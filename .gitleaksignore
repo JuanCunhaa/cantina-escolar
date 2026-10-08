@@ -6,3 +6,8 @@
 # generic-api-key casa pelo nome da variável (KEY_*) e pela entropia do hexadecimal.
 437b311c460b0f037eda0ee9d921f17be1c7b836:scripts/ci/tools/install-srcclr.sh:generic-api-key:8
 scripts/ci/tools/install-srcclr.sh:generic-api-key:8
+
+# 07/10/2026 (F19) — valor FICTÍCIO de teste (segredo do cron gerado só para o teste de integração com emulador), atribuído a
+# process.env.CRON_SECRET no commit 15a5e91 da branch da F19; a regra generic-api-key casa pelo nome da variável e pela entropia.
+# Não é credencial: o literal foi removido no commit seguinte (agora gerado em tempo de execução). Só o histórico precisa da exceção.
+15a5e91f52fff68a965aab8421a0212606c09fe6:tests/integration/online-confirmation-api.test.ts:generic-api-key:600
