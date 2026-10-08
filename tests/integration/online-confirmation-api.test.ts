@@ -303,7 +303,7 @@ describe("webhook: autenticidade (A05)", () => {
     expect((await intentDoc(intent)).review).toMatchObject({ reason: "currency_mismatch" });
   });
 
-  it("pagamento em OUTRA conta recebedora → revisão sem crédito; notificação de outra conta é registrada e ignorada sem consultar o provedor", async () => {
+  it("pagamento em OUTRA conta recebedora → revisão sem crédito; `user_id` do corpo (não assinado) não decide nada: vale a conta da order consultada", async () => {
     const student = await newStudent();
     const p = fakeMercadoPago();
     const intent = await newIntent(p, student);
@@ -315,29 +315,31 @@ describe("webhook: autenticidade (A05)", () => {
     const student2 = await newStudent();
     const intent2 = await newIntent(p, student2);
     p.pay(intent2);
-    const before = p.calls.getOrder;
+    // A simulação do painel traz o user_id do DONO da aplicação; no corpo isso é só informação (registrada), a order manda.
     const r = await notify(p, intent2, { userId: "999000111" });
-    expect(r).toMatchObject({ status: 200, body: { outcome: "noop" } });
-    expect(p.calls.getOrder).toBe(before);
-    await untouched(student2);
-    expect((await eventsOf(p.orderIdOf(intent2))).map((e) => e.outcome)).toEqual(["account_mismatch"]);
+    expect(r).toMatchObject({ status: 200, body: { outcome: "credited" } });
+    expect(await entriesOf(student2)).toHaveLength(1);
+    expect((await eventsOf(p.orderIdOf(intent2))).map((e) => [e.outcome, e.bodyUserId])).toEqual([["credited", "999000111"]]);
   });
 
-  it("o corpo NÃO é assinado: entrega com live_mode de outro ambiente é ignorada (evento registrado), não muda a recarga; a entrega legítima seguinte credita", async () => {
+  it("o corpo NÃO é assinado: `live_mode` do corpo (a simulação do painel manda true) não decide nada; o ambiente vem das credenciais e a order é consultada", async () => {
     const student = await newStudent();
     const p = fakeMercadoPago();
     const intent = await newIntent(p, student);
     p.pay(intent);
     const before = p.calls.getOrder;
-    expect(await notify(p, intent, { liveMode: true })).toMatchObject({ status: 200, body: { outcome: "noop" } });
-    expect(p.calls.getOrder).toBe(before); // nem consultou o provedor
-    await untouched(student);
+    expect(await notify(p, intent, { liveMode: true })).toMatchObject({ status: 200, body: { outcome: "credited" } });
+    expect(p.calls.getOrder - before).toBe(1); // a order foi consultada: é ela que decide
     const doc = await intentDoc(intent);
-    expect(doc.status).toBe("awaiting_payment");
-    expect(doc.review).toBeUndefined(); // quem reaproveita uma assinatura com corpo adulterado não coloca o pagamento em revisão
-    expect((await eventsOf(p.orderIdOf(intent))).map((e) => e.outcome)).toEqual(["environment_mismatch"]);
-    expect((await notify(p, intent)).body.outcome).toBe("credited");
+    expect(doc.status).toBe("confirmed");
+    expect(doc.review).toBeUndefined(); // corpo diferente do esperado não põe o pagamento em revisão
+    expect((await eventsOf(p.orderIdOf(intent))).map((e) => [e.outcome, e.bodyLiveMode])).toEqual([["credited", true]]);
     expect(await entriesOf(student)).toHaveLength(1);
+    // e uma order que NÃO está paga continua sem crédito, qualquer que seja o corpo
+    const student2 = await newStudent();
+    const intent2 = await newIntent(p, student2);
+    expect(await notify(p, intent2, { liveMode: true, bodyStatus: "processed" })).toMatchObject({ status: 200, body: { outcome: "noop" } });
+    await untouched(student2);
   });
 
   it("assinatura reaproveitada com OUTRO corpo (ação/versão/status trocados) cai no mesmo evento: nenhum documento novo e nenhuma mudança de estado", async () => {

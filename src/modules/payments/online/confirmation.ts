@@ -26,6 +26,7 @@ import type { OnlineProviders, ProviderOrder } from "./provider";
 export type ConfirmSource = "webhook" | "reconcile" | "sweep" | "admin";
 /** `requestId` e `tsMs` são ASSINADOS; `action`, `version`, `liveMode` e `userId` vêm do corpo (não assinado) e só informam/ignoram. */
 export type NotificationEvent = { action: string; version: string; requestId: string | null; tsMs: number; liveMode: boolean | null; userId: string | null };
+/** `production` é aceito por compatibilidade; o ambiente vem das credenciais (`MERCADOPAGO_ENV`), não do corpo da notificação. */
 export type ConfirmDeps = { providers: OnlineProviders; production?: boolean; clock?: () => Date };
 
 export type ConfirmOutcome = "credited" | "already_credited" | "reversal_applied" | "review" | "failed" | "expired" | "noop" | "unknown_order" | "no_charge";
@@ -46,7 +47,6 @@ function pickProvider(providers: OnlineProviders) {
   return candidates.find((p) => p.mode === "live") ?? candidates[0] ?? null;
 }
 
-const isProduction = (deps: ConfirmDeps) => deps.production ?? process.env.APP_ENV === "production";
 
 /**
  * ID do evento externo: unicidade por provedor + conta + order + entrega (`x-request-id` e `ts`, ambos ASSINADOS —
@@ -76,18 +76,11 @@ export async function confirmFromProvider(db: Firestore, deps: ConfirmDeps, orde
   if (!provider) throw unavailable("payment_unavailable", "Pagamento online indisponível.");
   const accountId = await provider.accountId();
   const eventId = trigger.event ? eventIdOf(provider.id, accountId, orderId, trigger.event.requestId, trigger.event.tsMs) : null;
-  const eventBase = trigger.event ? { eventId, provider: provider.id, accountId, orderId, action: trigger.event.action.slice(0, 80), version: trigger.event.version.slice(0, 40), requestId: trigger.event.requestId?.slice(0, 80) ?? null, source: trigger.source } : null;
+  const eventBase = trigger.event ? { eventId, provider: provider.id, accountId, orderId, bodyUserId: (trigger.event.userId ?? "").slice(0, 24), bodyLiveMode: trigger.event.liveMode, action: trigger.event.action.slice(0, 80), version: trigger.event.version.slice(0, 40), requestId: trigger.event.requestId?.slice(0, 80) ?? null, source: trigger.source } : null;
 
-  // Entrega de OUTRA conta recebedora ou de outro AMBIENTE (live_mode × APP_ENV): registra e ignora, sem consultar o provedor e
-  // sem tocar em nenhuma recarga (o corpo não é assinado, então não pode mudar estado; a próxima entrega legítima processa).
-  if (eventId && eventBase && trigger.event?.userId && trigger.event.userId !== accountId) {
-    await recordEventOnly(db, eventId, { ...eventBase, intentId: null, outcome: "account_mismatch" });
-    return noResult("noop", "account_mismatch");
-  }
-  if (eventId && eventBase && trigger.event && trigger.event.liveMode !== null && trigger.event.liveMode !== isProduction(deps)) {
-    await recordEventOnly(db, eventId, { ...eventBase, intentId: null, outcome: "environment_mismatch" });
-    return noResult("noop", "environment_mismatch");
-  }
+  // O corpo da notificação NÃO é assinado: `user_id` e `live_mode` dele não decidem nada (a simulação do painel, por exemplo, traz a
+  // conta e o ambiente do dono da aplicação). Conta e ambiente valem para a ORDER consultada com a nossa credencial: uma order de
+  // outra conta nem é encontrada (404 → `unknown_order`) e `decide` confere a conta recebedora da order. Ficam só registrados.
   const order = await provider.getOrder(orderId);
   if (!order || order.orderId !== orderId) {
     if (eventId && eventBase) await recordEventOnly(db, eventId, { ...eventBase, intentId: null, outcome: "unknown_order" });
