@@ -1,7 +1,7 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { DomainError } from "@/lib/domain-error";
 import { confirmFromProvider } from "./confirmation";
-import { parseNotification, verifyWebhookSignature, WEBHOOK_BODY_MAX_BYTES } from "./mercadopago-webhook";
+import { diagnoseSignature, parseNotification, parseSignatureHeader, verifyWebhookSignature, WEBHOOK_BODY_MAX_BYTES } from "./mercadopago-webhook";
 import { ProviderError, type OnlineProviders } from "./provider";
 
 /**
@@ -28,7 +28,14 @@ export async function handleMercadoPagoWebhook(request: Request, deps: WebhookDe
     if (Number(request.headers.get("content-length") ?? 0) > WEBHOOK_BODY_MAX_BYTES) return json(413, { error: "payload_too_large" });
     const signature = verifyWebhookSignature({ secret: deps.secret, signature: request.headers.get("x-signature"), requestId: request.headers.get("x-request-id"), dataId: queryId, nowMs: clock().getTime() });
     if (!signature.ok) {
-      console.warn("mercadopago webhook rejected: %s", signature.reason);
+      // Só dados NÃO secretos (ID da order, request-id, ts, 10 primeiros hex do v1 e quais variantes do manifesto bateriam).
+      const header = request.headers.get("x-signature");
+      const parsed = parseSignatureHeader(header);
+      console.warn(
+        "mercadopago webhook rejected: %s %s",
+        signature.reason,
+        JSON.stringify({ dataId: queryId.slice(0, 40), requestId: (request.headers.get("x-request-id") ?? "").slice(0, 60), ts: parsed?.ts ?? null, v1: parsed?.v1.slice(0, 10) ?? null, matches: signature.reason === "bad_signature" ? diagnoseSignature({ secret: deps.secret, signature: header, requestId: request.headers.get("x-request-id"), dataId: queryId }) : [] }),
+      );
       return json(401, { error: "invalid_signature" });
     }
     const text = await request.text();

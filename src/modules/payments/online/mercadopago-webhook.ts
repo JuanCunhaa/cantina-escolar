@@ -54,6 +54,28 @@ export function verifyWebhookSignature(input: { secret: string | undefined; sign
   return { ok: true, tsMs };
 }
 
+/**
+ * Diagnóstico de assinatura RECUSADA (só para o log do servidor; NUNCA aceita a requisição): quais variantes do manifesto
+ * teriam batido com a chave. Serve para distinguir "chave errada" de "formato do manifesto diferente do documentado" sem
+ * registrar a chave nem o v1 inteiro. Variantes: `default` (documentada), `id_original` (sem minúsculas), `sem_id`,
+ * `sem_request_id`, `sem_ts`.
+ */
+export function diagnoseSignature(input: { secret: string; signature: string | null; requestId: string | null; dataId: string | null }): string[] {
+  const parsed = parseSignatureHeader(input.signature);
+  if (!parsed) return ["cabecalho_malformado"];
+  const build = (id: string | null, rid: string | null, withTs = true) => `${id ? `id:${id};` : ""}${rid ? `request-id:${rid};` : ""}${withTs ? `ts:${parsed.ts};` : ""}`;
+  const variants: Record<string, string> = {
+    default: build(input.dataId?.toLowerCase() ?? null, input.requestId),
+    id_original: build(input.dataId, input.requestId),
+    sem_id: build(null, input.requestId),
+    sem_request_id: build(input.dataId?.toLowerCase() ?? null, null),
+    sem_ts: build(input.dataId?.toLowerCase() ?? null, input.requestId, false),
+  };
+  return Object.entries(variants)
+    .filter(([, manifest]) => computeSignature(input.secret, manifest) === parsed.v1)
+    .map(([name]) => name);
+}
+
 const notificationSchema = z
   .object({
     action: z.string().max(80).optional(),
