@@ -42,7 +42,7 @@ export async function handleMercadoPagoWebhook(request: Request, deps: WebhookDe
       console.warn(
         "mercadopago webhook rejected: %s %s",
         signature.reason,
-        JSON.stringify({ origin, dataId: queryId.slice(0, 40), requestId: (request.headers.get("x-request-id") ?? "").slice(0, 60), ts: parsed?.ts ?? null, v1: parsed?.v1.slice(0, 10) ?? null, matches: signature.reason === "bad_signature" ? diagnoseSignature({ secret: deps.secret, signature: header, requestId: request.headers.get("x-request-id"), dataId: queryId }) : [] }),
+        JSON.stringify({ origin, shape: { sigKeys: (header ?? "").split(",").map((part) => part.split("=")[0]?.trim()).slice(0, 6), ua: (request.headers.get("user-agent") ?? "").slice(0, 60), headers: [...request.headers.keys()].filter((name) => !/^(authorization|cookie|x-vercel-(protection|oidc|sc|forwarded|ip|proxy))/.test(name)).slice(0, 30), query: [...url.searchParams.keys()].filter((k) => k !== "x-vercel-protection-bypass") }, dataId: queryId.slice(0, 40), requestId: (request.headers.get("x-request-id") ?? "").slice(0, 60), ts: parsed?.ts ?? null, v1: parsed?.v1.slice(0, 10) ?? null, matches: signature.reason === "bad_signature" ? diagnoseSignature({ secret: deps.secret, signature: header, requestId: request.headers.get("x-request-id"), dataId: queryId }) : [] }),
       );
       return json(401, { error: "invalid_signature" });
     }
