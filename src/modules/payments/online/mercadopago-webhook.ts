@@ -5,7 +5,10 @@ import { z } from "zod";
  * Autenticidade da notificação do Mercado Pago (API Orders, documentação oficial "Notificações", consultada em 07/10/2026,
  * https://www.mercadopago.com.br/developers/en/docs/checkout-api-orders/notifications):
  * - cabeçalhos `x-signature` (`ts=<ms>,v1=<hex>`) e `x-request-id`; `data.id` vem na query (`?data.id=<id>&type=order`);
- * - manifesto `id:[data.id em minúsculas];request-id:[x-request-id];ts:[ts];` — componente ausente é descartado;
+ * - manifesto `id:[data.id];request-id:[x-request-id];ts:[ts];` — componente ausente é descartado. A documentação manda passar o
+ *   `data.id` para MINÚSCULAS, mas a notificação REAL da simulação do painel (order `ORDTST…`, 08/10/2026) é assinada com o ID
+ *   COMO RECEBIDO (maiúsculas); o diagnóstico de 3 entregas mostrou que só essa forma bate com a mesma chave. Por isso a
+ *   verificação aceita o ID como recebido E a forma em minúsculas documentada — as duas exigem a chave secreta;
  * - HMAC-SHA256 do manifesto com a chave secreta do webhook (painel "Suas integrações → Webhooks"), em hexadecimal,
  *   comparado em tempo constante com `v1`;
  * - o provedor tenta de novo a cada 15 min se não receber 200/201 em 22 s.
@@ -33,7 +36,7 @@ export function parseSignatureHeader(header: string | null): { ts: string; v1: s
 
 /** Manifesto assinado. `dataId` em minúsculas (documentação); parte ausente fica de fora. */
 export function signatureManifest(input: { dataId: string | null; requestId: string | null; ts: string }): string {
-  return `${input.dataId ? `id:${input.dataId.toLowerCase()};` : ""}${input.requestId ? `request-id:${input.requestId};` : ""}ts:${input.ts};`;
+  return `${input.dataId ? `id:${input.dataId};` : ""}${input.requestId ? `request-id:${input.requestId};` : ""}ts:${input.ts};`;
 }
 
 export function computeSignature(secret: string, manifest: string): string {
@@ -45,9 +48,14 @@ export function verifyWebhookSignature(input: { secret: string | undefined; sign
   if (!input.signature) return { ok: false, reason: "missing_signature" };
   const parsed = parseSignatureHeader(input.signature);
   if (!parsed) return { ok: false, reason: "malformed_signature" };
-  const expected = Buffer.from(computeSignature(input.secret, signatureManifest({ dataId: input.dataId, requestId: input.requestId, ts: parsed.ts })), "hex");
   const received = Buffer.from(parsed.v1, "hex");
-  if (expected.length !== received.length || !timingSafeEqual(expected, received)) return { ok: false, reason: "bad_signature" };
+  const ids = [...new Set([input.dataId, input.dataId?.toLowerCase() ?? null])]; // como recebido (observado) e minúsculas (documentado)
+  let valid = false;
+  for (const dataId of ids) {
+    const expected = Buffer.from(computeSignature(input.secret, signatureManifest({ dataId, requestId: input.requestId, ts: parsed.ts })), "hex");
+    if (expected.length === received.length && timingSafeEqual(expected, received)) valid = true; // sem curto-circuito: tempo independente de qual forma bateu
+  }
+  if (!valid) return { ok: false, reason: "bad_signature" };
   const raw = Number(parsed.ts);
   const tsMs = raw < 1e12 ? raw * 1000 : raw; // `ts` é em milissegundos; segundos são aceitos por tolerância de formato
   if (!Number.isFinite(tsMs) || Math.abs(input.nowMs - tsMs) > WEBHOOK_TOLERANCE_MS) return { ok: false, reason: "stale_timestamp" };

@@ -124,13 +124,13 @@ async function newIntent(p: FakeMercadoPago, student: string, over: Record<strin
 }
 
 /** Notificação autêntica (assinada com a chave de teste), como o Mercado Pago a entregaria. */
-async function notify(p: FakeMercadoPago, intentOrOrder: string, o: { action?: string; version?: number; secret?: string | null; ts?: number; requestId?: string; liveMode?: boolean; userId?: string; bodyStatus?: string; sign?: boolean; queryId?: string | null; signFor?: string } = {}) {
+async function notify(p: FakeMercadoPago, intentOrOrder: string, o: { action?: string; version?: number; secret?: string | null; ts?: number; requestId?: string; liveMode?: boolean; userId?: string; bodyStatus?: string; sign?: boolean; queryId?: string | null; signFor?: string; documentedCase?: boolean } = {}) {
   const orderId = intentOrOrder.startsWith("tpi_") ? p.orderIdOf(intentOrOrder) : intentOrOrder;
   const ts = String(o.ts ?? Date.now());
   const requestId = o.requestId ?? randomUUID();
   const queryId = o.queryId === undefined ? orderId : o.queryId;
   const headers: Record<string, string> = { "content-type": "application/json", "x-request-id": requestId };
-  if (o.sign !== false) headers["x-signature"] = `ts=${ts},v1=${computeSignature(SECRET, signatureManifest({ dataId: o.signFor ?? queryId, requestId, ts }))}`;
+  if (o.sign !== false) headers["x-signature"] = `ts=${ts},v1=${computeSignature(SECRET, signatureManifest({ dataId: o.documentedCase ? (queryId ?? "").toLowerCase() : (o.signFor ?? queryId), requestId, ts }))}`;
   const body = { action: o.action ?? "order.processed", type: "order", live_mode: o.liveMode ?? false, user_id: o.userId ?? FAKE_ACCOUNT, api_version: "v1", data: { id: orderId, status: o.bodyStatus ?? "processed", version: o.version ?? 1 } };
   const request = new Request(`http://localhost/api/webhooks/mercadopago?type=order${queryId ? `&data.id=${queryId}` : ""}`, { method: "POST", headers, body: JSON.stringify(body) });
   const response = await webhook.handleMercadoPagoWebhook(request, { db: db(), providers: p.providers, secret: o.secret === null ? undefined : (o.secret ?? SECRET), production: false });
@@ -197,6 +197,18 @@ describe("webhook: autenticidade (A05)", () => {
 
     const view = await intents.getTopupIntent(db(), actor(guardianA), intent);
     expect(view).toMatchObject({ status: "confirmed", credited: true, statusLabel: "Crédito lançado", credit: { amountCents: 5000, walletSeq: 1, balanceAfterCents: 5000, afterExpiry: false }, awaitingConfirmation: false });
+  });
+
+  it("assinatura com o ID COMO RECEBIDO (formato observado na simulação do painel) e com o ID em minúsculas (documentado): as duas creditam, cada uma uma vez", async () => {
+    const p = fakeMercadoPago();
+    for (const documentedCase of [false, true]) {
+      const student = await newStudent();
+      const intent = await newIntent(p, student);
+      p.pay(intent);
+      expect(await notify(p, intent, { documentedCase })).toMatchObject({ status: 200, body: { outcome: "credited" } });
+      expect(await notify(p, intent, { documentedCase })).toMatchObject({ status: 200, body: { outcome: "already_credited" } });
+      expect(await entriesOf(student)).toHaveLength(1);
+    }
   });
 
   it("o status do corpo NÃO credita: corpo diz 'processed' mas a order no provedor está pendente", async () => {

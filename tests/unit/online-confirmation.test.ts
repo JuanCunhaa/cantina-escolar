@@ -23,10 +23,21 @@ function signed(over: { dataId?: string | null; requestId?: string | null; ts?: 
 }
 
 describe("assinatura do webhook (A05)", () => {
-  it("manifesto: id em minúsculas, request-id e ts; parte ausente é descartada", () => {
-    expect(signatureManifest({ dataId: "ORDTST01ABC", requestId: "r1", ts: "1700000000000" })).toBe("id:ordtst01abc;request-id:r1;ts:1700000000000;");
+  it("manifesto: id, request-id e ts; parte ausente é descartada", () => {
+    expect(signatureManifest({ dataId: "ORDTST01ABC", requestId: "r1", ts: "1700000000000" })).toBe("id:ORDTST01ABC;request-id:r1;ts:1700000000000;");
     expect(signatureManifest({ dataId: null, requestId: "r1", ts: "5" })).toBe("request-id:r1;ts:5;");
-    expect(signatureManifest({ dataId: "X", requestId: null, ts: "5" })).toBe("id:x;ts:5;");
+    expect(signatureManifest({ dataId: "X", requestId: null, ts: "5" })).toBe("id:X;ts:5;");
+  });
+
+  it("ID da order: aceita a forma COMO RECEBIDA (observada na simulação do painel) e a forma em minúsculas documentada; mistura de caixa é recusada", () => {
+    const ts = String(NOW);
+    const at = (manifestId: string) => ({ signature: `ts=${ts},v1=${computeSignature(SECRET, `id:${manifestId};request-id:r1;ts:${ts};`)}` });
+    const check = (manifestId: string, queryId = "ORDTST01M4EDRH87FT") => verifyWebhookSignature({ secret: SECRET, signature: at(manifestId).signature, requestId: "r1", dataId: queryId, nowMs: NOW });
+    expect(check("ORDTST01M4EDRH87FT").ok).toBe(true); // como recebido (maiúsculas)
+    expect(check("ordtst01m4edrh87ft").ok).toBe(true); // documentado (minúsculas)
+    expect(check("OrdTst01M4EDRH87FT")).toEqual({ ok: false, reason: "bad_signature" }); // caixa mista nunca assinada
+    expect(check("ORDTST01M4EDRH87FX")).toEqual({ ok: false, reason: "bad_signature" }); // outro ID
+    expect(verifyWebhookSignature({ secret: "outra-chave", signature: at("ORDTST01M4EDRH87FT").signature, requestId: "r1", dataId: "ORDTST01M4EDRH87FT", nowMs: NOW })).toEqual({ ok: false, reason: "bad_signature" });
   });
 
   it("aceita assinatura correta (inclusive data.id em maiúsculas na query)", () => {
@@ -269,8 +280,9 @@ describe("diagnóstico de assinatura recusada (só log; nunca aceita)", () => {
     expect(diagnoseSignature({ ...common, signature: header(`id:ord01abc;request-id:req-1;`) })).toEqual(["sem_ts"]);
     expect(diagnoseSignature({ ...common, signature: `ts=${ts},v1=${"0".repeat(64)}` })).toEqual([]);
     expect(diagnoseSignature({ ...common, signature: "lixo" })).toEqual(["cabecalho_malformado"]);
-    // e a verificação oficial continua recusando a variante divergente
-    const bad = verifyWebhookSignature({ secret: SECRET, signature: header(`id:ORD01ABC;request-id:req-1;ts:${ts};`), requestId: "req-1", dataId: "ORD01ABC", nowMs: Number(ts) });
-    expect(bad).toEqual({ ok: false, reason: "bad_signature" });
+    // a verificação oficial aceita o ID como recebido, mas continua recusando as demais variantes (sem id, sem request-id, sem ts)
+    const verify = (manifest: string) => verifyWebhookSignature({ secret: SECRET, signature: header(manifest), requestId: "req-1", dataId: "ORD01ABC", nowMs: Number(ts) });
+    expect(verify(`id:ORD01ABC;request-id:req-1;ts:${ts};`).ok).toBe(true);
+    for (const manifest of [`request-id:req-1;ts:${ts};`, `id:ord01abc;ts:${ts};`, `id:ord01abc;request-id:req-1;`]) expect(verify(manifest)).toEqual({ ok: false, reason: "bad_signature" });
   });
 });
