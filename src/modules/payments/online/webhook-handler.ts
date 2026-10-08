@@ -31,10 +31,18 @@ export async function handleMercadoPagoWebhook(request: Request, deps: WebhookDe
       // Só dados NÃO secretos (ID da order, request-id, ts, 10 primeiros hex do v1 e quais variantes do manifesto bateriam).
       const header = request.headers.get("x-signature");
       const parsed = parseSignatureHeader(header);
+      // Corpo (NÃO assinado, só diagnóstico): de qual aplicação/conta/ambiente vem a entrega recusada. Nada além destes 4 campos curtos.
+      let origin: Record<string, unknown> = {};
+      try {
+        const raw = JSON.parse((await request.text()).slice(0, WEBHOOK_BODY_MAX_BYTES)) as Record<string, unknown>;
+        origin = { application_id: String(raw.application_id ?? "").slice(0, 24), user_id: String(raw.user_id ?? "").slice(0, 24), live_mode: raw.live_mode ?? null, action: String(raw.action ?? "").slice(0, 40) };
+      } catch {
+        origin = { corpo: "ilegível" };
+      }
       console.warn(
         "mercadopago webhook rejected: %s %s",
         signature.reason,
-        JSON.stringify({ dataId: queryId.slice(0, 40), requestId: (request.headers.get("x-request-id") ?? "").slice(0, 60), ts: parsed?.ts ?? null, v1: parsed?.v1.slice(0, 10) ?? null, matches: signature.reason === "bad_signature" ? diagnoseSignature({ secret: deps.secret, signature: header, requestId: request.headers.get("x-request-id"), dataId: queryId }) : [] }),
+        JSON.stringify({ origin, dataId: queryId.slice(0, 40), requestId: (request.headers.get("x-request-id") ?? "").slice(0, 60), ts: parsed?.ts ?? null, v1: parsed?.v1.slice(0, 10) ?? null, matches: signature.reason === "bad_signature" ? diagnoseSignature({ secret: deps.secret, signature: header, requestId: request.headers.get("x-request-id"), dataId: queryId }) : [] }),
       );
       return json(401, { error: "invalid_signature" });
     }
