@@ -228,10 +228,11 @@ test("reembolso PARCIAL REAL acumulado no sandbox (contrato observado): cada par
 
 test("reembolso REAL com o crédito já consumido: recupera o saldo, abre pendência, bloqueia a carteira e a administração regulariza", async ({ request }) => {
   test.setTimeout(420_000);
+  const start = await wallet(request);
   const intentId = await createPix(request, fam.studentId, 1000);
   await waitConfirmed(request, intentId);
   const credited = await wallet(request);
-  expect(credited).toMatchObject({ balanceCents: 1000, version: 3 });
+  expect(credited).toMatchObject({ balanceCents: start.balanceCents + 1000, version: start.version + 1 }); // relativo ao estado lido: os testes anteriores já lançaram movimentos
   // Consumo: transferência de R$ 7,00 para o irmão (saldo restante R$ 3,00).
   const transfer = await call(request, fam.guardian, "POST", "/api/wallets/transfer", { key: newKey("hml-f19-tr"), fromStudentId: fam.studentId, toStudentId: siblingId, amountCents: 700, reason: "Consumo de teste F19" });
   expect(transfer.status, String(transfer.body.error ?? "")).toBe(200);
