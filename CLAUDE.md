@@ -41,6 +41,7 @@ Desenvolver site operacional para uma escola (~300 alunos), com Next.js/React, T
 
 Comandos reais (F01, `package.json`, npm; Node >=24.12, Java 21 para emuladores; projeto emulador `demo-cantina`):
 
+- Na nuvem (`CLAUDE_CODE_REMOTE=true`), seguir a skill `cantina-node-env` em todo comando node/npm/npx: prefixo `export PATH=/usr/local/bin:$PATH PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/ms-playwright;`.
 - `npm run dev` / `npm run build` — Next padrão (Turbopack). Nesta máquina Windows o binário SWC nativo é bloqueado: usar `npm run dev:webpack` / `npm run build:webpack`.
 - `npm run lint` (ESLint 9), `npm run typecheck` (tsc strict), `npm test` (unit, Vitest).
 - `npm run test:rules`, `npm run test:integration`, `npm run test:e2e` — sobem Auth/Firestore via `firebase emulators:exec` (arquivos: armazenamento local `STORAGE_LOCAL_DIR`, double do R2; sem Storage Emulator); e2e usa Playwright com `next dev --webpack` na porta 3100 e ambiente hermético (zera credencial de `.env` local).
