@@ -22,7 +22,7 @@ test.describe.configure({ mode: "serial" });
 
 const STATE = ".agent-logs/f19-sim-state.json";
 const MP_API = "https://api.mercadopago.com";
-const AMOUNT = 1100;
+const AMOUNT = 1300;
 let fam: Family;
 let sandbox = false;
 let intentId = "";
@@ -73,7 +73,7 @@ test("recarga nova aprovada no sandbox, SEM crédito antes da simulação (carte
   // Aprovação no sandbox, consultada DIRETAMENTE no provedor (não passa pelo nosso servidor, não lança crédito).
   const token = envFile().MERCADOPAGO_ACCESS_TOKEN?.trim() ?? "";
   const approved = await observe("aprovação da order no sandbox", 3, async () => ((await (await fetch(`${MP_API}/v1/orders/${orderId}`, { headers: { authorization: `Bearer ${token}` } })).json()) as Json), (o) => o.status === "processed");
-  expect(approved).toMatchObject({ status: "processed", status_detail: "accredited", total_paid_amount: "11.00" });
+  expect(approved).toMatchObject({ status: "processed", status_detail: "accredited", total_paid_amount: "13.00" });
 
   // Antes da simulação: nada de crédito em lugar nenhum.
   expect(await wallet(request)).toMatchObject({ balanceCents: 0, version: 0, pendingReversalCents: 0 });
@@ -87,9 +87,9 @@ test("recarga nova aprovada no sandbox, SEM crédito antes da simulação (carte
 });
 
 test("1ª simulação do painel: assinatura válida, evento recebido, consulta confirmatória e crédito ORIGINADO pelo webhook", async ({ request }) => {
-  test.setTimeout(30 * 60_000);
+  test.setTimeout(90 * 60_000);
   expect(orderId, "depende do teste anterior").not.toBe("");
-  const seen = await observe("1ª simulação (recarga confirmada)", 25, async () => (await call(request, fam.guardian, "GET", `/api/topups/online/${intentId}`)).body, (v) => v.status === "confirmed");
+  const seen = await observe("1ª simulação (recarga confirmada)", 60, async () => (await call(request, fam.guardian, "GET", `/api/topups/online/${intentId}`)).body, (v) => v.status === "confirmed");
   expect(seen).toMatchObject({ status: "confirmed", credited: true, credit: { amountCents: AMOUNT, walletSeq: 1, balanceAfterCents: AMOUNT } });
 
   const doc = await intentDoc();
@@ -107,9 +107,9 @@ test("1ª simulação do painel: assinatura válida, evento recebido, consulta c
 });
 
 test("2ª simulação do painel: nenhum segundo crédito (carteira, livro e auditoria intactos)", async ({ request }) => {
-  test.setTimeout(30 * 60_000);
+  test.setTimeout(90 * 60_000);
   expect(orderId, "depende dos testes anteriores").not.toBe("");
-  const all = await observe("2ª simulação (novo evento)", 25, events, (list) => list.length >= 2);
+  const all = await observe("2ª simulação (novo evento)", 60, events, (list) => list.length >= 2);
   expect(all.filter((e) => e.outcome === "credited")).toHaveLength(1);
   const second = all.find((e) => e.outcome !== "credited")!;
   expect(second).toMatchObject({ source: "webhook", outcome: "noop", reason: "already_credited" });
