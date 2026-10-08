@@ -230,6 +230,13 @@ describe("consulta confirmatória e conta recebedora (F19)", () => {
     expect(garbled).toMatchObject({ kind: "uncertain", code: "unreadable_order" });
   });
 
+  it("ID malformado para o provedor (400 invalid_path_param, medido no sandbox) = order inexistente; outros 400 continuam incertos", async () => {
+    const invalid = { errors: [{ code: "invalid_path_param", message: "path param order id is invalid" }] };
+    expect(await mercadoPagoPix(cfg(fakeHttp([{ status: 400, body: invalid }]).fetchFn)).getOrder("123456")).toBeNull();
+    const other = await failure(mercadoPagoPix(cfg(fakeHttp([{ status: 400, body: { errors: [{ code: "bad_request" }] } }]).fetchFn)).getOrder("ORDX"));
+    expect(other.kind).toBe("uncertain");
+  });
+
   it("ID de order fora do formato nem chega à rede (sem injeção de caminho)", async () => {
     const http = fakeHttp([]);
     expect(await mercadoPagoPix(cfg(http.fetchFn)).getOrder("../users/me")).toBeNull();

@@ -223,6 +223,8 @@ async function getOrder(cfg: MercadoPagoConfig, orderId: string): Promise<Provid
   if (!/^[A-Za-z0-9_-]{1,80}$/.test(orderId)) return null;
   const r = await request(cfg, "GET", `/v1/orders/${encodeURIComponent(orderId)}`);
   if (r.status === 404) return null;
+  // ID malformado (ex.: o "123456" padrão da simulação do painel) = 400 `invalid_path_param` (medido no sandbox em 08/10/2026): essa order não existe.
+  if (r.status === 400 && errorCode(r.body, r.status) === "invalid_path_param") return null;
   if (r.status !== 200) throw new ProviderError("uncertain", errorCode(r.body, r.status));
   return normalizeOrder(r.body);
 }
