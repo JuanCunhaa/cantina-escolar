@@ -142,7 +142,7 @@ test("Pix aprovado pelo sandbox é confirmado pelo servidor e creditado UMA vez 
   }
 });
 
-test("webhook: assinatura inválida recusada; com a chave REAL, a notificação repetida não duplica; order desconhecida ou de outra conta não credita", async ({ request }) => {
+test("webhook: assinatura inválida recusada; com a chave REAL, a notificação repetida não duplica; order desconhecida não credita e o user_id do corpo não decide nada", async ({ request }) => {
   test.skip(!secret, "MERCADOPAGO_WEBHOOK_SECRET ausente no arquivo local: não é possível assinar notificações de teste");
   expect(pixOrder, "depende do teste anterior").not.toBe("");
   const bad = await deliver(request, pixOrder, { badSignature: true });
@@ -156,8 +156,9 @@ test("webhook: assinatura inválida recusada; com a chave REAL, a notificação 
 
   const unknown = await deliver(request, "ORDTSTNAOEXISTE0000000000000", { userId: accountId });
   expect(unknown).toMatchObject({ status: 200, body: { outcome: "unknown_order" } });
+  // user_id do corpo (não assinado) NÃO decide nada: vale a order consultada, que já está creditada → nenhuma mudança.
   const otherAccount = await deliver(request, pixOrder, { userId: "999000111" });
-  expect(otherAccount).toMatchObject({ status: 200, body: { outcome: "noop" } });
+  expect(otherAccount).toMatchObject({ status: 200, body: { outcome: "already_credited" } });
   expect(await wallet(request)).toMatchObject({ balanceCents: 1234, version: 1 });
   expect(await ledgerOk(request)).toMatchObject({ entryCount: 1 });
 });
