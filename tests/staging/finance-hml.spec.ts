@@ -142,15 +142,16 @@ test("caixa: abrir com saldo confirmado, receber, fechar SEM diferença; só o p
 
   const mine = await call(request, secretaria, "GET", "/api/cash");
   const secPoint = (mine.body.points as { point: string; live: { receiptCount: number; expectedCashCents: number; byMethod: { method: string; netCents: number }[] } }[]).find((p) => p.point === "secretaria")!;
-  expect(secPoint.live).toMatchObject({ receiptCount: 3, expectedCashCents: 12_000 });
-  expect(Object.fromEntries(secPoint.live.byMethod.map((m) => [m.method, m.netCents]))).toMatchObject({ cash: 2000, pix: 3000, card_debit: 1000, card_credit: 0 });
+  // 4 recebimentos: o cartão de R$ 50,00 do teste anterior (mesma operadora) + dinheiro, Pix e débito deste; só o dinheiro entra na gaveta
+  expect(secPoint.live).toMatchObject({ receiptCount: 4, expectedCashCents: 12_000 });
+  expect(Object.fromEntries(secPoint.live.byMethod.map((m) => [m.method, m.netCents]))).toMatchObject({ cash: 2000, pix: 3000, card_debit: 1000, card_credit: 5000 });
 
   // outro operador não fecha este caixa; a administração também não
   expect((await close(request, secretaria2, sid(TODAY, secretaria))).status).toBe(403);
   expect((await close(request, fam.admin, sid(TODAY, secretaria))).status).toBe(403);
   const body = { key: newKey("hml-f20"), sessionId: sid(TODAY, secretaria), countedCashCents: 12_000, declared: { pixCents: 3000 }, note: MARK };
   const closed = await call(request, secretaria, "POST", "/api/cash/close", body);
-  expect(closed, JSON.stringify(closed.body)).toMatchObject({ status: 200, body: { closureNo: 1, hasDivergence: false, reviewStatus: "not_required", expectedCashCents: 12_000, receiptCount: 3 } });
+  expect(closed, JSON.stringify(closed.body)).toMatchObject({ status: 200, body: { closureNo: 1, hasDivergence: false, reviewStatus: "not_required", expectedCashCents: 12_000, receiptCount: 4 } });
   expect((await call(request, secretaria, "POST", "/api/cash/close", body)).body).toMatchObject({ replayed: true, closureNo: 1 });
   expect((await close(request, secretaria, sid(TODAY, secretaria))).body.error).toBe("already_closed");
   expect(await audit(`${secretaria.uid}__cash.close__${body.key}`)).toMatchObject({ action: "cash.close", after: { closureNo: 1, hasDivergence: false } });

@@ -36,15 +36,15 @@ beforeEach(async () => {
 });
 
 describe("Firestore rules — F20: caixa, taxas e conferências são fechados ao cliente", () => {
-  it.each(["admin", "secretaria", "cantina", "guardian", "student"])("%s não lê nem lista nenhuma coleção financeira da F20", async (role) => {
+  // Testes ESTÁTICOS (um `it` literal por papel): o gate compara testes listados × executados e a listagem não expande `.each` nem laços.
+  const cannotRead = async (role: string) => {
     const db = (await as(`u_${role}`, role)).firestore();
     for (const path of PATHS) await assertFails(getDoc(doc(db, path)));
     await assertFails(getDocs(collection(db, "cashSessions")));
     await assertFails(getDocs(collection(db, "feeSeries")));
     await assertFails(getDocs(collection(db, "paymentSources")));
-  });
-
-  it.each(["admin", "secretaria", "cantina"])("%s não escreve, altera nem apaga: nem o próprio caixa (a escrita é só do servidor)", async (role) => {
+  };
+  const cannotWrite = async (role: string) => {
     const db = (await as(`w_${role}`, role)).firestore();
     await assertFails(setDoc(doc(db, "cashSessions/2026-10-09__secretaria__w_" + role), { operator: { uid: `w_${role}` }, status: "closed", opening: { cents: 1 } }));
     await assertFails(updateDoc(doc(db, PATHS[0]), { status: "closed" }));
@@ -52,7 +52,15 @@ describe("Firestore rules — F20: caixa, taxas e conferências são fechados ao
     await assertFails(setDoc(doc(db, "feeSeries/term_x__pix"), { versions: [{ n: 1, percentBp: 1 }] }));
     await assertFails(updateDoc(doc(db, "feeSeries/term_abc__card_credit"), { versions: [] }));
     await assertFails(setDoc(doc(db, "topups/tpm_1/reconciliations/rcn_9"), { after: { fee: { status: "confirmed", cents: 0 } } }));
-  });
+  };
+  it("admin não lê nem lista nenhuma coleção financeira da F20", () => cannotRead("admin"));
+  it("secretaria não lê nem lista nenhuma coleção financeira da F20", () => cannotRead("secretaria"));
+  it("cantina não lê nem lista nenhuma coleção financeira da F20", () => cannotRead("cantina"));
+  it("guardian não lê nem lista nenhuma coleção financeira da F20", () => cannotRead("guardian"));
+  it("student não lê nem lista nenhuma coleção financeira da F20", () => cannotRead("student"));
+  it("admin não escreve, altera nem apaga: nem o próprio caixa (a escrita é só do servidor)", () => cannotWrite("admin"));
+  it("secretaria não escreve, altera nem apaga: nem o próprio caixa (a escrita é só do servidor)", () => cannotWrite("secretaria"));
+  it("cantina não escreve, altera nem apaga: nem o próprio caixa (a escrita é só do servidor)", () => cannotWrite("cantina"));
 
   it("sem login: nada", async () => {
     const db = env.unauthenticatedContext().firestore();

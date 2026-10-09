@@ -181,12 +181,24 @@ const walletOf = async (studentId: string) => (await doc(`wallets/${studentId}`)
 /* ------------------------------------------------------------------------------------- autorização */
 
 describe("autorização: só a administração vê regras, conferência, relatório e exportação", () => {
-  it.each(ADMIN_ROUTES)("%s %s: anônimo 401; secretaria, cantina, responsável e aluno 403", async (method, file, url) => {
+  // Testes ESTÁTICOS (um `it` literal por rota): o gate do CI compara os testes LISTADOS pelo Vitest com os executados, e a listagem não expande `.each` nem laços.
+  const denied = async (method: string, file: string) => {
+    const url = ADMIN_ROUTES.find(([m, f]) => m === method && f === file)![2];
     const key = `${method} ${file}`;
     const body = method === "POST" ? {} : undefined;
     expect((await call(key, null, method, url, body)).status).toBe(401);
     for (const user of [secretaria, cantina, guardian, studentUser]) expect((await call(key, user, method, url, body)).status, `${file} ${user.email}`).toBe(403);
-  });
+  };
+  it("GET admin/finance/fees/route: anônimo 401; secretaria, cantina, responsável e aluno 403", () => denied("GET", "admin/finance/fees/route"));
+  it("POST admin/finance/sources/route: anônimo 401; secretaria, cantina, responsável e aluno 403", () => denied("POST", "admin/finance/sources/route"));
+  it("POST admin/finance/sources/active/route: anônimo 401; secretaria, cantina, responsável e aluno 403", () => denied("POST", "admin/finance/sources/active/route"));
+  it("POST admin/finance/rules/route: anônimo 401; secretaria, cantina, responsável e aluno 403", () => denied("POST", "admin/finance/rules/route"));
+  it("POST admin/finance/rules/withdraw/route: anônimo 401; secretaria, cantina, responsável e aluno 403", () => denied("POST", "admin/finance/rules/withdraw/route"));
+  it("GET admin/finance/receipts/route: anônimo 401; secretaria, cantina, responsável e aluno 403", () => denied("GET", "admin/finance/receipts/route"));
+  it("POST admin/finance/reconcile/route: anônimo 401; secretaria, cantina, responsável e aluno 403", () => denied("POST", "admin/finance/reconcile/route"));
+  it("GET admin/finance/report/route: anônimo 401; secretaria, cantina, responsável e aluno 403", () => denied("GET", "admin/finance/report/route"));
+  it("GET admin/finance/export/route: anônimo 401; secretaria, cantina, responsável e aluno 403", () => denied("GET", "admin/finance/export/route"));
+  it("GET admin/finance/cash/route: anônimo 401; secretaria, cantina, responsável e aluno 403", () => denied("GET", "admin/finance/cash/route"));
 
   it("a secretaria e a cantina listam só NOME e meios das maquininhas (nunca percentuais, prazos ou regras); família não lista", async () => {
     const created = await adminPost("admin/finance/sources/route", { key: randomUUID(), kind: "terminal", code, name: "Maquininha fictícia balcão", methods: ["card_debit", "card_credit"], fictitious: true });
