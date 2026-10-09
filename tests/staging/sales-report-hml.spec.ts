@@ -8,17 +8,19 @@
 // Fica na homologação (auditável e marcado como teste): o histórico de estoque, os pedidos e a recarga simulada; os produtos fictícios
 // são ARQUIVADOS no fim e só as contas efêmeras saem no teardown.
 import { randomUUID } from "node:crypto";
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { DEMO_SHIFTS } from "../../scripts/lib/demo-seed.ts";
 import { firestoreRest } from "../../scripts/staging/admin.ts";
-import { loadTarget } from "../../scripts/staging/target.ts";
+import { PUBLISHED_STATE_FILE, loadTarget } from "../../scripts/staging/target.ts";
 import { localDateOf } from "../../src/lib/dates/school-time";
-import { createTestUser, type TestUser } from "../helpers/auth-emulator";
+import { createTestUser, TEST_PASSWORD, type TestUser } from "../helpers/auth-emulator";
 import { createTempProduct, fixtureIds, prepareCatalog, retireTempProduct } from "../helpers/catalog-fixtures.ts";
 import { createFamily, type Family } from "../helpers/menu-fixtures.ts";
 import { bearer, fsRequest } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
+
+const target = loadTarget();
 
 const tag = Math.random().toString(36).slice(2, 7);
 const TODAY = localDateOf(new Date());
@@ -34,6 +36,9 @@ let openDate = "";
 let orderId = "";
 
 type Json = Record<string, unknown> & { error?: string; details?: Record<string, unknown> };
+/** Só as CHAVES do JSON (nomes de produto do cadastro de homologação podem conter qualquer palavra). */
+const keysOf = (value: unknown): string[] => (Array.isArray(value) ? value.flatMap(keysOf) : value && typeof value === "object" ? Object.entries(value).flatMap(([k, v]) => [k, ...keysOf(v)]) : []);
+const COST_KEYS = /cost|cogs|profit|margin|fee|result|purchase|ledger|wallet|estimate|check/i;
 const call = async (request: APIRequestContext, user: TestUser | null, method: "GET" | "POST", url: string, data?: unknown) => {
   const response = await request.fetch(url, { method, headers: user ? bearer(user.idToken) : {}, data });
   return { status: response.status(), body: (await response.json().catch(() => ({}))) as Json };
@@ -41,7 +46,10 @@ const call = async (request: APIRequestContext, user: TestUser | null, method: "
 const post = (request: APIRequestContext, user: TestUser | null, url: string, data: Record<string, unknown>, key = randomUUID()) => call(request, user, "POST", url, { key, ...data });
 const report = (request: APIRequestContext, user: TestUser | null, params: string) => call(request, user, "GET", `/api/reports/sales?from=${TODAY}&to=${TODAY}&${params}`);
 type Totals = { units: number; revenueCents: number; cogsCents: number; costMicros: number; grossProfitCents: number; marginBp: number | null; complete: boolean };
-const realized = (r: { body: Json }) => r.body.realized as { totals: Totals; byChannel: { key: string; units: number; revenueCents: number }[] };
+const realized = (r: { status?: number; body: Json }) => {
+  expect(r.status, JSON.stringify(r.body)).toBe(200); // falha com o corpo do erro, não com TypeError
+  return r.body.realized as { totals: Totals; byChannel: { key: string; units: number; revenueCents: number }[] };
+};
 
 test.beforeAll(async ({ request }) => {
   await prepareCatalog();
@@ -81,7 +89,7 @@ test("autorização: administração completa; cantina só quantidades e valores
   const c = await report(request, cantina, "");
   expect([a.status, a.body.scope, a.body.production]).toEqual([200, "full", false]);
   expect([c.status, c.body.scope]).toEqual([200, "operational"]);
-  expect(JSON.stringify(c.body)).not.toMatch(/cost|cogs|profit|margin|fee|ledger|wallet/i);
+  expect(keysOf(c.body).filter((k) => COST_KEYS.test(k))).toEqual([]);
   expect((await report(request, fam.admin, "from=2026-01-01&to=2026-12-31")).status).toBe(409); // período maior que o limite
 });
 
@@ -107,7 +115,7 @@ test("A20 com vendas reais: 100×R$1,00 + 100×R$1,10; venda direta de 10 a R$2,
   // a cantina vê as mesmas quantidades e valores, sem custo
   const c = await report(request, cantina, `productId=${pa}`);
   expect(realized(c).totals).toMatchObject({ units: 10, revenueCents: 2000 });
-  expect(JSON.stringify(c.body)).not.toMatch(/cost|cogs|profit|margin/i);
+  expect(keysOf(c.body).filter((k) => COST_KEYS.test(k))).toEqual([]);
 });
 
 test("recarga simulada não é receita; venda no balcão com saldo, pedido futuro a realizar e cancelamento com reembolso aparecem separados", async ({ request }) => {
@@ -150,7 +158,7 @@ test("perda e compra de estoque ficam fora do CMV e do resultado; cantina vê a 
   expect(realized(r).totals.cogsCents).toBe(200); // a perda (R$ 3,00) e a compra (R$ 20,00) não entram no CMV
   const c = await report(request, cantina, `productId=${pb}`);
   expect(c.body.losses).toMatchObject({ totalUnits: 3 });
-  expect(JSON.stringify(c.body.losses)).not.toMatch(/cost/i);
+  expect(keysOf(c.body.losses).filter((k) => COST_KEYS.test(k))).toEqual([]);
   expect(c.body.purchases).toBeUndefined();
   // sem filtro: resultado, carteiras e conferências existem; as conferências fecham
   const all = await report(request, fam.admin, "");
@@ -200,4 +208,45 @@ test("Security Rules publicadas: custo, receita e cancelamentos não saem pelo c
     expect((await fsRequest(user.idToken, "GET", `stockCosts/${pa}/movements/m000000001`)).status, user.email).toBe(403);
   }
   expect(await group(null, "movements")).toBe(403);
+});
+
+async function login(page: Page, email: string, path: string) {
+  await page.goto(path);
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Senha").fill(TEST_PASSWORD);
+  await page.getByRole("button", { name: "Entrar" }).click();
+}
+
+test("tela publicada: administração vê CMV e lucro do produto A20, ambiente fictício identificado e celular sem rolagem lateral", async ({ page }) => {
+  await login(page, fam.admin.email, "/operacao/relatorios");
+  await expect(page.getByRole("heading", { name: "Relatórios de vendas" })).toBeVisible({ timeout: 45000 });
+  await page.locator("#rs-product").selectOption(pa);
+  const totals = page.getByTestId("sales-totals");
+  await expect(totals).toContainText(/R\$\s20,00/, { timeout: 30000 });
+  await expect(totals).toContainText(/R\$\s10,50/);
+  await expect(page.getByTestId("sales-profit")).toContainText(/R\$\s9,50/);
+  await expect(totals).toContainText("47,50 %");
+  await expect(page.getByTestId("sales-fictitious")).toBeVisible();
+  await page.locator("#rs-product").selectOption("");
+  await expect(page.getByTestId("sales-result")).toBeVisible();
+  await expect(page.getByTestId("sales-checks")).toBeVisible();
+  await page.screenshot({ path: "test-results/f21-publicada-relatorio-admin.png", fullPage: true });
+  await page.setViewportSize({ width: 360, height: 760 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+});
+
+test("tela publicada: cantina vê quantidades e valores sem custo, CMV, lucro nem margem; secretaria é recusada", async ({ page, browser }) => {
+  await login(page, cantina.email, "/operacao/relatorios");
+  await expect(page.getByRole("heading", { name: "Relatórios de vendas" })).toBeVisible({ timeout: 45000 });
+  await page.locator("#rs-product").selectOption(pa);
+  await expect(page.getByTestId("sales-totals")).toContainText(/R$s20,00/, { timeout: 30000 });
+  await expect(page.getByTestId("sales-totals")).toContainText("Ticket médio");
+  const body = await page.locator("body").innerText();
+  for (const word of ["CMV", "Lucro", "Margem", "Resultado após", "Compras de estoque", "Carteiras"]) expect(body, word).not.toContain(word);
+  await page.screenshot({ path: "test-results/f21-publicada-relatorio-cantina.png", fullPage: true });
+  const sec = await browser.newContext(target.published ? { storageState: PUBLISHED_STATE_FILE } : {});
+  const denied = await sec.newPage();
+  await login(denied, secretaria.email, "/operacao/relatorios");
+  await expect(denied.getByText("Seu perfil não acessa os relatórios de vendas.")).toBeVisible({ timeout: 45000 });
+  await sec.close();
 });

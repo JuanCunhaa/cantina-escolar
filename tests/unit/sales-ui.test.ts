@@ -267,6 +267,16 @@ describe("F21 — administração vê custo, lucro e margem; parcial nunca vira 
     expect(view(toOperational(r))).not.toContain("Recebimentos externos");
   });
 
+  it("a origem dos dias aparece (cache, preparados agora, ao vivo) e dia em preparação é pendência que torna o relatório incompleto", () => {
+    const r = buildSalesReport(input({ sales: [sale({ productId: "p1", units: 1, revenueCents: 100, costMicros: c(40) })], projection: { cachedDays: 2, builtDays: 1, liveDays: 1, building: ["2026-10-03"] } }));
+    const out = view(r);
+    expect(out).toContain("2 do cache diário, 1 preparados agora, 1 ao vivo, 1 em preparação");
+    expect(out).toContain("Dias em preparação");
+    expect(out).toContain("PARCIAL");
+    expect(view(toOperational(r))).toContain("1 em preparação");
+    expect(view(buildSalesReport(input()))).not.toContain("Fonte dos dias");
+  });
+
   it("conferência que diverge aparece como alerta com os números", () => {
     const r = a20();
     r.checks = [{ id: "units_produto", label: "Unidades por produto = total", kind: "internal", expected: 10, actual: 9, ok: false }];

@@ -494,7 +494,7 @@ function buildLedger(facts: readonly LedgerFact[]): LedgerSection {
 /* ---------------------------------------------------------------------------------------------- pendências e relatório */
 
 /** Pendências que a visão da cantina pode ver: sem custo, taxa nem margem (essas só existem na visão completa). */
-export const operationalPendency = (code: string): boolean => code === "origin_missing" || code.startsWith("truncated_") || code.startsWith("unreadable_");
+export const operationalPendency = (code: string): boolean => code === "origin_missing" || code === "projection_building" || code.startsWith("truncated_") || code.startsWith("unreadable_");
 
 /** Opções dos filtros da tela (nomes do cadastro de hoje; só rótulos). */
 export type FilterOptions = { shifts: { id: string; label: string }[]; categories: { id: string; label: string }[]; products: { id: string; name: string }[] };
@@ -515,6 +515,9 @@ export type ReceiptsSummary = {
   pendingGrossCents: number;
   overdueGrossCents: number;
 };
+
+/** De onde vieram os dias do período: cache diário, materializados agora, ao vivo (dia corrente / incompletos) ou ainda em construção. */
+export type ProjectionStats = { cachedDays: number; builtDays: number; liveDays: number; building: string[] };
 
 export type Pendency = { code: string; count: number; detail: string; blocksResult: boolean };
 
@@ -559,6 +562,7 @@ export type SalesInput = {
   walletCount: number | null;
   /** Fontes cuja leitura bateu no teto (relatório parcial). */
   truncated: readonly string[];
+  projection?: ProjectionStats;
   /** Documentos de origem que não puderam ser lidos (campo ausente/ inválido) por fonte: viram pendência, nunca zero. */
   unreadable: readonly { source: string; count: number }[];
 };
@@ -574,6 +578,7 @@ export type SalesReport = {
   dateBasis: Record<"sales" | "losses" | "purchases" | "fees" | "pending" | "cancellations" | "retained" | "ledger", string>;
   truncated: string[];
   skipped: Partial<Record<SectionName, string>>;
+  projection: ProjectionStats | null;
   realized: {
     totals: Agg & Derived;
     /** Pedidos/vendas de origem distintos com baixa no período (base do ticket médio). */
@@ -681,6 +686,7 @@ export function buildSalesReport(input: SalesInput): SalesReport {
   if (pending?.estimate && pending.estimate.missingCostUnits > 0) pendencies.push({ code: "pending_cost_unknown", count: pending.estimate.missingCostUnits, detail: `${pending.estimate.missingCostUnits} unidade(s) a realizar sem custo médio atual: margem estimada indisponível para elas.`, blocksResult: false });
   if (reversals && reversals.open > 0) pendencies.push({ code: "reversal_open", count: reversals.open, detail: `${reversals.open} reversão(ões) externa(s) (reembolso/chargeback) aguardam regularização, ${reversals.outstandingCents} centavos a recuperar: ainda não são perda nem entram no resultado.`, blocksResult: false });
   for (const u of input.unreadable) if (u.count > 0) pendencies.push({ code: `unreadable_${u.source}`, count: u.count, detail: `${u.count} documento(s) de "${u.source}" ilegíveis (campo ausente ou inválido) ficaram fora do relatório.`, blocksResult: true });
+  if (input.projection && input.projection.building.length > 0) pendencies.push({ code: "projection_building", count: input.projection.building.length, detail: `${input.projection.building.length} dia(s) do período ainda estão sendo preparados (${input.projection.building.join(", ")}): o relatório está incompleto; tente de novo em instantes.`, blocksResult: true });
   for (const source of input.truncated) pendencies.push({ code: `truncated_${source}`, count: 1, detail: `A leitura de "${source}" bateu no teto: o período está incompleto. Reduza o intervalo.`, blocksResult: true });
 
   const lossCostCents = losses?.totals.costCents ?? 0;
@@ -709,6 +715,7 @@ export function buildSalesReport(input: SalesInput): SalesReport {
     dateBasis: DATE_BASIS,
     truncated: [...input.truncated],
     skipped,
+    projection: input.projection ?? null,
     realized,
     losses,
     adjustments,
@@ -812,6 +819,7 @@ export type OperationalReport = {
   dateBasis: Pick<SalesReport["dateBasis"], "sales" | "losses" | "pending" | "cancellations" | "retained">;
   truncated: string[];
   skipped: Partial<Record<SectionName, string>>;
+  projection: ProjectionStats | null;
   realized: {
     totals: { facts: number; origins: number; units: number; revenueCents: number; ticketAverageCents: number | null };
     byProduct: OperationalProductRow[];
@@ -846,6 +854,7 @@ export function toOperational(report: SalesReport): OperationalReport {
     dateBasis: { sales: dateBasis.sales, losses: dateBasis.losses, pending: dateBasis.pending, cancellations: dateBasis.cancellations, retained: dateBasis.retained },
     truncated: [...report.truncated],
     skipped: Object.fromEntries(Object.entries(report.skipped).filter(([k]) => OPERATIONAL_SECTIONS.includes(k as SectionName))),
+    projection: report.projection,
     realized: {
       // Ticket médio = receita ÷ pedidos/vendas distintos de origem (não por linha entregue).
       totals: { facts: r.totals.facts, origins: r.origins, units: r.totals.units, revenueCents: r.totals.revenueCents, ticketAverageCents: r.origins > 0 ? roundDiv(r.totals.revenueCents, r.origins) : null },

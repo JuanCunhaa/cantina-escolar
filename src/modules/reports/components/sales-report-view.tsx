@@ -100,6 +100,11 @@ export function ReportNotices({ report }: { report: Report }) {
           </ul>
         </div>
       )}
+      {report.projection && (
+        <p className="muted" data-testid="sales-projection">
+          Fonte dos dias: {report.projection.cachedDays} do cache diário, {report.projection.builtDays} preparados agora, {report.projection.liveDays} ao vivo{report.projection.building.length > 0 ? `, ${report.projection.building.length} em preparação` : ""}.
+        </p>
+      )}
       {Object.entries(report.skipped).length > 0 && (
         <p role="note" className="muted" data-testid="sales-skipped">
           Seções que não seguem os filtros ativos foram omitidas: {Object.values(report.skipped).length} (limpe os filtros para vê-las).
@@ -755,7 +760,8 @@ export function SalesReportView({ report, error = null, params, onParams, today,
 export function SalesReportPage({ user, tabs }: { user: User; tabs: boolean }) {
   const today = localDateOf(new Date());
   const [params, setParams] = useState<SalesParams>({ ...presetRange("month", today), filters: {} });
-  const q = useServerQuery<Report>(user, "/api/reports/sales", salesQuery(params));
+  // Sem releitura a cada foco da janela: cada abertura custa leituras do Firestore.
+  const q = useServerQuery<Report>(user, "/api/reports/sales", salesQuery(params), true, false);
   const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 

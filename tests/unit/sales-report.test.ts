@@ -337,6 +337,23 @@ describe("F21 — achados da revisão: canal em todas as seções que o declaram
   });
 });
 
+describe("F21 — projeção diária na saída e nas tabelas", () => {
+  it("estatística de origem dos dias vai na resposta, no resumo exportado e (sem custo) na visão da cantina", () => {
+    const projection = { cachedDays: 3, builtDays: 1, liveDays: 1, building: [] };
+    const r = buildSalesReport(input({ sales: [sale({ productId: "p1", units: 1, revenueCents: 100, costMicros: c(40) })], projection }));
+    expect(r.projection).toEqual(projection);
+    expect(toOperational(r).projection).toEqual(projection);
+    expect(buildSalesReport(input()).projection).toBeNull();
+    const row = buildSalesTables(r, [], "full").summary!.rows.find((x) => x[0] === "Projeção diária")!;
+    expect(row[2]).toBe("3 / 1 / 1 / 0");
+    expect(r.pendencies.map((x) => x.code)).not.toContain("projection_building");
+    const waiting = buildSalesReport(input({ projection: { cachedDays: 0, builtDays: 0, liveDays: 0, building: ["2026-10-01", "2026-10-02"] } }));
+    expect(waiting.pendencies.find((x) => x.code === "projection_building")).toMatchObject({ count: 2, blocksResult: true });
+    expect(waiting.result?.definitive).toBe(false);
+    expect(toOperational(waiting).pendencies.map((x) => x.code)).toContain("projection_building");
+  });
+});
+
 describe("F21 — recebimentos externos e liquidação (F20) como seção própria", () => {
   const receipts = { count: 2, grossCents: 7000, reversedCents: 1000, feeConfirmedCents: 100, feeInformedCents: 50, feeEstimatedCents: 150, feeUnknownCount: 1, feeEffectiveCents: 300, netExpectedCents: 6200, netRealCents: 5000, settledGrossCents: 2000, pendingGrossCents: 5000, overdueGrossCents: 1000 };
 

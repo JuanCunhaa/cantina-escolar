@@ -59,6 +59,7 @@ beforeAll(async () => {
   reportsMod = await import("@/modules/reports/sales-report");
   routes["GET sales"] = (await import("@/app/api/reports/sales/route")).GET as unknown as Handler;
   routes["GET finance report"] = (await import("@/app/api/admin/finance/report/route")).GET as unknown as Handler;
+  routes["POST days"] = (await import("@/app/api/admin/reports/days/route")).POST as unknown as Handler;
   routes["GET export"] = (await import("@/app/api/reports/sales/export/route")).GET as unknown as Handler;
   routes["POST receipts"] = (await import("@/app/api/inventory/receipts/route")).POST as unknown as Handler;
   routes["POST losses"] = (await import("@/app/api/inventory/losses/route")).POST as unknown as Handler;
@@ -94,6 +95,7 @@ const globalDoc = async (path: string, data: Record<string, string | number | bo
 const synthetic: string[] = [];
 afterAll(async () => {
   for (const path of [...globalDocs.splice(0), ...synthetic.splice(0)]) await adminDb().doc(path).delete();
+  await adminDb().recursiveDelete(adminDb().collection("reportDays")); // cache de projeção (reconstruível) deste arquivo
 });
 
 /* ------------------------------------------------------------------------------------------------- apoio */
@@ -243,8 +245,7 @@ describe("consulta: período, filtros e entradas inválidas", () => {
     expect((await report(admin, { from: d(1), to: d(0) })).body.error).toBe("invalid_range");
     const long = await report(admin, { from: d(-93), to: d(0) });
     expect(long).toMatchObject({ status: 409, body: { error: "range_too_long", details: { maxDays: 93 } } });
-    expect((await report(admin, { from: d(-92), to: d(0) })).status).toBe(200); // 93 dias exatos passam
-    expect((await report(admin, { from: "2026-02-30" })).status).toBe(400);
+      expect((await report(admin, { from: "2026-02-30" })).status).toBe(400);
     expect((await report(admin, { bogus: "1" })).status).toBe(400);
     expect((await report(admin, { channel: "online" })).status).toBe(400);
     expect((await report(admin, { shiftId: "../x" })).status).toBe(400);
@@ -663,6 +664,143 @@ describe("carteira, taxas e conferências da escola inteira (administração)", 
   });
 });
 
+
+/* ------------------------------------------------------------- projeção diária persistida (dias fechados) */
+
+describe("projeção diária persistida: dia fechado é materializado uma vez, reconstruível e conferível (A38)", () => {
+  // Relógio adiantado: depois de dois dias, hoje (BASE) já é um dia FECHADO. O relatório "ao vivo" (relógio real) é o oráculo.
+  const later = () => school.localInstant(d(2), "12:00");
+  const range = () => ({ from: BASE, to: BASE });
+  const sections = (r: Record<string, unknown>) => ({ realized: r.realized, losses: r.losses, adjustments: r.adjustments, purchases: r.purchases, cancellations: r.cancellations, ledger: r.ledger, retained: r.retained });
+  const asFull = async (clock: () => Date, opts: Parameters<typeof reportsMod.salesReport>[4] = {}) => (await reportsMod.salesReport(db(), actorOf(admin, "admin"), range(), clock, opts)) as unknown as Record<string, unknown> & { projection: { cachedDays: number; builtDays: number; liveDays: number; building: string[] }; pendencies: { code: string }[]; result: { definitive: boolean } | null };
+  const meta = async () => (await doc(`reportDays/${BASE}`)) as { digest: string; parts: number; schemaVersion: number; counts: Record<string, number> } | undefined;
+  const wipe = () => db().recursiveDelete(db().doc(`reportDays/${BASE}`));
+  let liveBody: Record<string, unknown>;
+  let digest = "";
+  let synthetic3 = "";
+
+  it("a leitura ao vivo (relógio real) não grava cache; a primeira leitura do dia fechado materializa e a segunda lê do cache — números idênticos", async () => {
+    await wipe();
+    // O documento ilegível criado mais acima impede a materialização: dia com origem ilegível NUNCA é gravado como completo.
+    const blocked = await asFull(later);
+    expect(blocked.projection).toMatchObject({ builtDays: 0, liveDays: 1 });
+    expect((blocked.pendencies as { code: string }[]).map((x) => x.code)).toContain("unreadable_baixas de venda");
+    expect(await meta()).toBeUndefined();
+    await db().doc(P.badPath).delete();
+    const live = await asFull(() => new Date());
+    expect(live.projection).toMatchObject({ cachedDays: 0, builtDays: 0, liveDays: 1 });
+    expect(await meta()).toBeUndefined(); // hoje é dia corrente: nunca vira cache
+    liveBody = live;
+
+    const first = await asFull(later);
+    expect(first.projection).toMatchObject({ cachedDays: 0, builtDays: 1, liveDays: 0, building: [] });
+    expect(sections(first)).toEqual(sections(liveBody));
+    const m = (await meta())!;
+    expect(m).toMatchObject({ schemaVersion: 1 });
+    expect(m.parts).toBeGreaterThanOrEqual(1);
+    expect(m.counts.sales).toBeGreaterThan(0);
+    digest = m.digest;
+
+    const second = await asFull(later);
+    expect(second.projection).toMatchObject({ cachedDays: 1, builtDays: 0, liveDays: 0 });
+    expect(sections(second)).toEqual(sections(liveBody));
+    expect((await meta())!.digest).toBe(digest); // reler não regrava
+  });
+
+  it("apagar o cache não muda nenhum número: reconstrói das fontes com o MESMO digest (replay)", async () => {
+    await wipe();
+    expect(await meta()).toBeUndefined();
+    const rebuilt = await asFull(later);
+    expect(rebuilt.projection.builtDays).toBe(1);
+    expect(sections(rebuilt)).toEqual(sections(liveBody));
+    expect((await meta())!.digest).toBe(digest);
+    const replay = await reportsMod.maintainDays(db(), actorOf(admin, "admin"), { mode: "rebuild", ...range() }, later);
+    expect(replay.days).toEqual([expect.objectContaining({ date: BASE, status: "unchanged", cachedDigest: digest, sourceDigest: digest })]);
+  });
+
+  it("verify compara cache × fontes: igual; fonte mudada depois do fechamento = divergente, o cache segue o que foi materializado até reaplicar", async () => {
+    const pm = P.pm;
+    synthetic3 = `stockCosts/${pm}/movements/m000000003`;
+    synthetic.push(synthetic3);
+    await db().doc(synthetic3).set({ seq: 3, type: "sale_exit", quantity: -2, onHandAfter: 0, referenceType: "order", referenceId: "verificacao", revenueCents: 300, totalCostMicros: -100_000_000, createdAt: Timestamp.now() });
+    await wipe();
+    const before = await asFull(later); // materializa COM o movimento novo
+    const sold = (r: Record<string, unknown>) => (r.realized as Realized).byProduct.find((p) => p.productId === pm)?.units ?? 0;
+    expect(sold(before)).toBe(5); // 3 (sem custo) + 2
+    expect((await reportsMod.maintainDays(db(), actorOf(admin, "admin"), { mode: "verify", ...range() }, later)).days[0]).toMatchObject({ status: "equal" });
+
+    await db().doc(synthetic3).delete(); // a fonte muda DEPOIS do fechamento (não deveria acontecer: serve para provar a conferência)
+    const verify = (await reportsMod.maintainDays(db(), actorOf(admin, "admin"), { mode: "verify", ...range() }, later)).days[0]!;
+    expect(verify.status).toBe("diverged");
+    expect(verify.cachedDigest).not.toBe(verify.sourceDigest);
+    expect(sold(await asFull(later))).toBe(5); // o cache é projeção materializada: só muda quando reaplicado
+    const rebuild = (await reportsMod.maintainDays(db(), actorOf(admin, "admin"), { mode: "rebuild", ...range() }, later)).days[0]!;
+    expect(rebuild.status).toBe("rebuilt");
+    expect(sold(await asFull(later))).toBe(3);
+    expect((await reportsMod.maintainDays(db(), actorOf(admin, "admin"), { mode: "verify", ...range() }, later)).days[0]!.status).toBe("equal");
+    digest = (await meta())!.digest;
+  });
+
+  it("parte do cache adulterada é descartada pelo digest e o dia é reconstruído certo", async () => {
+    const expected = sections(await asFull(later));
+    const part = db().doc(`reportDays/${BASE}/parts/p000`);
+    expect(((await part.get()).get("json") as string).length).toBeGreaterThan(10);
+    await part.update({ json: JSON.stringify({ sales: [{ id: "x", date: BASE, productId: "p", productName: "FORJADO", categoryId: null, channel: "direct", shiftId: null, units: 999, revenueCents: 999_999, costMicros: 1, origin: "o", originFound: true }], losses: [], adjustments: [], purchases: [], purchaseReversals: [], cancellations: [], ledger: [], retained: [], unreadable: {}, truncated: [] }) });
+    const repaired = await asFull(later);
+    expect(repaired.projection.builtDays).toBe(1); // o cache forjado não foi usado
+    expect(sections(repaired)).toEqual(expected);
+    expect(JSON.stringify(repaired)).not.toContain("FORJADO");
+    expect((await meta())!.digest).toBe(digest);
+  });
+
+  it("quatro leituras simultâneas de um dia ainda não materializado dão o mesmo relatório e um único resumo", async () => {
+    await wipe();
+    const all = await Promise.all([asFull(later), asFull(later), asFull(later), asFull(later)]);
+    for (const r of all) expect(sections(r)).toEqual(sections(all[0]!));
+    expect(all.reduce((n, r) => n + r.projection.builtDays + r.projection.cachedDays, 0)).toBe(4);
+    expect((await meta())!.digest).toBe(digest);
+    const parts = await db().collection(`reportDays/${BASE}/parts`).get();
+    expect(parts.size).toBe((await meta())!.parts);
+  });
+
+  it("dia com fonte truncada NÃO é gravado como completo; orçamento de tempo esgotado deixa o dia 'em preparação' e bloqueia a exportação", async () => {
+    await wipe();
+    const truncated = await asFull(later, { cap: 1 });
+    expect((truncated.truncated as string[]).length).toBeGreaterThan(0);
+    expect(await meta()).toBeUndefined();
+    expect(truncated.projection.liveDays).toBe(1);
+
+    const waiting = await asFull(later, { buildBudgetMs: -1 });
+    expect(waiting.projection.building).toEqual([BASE]);
+    expect(waiting.pendencies.map((p) => p.code)).toContain("projection_building");
+    expect(waiting.result?.definitive).toBe(false);
+    expect(await meta()).toBeUndefined();
+    const refused = await reportsMod.exportSales(db(), actorOf(admin, "admin"), { view: "summary", ...range() }, later, { buildBudgetMs: -1 }).catch((e: unknown) => e);
+    expect(refused).toMatchObject({ status: 409, code: "projection_building" });
+    const op = (await reportsMod.salesReport(db(), actorOf(cantina, "cantina"), range(), later, { buildBudgetMs: -1 })) as { pendencies: { code: string }[] };
+    expect(op.pendencies.map((p) => p.code)).toContain("projection_building");
+  });
+
+  it("a rota de manutenção é só da administração e não grava dia corrente", async () => {
+    const url = "/api/admin/reports/days";
+    const body = { mode: "verify", from: d(-5), to: d(-5) };
+    expect((await call("POST days", null, "POST", url, body)).status).toBe(401);
+    for (const user of [secretaria, cantina, guardian, studentUser]) expect((await call("POST days", user, "POST", url, body)).status, user.email).toBe(403);
+    expect((await call("POST days", admin, "POST", url, { mode: "repair", from: d(-5), to: d(-5) })).status).toBe(400);
+    expect((await call("POST days", admin, "POST", url, { mode: "verify", from: d(-5), to: d(-5), extra: 1 })).status).toBe(400);
+    expect((await call("POST days", admin, "POST", url, { mode: "verify", from: d(-100), to: d(0) })).body.error).toBe("range_too_long");
+    const open = await call("POST days", admin, "POST", url, { mode: "rebuild", from: BASE, to: BASE });
+    expect(open.status).toBe(200);
+    expect((open.body.days as { status: string }[])[0]!.status).toBe("open_day");
+    expect(await meta()).toBeUndefined();
+    // dia antigo sem movimento: ausente → reaplicado (vazio, válido) → inalterado ao repetir
+    const rebuild = await call("POST days", admin, "POST", url, { mode: "rebuild", from: d(-5), to: d(-5) });
+    expect((rebuild.body.days as { status: string }[])[0]!.status).toBe("rebuilt");
+    expect(((await call("POST days", admin, "POST", url, { mode: "rebuild", from: d(-5), to: d(-5) })).body.days as { status: string }[])[0]!.status).toBe("unchanged");
+    synthetic.push(`reportDays/${d(-5)}`);
+  });
+});
+
 /* ------------------------------------------------------------------------------------- exportação */
 
 describe("exportação CSV e XLSX: segura, completa e conferindo com o resumo", () => {
@@ -708,9 +846,9 @@ describe("exportação CSV e XLSX: segura, completa e conferindo com o resumo", 
   });
 
   it("exportação NUNCA é truncada em silêncio: teto estourado = 409, e o relatório avisa que é parcial", async () => {
-    const r = await reportsMod.exportSales(db(), actorOf(admin, "admin"), { view: "detail", from: BASE, to: BASE }, () => new Date(), 1).catch((e: unknown) => e);
+    const r = await reportsMod.exportSales(db(), actorOf(admin, "admin"), { view: "detail", from: BASE, to: BASE }, () => new Date(), { cap: 1 }).catch((e: unknown) => e);
     expect(r).toMatchObject({ status: 409, code: "export_truncated" });
-    const partial = (await reportsMod.salesReport(db(), actorOf(admin, "admin"), { from: BASE, to: BASE }, () => new Date(), 1)) as { truncated: string[]; result: { definitive: boolean } | null; pendencies: { code: string }[] };
+    const partial = (await reportsMod.salesReport(db(), actorOf(admin, "admin"), { from: BASE, to: BASE }, () => new Date(), { cap: 1 })) as { truncated: string[]; result: { definitive: boolean } | null; pendencies: { code: string }[] };
     expect(partial.truncated).toContain("movimentos de estoque");
     expect(partial.result?.definitive).toBe(false);
     expect(partial.pendencies.map((p) => p.code)).toContain("truncated_movimentos de estoque");

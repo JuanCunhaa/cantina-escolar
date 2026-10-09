@@ -22,6 +22,8 @@ const PATHS = [
   "feeSeries/term_abc__card_credit",
   "topups/tpm_1/reconciliations/rcn_1",
   "directSales/dsl_1/reconciliations/rcn_2",
+  "reportDays/2026-10-08", // F21: projeção diária dos relatórios (custo e receita por fato)
+  "reportDays/2026-10-08/parts/p000",
 ] as const;
 
 beforeAll(async () => {
@@ -51,6 +53,8 @@ describe("Firestore rules — F20: caixa, taxas e conferências são fechados ao
     await assertFails(deleteDoc(doc(db, PATHS[1])));
     await assertFails(setDoc(doc(db, "feeSeries/term_x__pix"), { versions: [{ n: 1, percentBp: 1 }] }));
     await assertFails(updateDoc(doc(db, "feeSeries/term_abc__card_credit"), { versions: [] }));
+    await assertFails(setDoc(doc(db, "reportDays/2026-10-09"), { digest: "forjado", parts: 1, schemaVersion: 1 })); // F21: ninguém grava a projeção pelo cliente
+    await assertFails(updateDoc(doc(db, "reportDays/2026-10-08"), { digest: "forjado" }));
     await assertFails(setDoc(doc(db, "topups/tpm_1/reconciliations/rcn_9"), { after: { fee: { status: "confirmed", cents: 0 } } }));
   };
   it("admin não lê nem lista nenhuma coleção financeira da F20", () => cannotRead("admin"));

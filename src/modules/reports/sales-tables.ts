@@ -34,6 +34,7 @@ export function buildSalesTables(report: SalesReport, sales: readonly SaleFact[]
   row("Período", "Até", date(report.to));
   row("Ambiente", report.production ? "Produção" : "Teste / homologação", report.production ? "" : "Dados FICTÍCIOS: não representam a operação real da escola");
   if (full && report.fees && report.fees.fictitiousCount > 0 && !report.production) row("Ambiente", "Recebimentos com regra de taxa FICTÍCIA", intCell(report.fees.fictitiousCount), "taxas estimadas de teste, não representam taxas reais");
+  if (report.projection) row("Projeção diária", "Dias do cache / preparados agora / ao vivo / em preparação", `${report.projection.cachedDays} / ${report.projection.builtDays} / ${report.projection.liveDays} / ${report.projection.building.length}`, "dia fechado é imutável e fica materializado; o dia corrente é lido ao vivo das fontes");
   const f = report.filters;
   row("Filtros", "Turno / produto / categoria / canal", [f.shiftId ?? "todos", f.productId ?? "todos", f.categoryId ?? "todos", f.channel ? CHANNEL_LABEL[f.channel] : "todos"].join(" / "));
   row("Vendas realizadas", "Unidades entregues/vendidas", intCell(r.totals.units), "Receita realizada = baixa de estoque; recarga e reserva não entram");
