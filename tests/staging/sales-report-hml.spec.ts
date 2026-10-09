@@ -239,7 +239,7 @@ test("tela publicada: cantina vê quantidades e valores sem custo, CMV, lucro ne
   await login(page, cantina.email, "/operacao/relatorios");
   await expect(page.getByRole("heading", { name: "Relatórios de vendas" })).toBeVisible({ timeout: 45000 });
   await page.locator("#rs-product").selectOption(pa);
-  await expect(page.getByTestId("sales-totals")).toContainText(/R$s20,00/, { timeout: 30000 });
+  await expect(page.getByTestId("sales-totals")).toContainText(/R\$\s20,00/, { timeout: 30000 });
   await expect(page.getByTestId("sales-totals")).toContainText("Ticket médio");
   const body = await page.locator("body").innerText();
   for (const word of ["CMV", "Lucro", "Margem", "Resultado após", "Compras de estoque", "Carteiras"]) expect(body, word).not.toContain(word);
