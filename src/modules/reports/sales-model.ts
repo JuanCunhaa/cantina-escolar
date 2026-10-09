@@ -58,23 +58,29 @@ export type SaleFact = {
   /** Documento de origem (`order:ID` ou `directSale:ID`). */
   origin: string;
   originFound: boolean;
+  /** Valor TOTAL pago do pedido/venda de origem (para conferir que as baixas não passam do pago); `null` sem origem. */
+  originPaidCents?: number | null;
 };
 
 export type LossFact = { id: string; date: LocalDate; productId: string; productName: string; categoryId: string | null; reasonCode: string; units: number; costMicros: number | null; origin: string };
 /** Contagem/ajuste de estoque (assinado: negativo = falta). Não é perda nem CMV; aparece à parte. */
 export type AdjustmentFact = { id: string; date: LocalDate; productId: string; productName: string; categoryId: string | null; type: string; units: number; costMicros: number };
-export type PurchaseFact = { id: string; date: LocalDate; productId: string; productName: string; categoryId: string | null; kind: string; units: number; costMicros: number; reversed: boolean };
+/** Entrada de estoque na data em que foi registrada (imutável; o estorno é outro fato, na data do estorno). */
+export type PurchaseFact = { id: string; date: LocalDate; productId: string; productName: string; categoryId: string | null; kind: string; units: number; costMicros: number };
+/** Estorno de entrada (movimento `receipt_reversal`) na data em que aconteceu: abate no período do estorno, sem reescrever a compra. */
+export type PurchaseReversalFact = { id: string; date: LocalDate; productId: string; productName: string; categoryId: string | null; units: number; costMicros: number };
 
 export type PendingLine = { productId: string; name: string; categoryId: string | null; units: number; valueCents: number };
 /** Pedido pago e ainda não realizado (restante a entregar). `bucket` é relativo ao dia de hoje. */
-export type PendingOrderFact = { id: string; consumptionDate: LocalDate; shiftId: string | null; status: string; lines: PendingLine[] };
-export type RetainedFact = { id: string; date: LocalDate; shiftId: string | null; amountCents: number; units: number };
+export type PendingOrderFact = { id: string; consumptionDate: LocalDate; shiftId: string | null; channel: SaleChannel; status: string; lines: PendingLine[] };
+export type RetainedFact = { id: string; date: LocalDate; shiftId: string | null; channel: SaleChannel; amountCents: number; units: number };
 export type CancellationFact = {
   id: string;
   date: LocalDate;
   orderId: string;
   kind: string;
   shiftId: string | null;
+  channel: SaleChannel;
   lines: { productId: string; name: string; categoryId: string | null; units: number; refundCents: number }[];
 };
 /** Pendência de reversão externa (reembolso/chargeback que não coube no saldo): posição de HOJE, não do período. */
@@ -315,20 +321,23 @@ function buildAdjustments(facts: readonly AdjustmentFact[], filters: Filters): A
   return { rows, netUnits, netCostMicros, netCostCents: microsToCents(netCostMicros) };
 }
 
-export type PurchaseRow = { kind: string; facts: number; units: number; costMicros: number; reversedFacts: number; reversedCostMicros: number };
-export type PurchaseSection = { rows: PurchaseRow[]; byProduct: { productId: string; name: string; units: number; costMicros: number }[]; netCostMicros: number; netCostCents: number };
-function buildPurchases(facts: readonly PurchaseFact[], filters: Filters): PurchaseSection {
+export type PurchaseRow = { kind: string; facts: number; units: number; costMicros: number };
+export type PurchaseSection = {
+  rows: PurchaseRow[];
+  byProduct: { productId: string; name: string; units: number; costMicros: number }[];
+  /** Estornos de entrada ocorridos NO período (data do estorno); abatem do total, nunca reescrevem a compra do mês anterior. */
+  reversals: { facts: number; units: number; costMicros: number };
+  /** Entradas do período − estornos do período. */
+  netCostMicros: number;
+  netCostCents: number;
+};
+function buildPurchases(facts: readonly PurchaseFact[], reversalFacts: readonly PurchaseReversalFact[], filters: Filters): PurchaseSection {
   const kinds = new Map<string, PurchaseRow>();
   const products = new Map<string, { productId: string; name: string; units: number; costMicros: number }>();
   for (const f of facts) {
     if (!productMatches(f.productId, f.categoryId, filters)) continue;
     let k = kinds.get(f.kind);
-    if (!k) kinds.set(f.kind, (k = { kind: f.kind, facts: 0, units: 0, costMicros: 0, reversedFacts: 0, reversedCostMicros: 0 }));
-    if (f.reversed) {
-      k.reversedFacts += 1;
-      k.reversedCostMicros = add(k.reversedCostMicros, f.costMicros);
-      continue; // entrada estornada não é aplicação de caixa efetiva: aparece só como estornada
-    }
+    if (!k) kinds.set(f.kind, (k = { kind: f.kind, facts: 0, units: 0, costMicros: 0 }));
     k.facts += 1;
     k.units = add(k.units, f.units);
     k.costMicros = add(k.costMicros, f.costMicros);
@@ -337,9 +346,23 @@ function buildPurchases(facts: readonly PurchaseFact[], filters: Filters): Purch
     p.units = add(p.units, f.units);
     p.costMicros = add(p.costMicros, f.costMicros);
   }
+  const reversals = { facts: 0, units: 0, costMicros: 0 };
+  for (const f of reversalFacts) {
+    if (!productMatches(f.productId, f.categoryId, filters)) continue;
+    reversals.facts += 1;
+    reversals.units = add(reversals.units, f.units);
+    reversals.costMicros = add(reversals.costMicros, f.costMicros);
+    let p = products.get(f.productId);
+    if (!p) products.set(f.productId, (p = { productId: f.productId, name: f.productName, units: 0, costMicros: 0 }));
+    p.units = add(p.units, -f.units);
+    p.costMicros = add(p.costMicros, -f.costMicros);
+  }
   const rows = [...kinds.values()].sort((a, b) => a.kind.localeCompare(b.kind));
-  const netCostMicros = rows.reduce((n, r) => add(n, r.costMicros), 0);
-  return { rows, byProduct: [...products.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.productId.localeCompare(b.productId)), netCostMicros, netCostCents: microsToCents(netCostMicros) };
+  const netCostMicros = add(
+    rows.reduce((n, r) => add(n, r.costMicros), 0),
+    -reversals.costMicros,
+  );
+  return { rows, reversals, byProduct: [...products.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.productId.localeCompare(b.productId)), netCostMicros, netCostCents: microsToCents(netCostMicros) };
 }
 
 export const PENDING_BUCKETS = ["overdue", "today", "next7", "later"] as const;
@@ -368,6 +391,7 @@ function buildPending(orders: readonly PendingOrderFact[], filters: Filters, tod
   const estimate = avgCost ? { costMicros: 0, missingCostUnits: 0, valueCents: 0 } : null;
   for (const o of orders) {
     if (filters.shiftId !== undefined && o.shiftId !== filters.shiftId) continue;
+    if (filters.channel !== undefined && o.channel !== filters.channel) continue;
     const bucket = buckets.get(pendingBucket(o.consumptionDate, today, plus7))!;
     for (const l of o.lines) {
       if (!productMatches(l.productId, l.categoryId, filters) || l.units <= 0) continue;
@@ -404,7 +428,7 @@ function buildPending(orders: readonly PendingOrderFact[], filters: Filters, tod
 
 export type RetainedSection = { orders: number; units: number; amountCents: number };
 function buildRetained(facts: readonly RetainedFact[], filters: Filters): RetainedSection {
-  const picked = facts.filter((f) => filters.shiftId === undefined || f.shiftId === filters.shiftId);
+  const picked = facts.filter((f) => (filters.shiftId === undefined || f.shiftId === filters.shiftId) && (filters.channel === undefined || f.channel === filters.channel));
   return { orders: picked.length, units: picked.reduce((n, f) => add(n, f.units), 0), amountCents: picked.reduce((n, f) => add(n, f.amountCents), 0) };
 }
 
@@ -419,6 +443,7 @@ function buildCancellations(facts: readonly CancellationFact[], filters: Filters
   const events = new Set<string>();
   for (const c of facts) {
     if (filters.shiftId !== undefined && c.shiftId !== filters.shiftId) continue;
+    if (filters.channel !== undefined && c.channel !== filters.channel) continue;
     for (const l of c.lines) {
       if (!productMatches(l.productId, l.categoryId, filters)) continue;
       events.add(c.id);
@@ -451,15 +476,18 @@ function buildReversals(facts: readonly ReversalFact[]): ReversalSection {
 export type LedgerSection = { rows: { type: string; entries: number; amountCents: number }[]; creditedCents: number; spentCents: number; netCents: number };
 function buildLedger(facts: readonly LedgerFact[]): LedgerSection {
   const map = new Map<string, { type: string; entries: number; amountCents: number }>();
+  let credited = 0;
+  let spent = 0;
   for (const f of facts) {
     let r = map.get(f.type);
     if (!r) map.set(f.type, (r = { type: f.type, entries: 0, amountCents: 0 }));
     r.entries += 1;
     r.amountCents = add(r.amountCents, f.amountCents);
+    // Créditos e débitos POR LANÇAMENTO: tipos como ajuste e troca têm lançamentos nos dois sentidos.
+    if (f.amountCents > 0) credited = add(credited, f.amountCents);
+    else spent = add(spent, f.amountCents);
   }
   const rows = [...map.values()].sort((a, b) => a.type.localeCompare(b.type));
-  const credited = rows.filter((r) => r.amountCents > 0).reduce((n, r) => add(n, r.amountCents), 0);
-  const spent = rows.filter((r) => r.amountCents < 0).reduce((n, r) => add(n, r.amountCents), 0);
   return { rows, creditedCents: credited, spentCents: spent, netCents: add(credited, spent) };
 }
 
@@ -500,7 +528,8 @@ export type ResultSection = {
   note: string;
 };
 
-export type Check = { id: string; label: string; expected: number; actual: number; ok: boolean };
+/** `internal` = agrupamentos da mesma lista de fatos (protegem contra regressão de chave/soma); `cross` = fontes independentes. */
+export type Check = { id: string; label: string; kind: "internal" | "cross"; expected: number; actual: number; ok: boolean };
 
 export type SalesInput = {
   from: LocalDate;
@@ -514,6 +543,7 @@ export type SalesInput = {
   losses: readonly LossFact[];
   adjustments: readonly AdjustmentFact[];
   purchases: readonly PurchaseFact[];
+  purchaseReversals?: readonly PurchaseReversalFact[];
   pending: readonly PendingOrderFact[];
   retained: readonly RetainedFact[];
   cancellations: readonly CancellationFact[];
@@ -619,9 +649,10 @@ export function buildSalesReport(input: SalesInput): SalesReport {
       profit: rankProducts(rows, "profit", RANK_LIMIT),
       profitPerUnit: rankProducts(rows, "profitPerUnit", RANK_LIMIT),
       margin: rankProducts(rows, "margin", RANK_LIMIT),
+      // Produto sem venda só é "zero" para a escola inteira; com filtro de turno/canal ele pode ter vendido em outro recorte.
       lowTurnover: lowTurnover(
         rows,
-        input.catalog.filter((c) => productMatches(c.productId, c.categoryId, filters)),
+        filters.shiftId === undefined && filters.channel === undefined ? input.catalog.filter((c) => productMatches(c.productId, c.categoryId, filters)) : [],
         RANK_LIMIT,
       ),
     },
@@ -629,7 +660,7 @@ export function buildSalesReport(input: SalesInput): SalesReport {
 
   const losses = section("losses", () => buildLosses(unique(input.losses), filters));
   const adjustments = section("purchases", () => buildAdjustments(unique(input.adjustments), filters)); // mesmo conjunto de filtros dos movimentos de entrada
-  const purchases = section("purchases", () => buildPurchases(unique(input.purchases), filters));
+  const purchases = section("purchases", () => buildPurchases(unique(input.purchases), unique(input.purchaseReversals ?? []), filters));
   const plus7 = addDaysIso(input.today, 7);
   const pending = section("pending", () => buildPending(unique(input.pending), filters, input.today, plus7, input.avgCost));
   const retained = section("retained", () => buildRetained(unique(input.retained), filters));
@@ -694,7 +725,7 @@ export function buildSalesReport(input: SalesInput): SalesReport {
     checks: [],
     duplicatesIgnored,
   };
-  report.checks = reconcileSales(report);
+  report.checks = reconcileSales(report, sales);
   return report;
 }
 
@@ -719,14 +750,14 @@ function addDaysIso(date: LocalDate, days: number): LocalDate {
 
 /* ----------------------------------------------------------------------------------------------- reconciliação */
 
-const check = (id: string, label: string, expected: number, actual: number): Check => ({ id, label, expected, actual, ok: expected === actual });
+const check = (id: string, label: string, kind: Check["kind"], expected: number, actual: number): Check => ({ id, label, kind, expected, actual, ok: expected === actual });
 
 /**
  * Conferências internas: todos os agrupamentos saem da MESMA lista de fatos, então precisam fechar entre si (em unidades,
  * receita e CMV EXATO em micro-centavos — nunca em centavos já arredondados). Conferem também as fontes cruzadas: o reembolso
  * dos cancelamentos × os lançamentos `order_refund` da carteira, e as transferências (anulam-se entre alunos).
  */
-export function reconcileSales(report: SalesReport): Check[] {
+export function reconcileSales(report: SalesReport, sales: readonly SaleFact[] = []): Check[] {
   const t = report.realized.totals;
   const checks: Check[] = [];
   const groups: [string, GroupRow[] | ProductRow[]][] = [
@@ -737,17 +768,26 @@ export function reconcileSales(report: SalesReport): Check[] {
     ["dia", report.realized.byDay],
   ];
   for (const [name, rows] of groups) {
-    checks.push(check(`units_${name}`, `Unidades por ${name} = total`, t.units, rows.reduce((n, r) => n + r.units, 0)));
-    checks.push(check(`revenue_${name}`, `Receita por ${name} = total`, t.revenueCents, rows.reduce((n, r) => n + r.revenueCents, 0)));
-    checks.push(check(`cost_${name}`, `CMV exato por ${name} = total`, t.costMicros, rows.reduce((n, r) => n + r.costMicros, 0)));
+    checks.push(check(`units_${name}`, `Unidades por ${name} = total`, "internal", t.units, rows.reduce((n, r) => n + r.units, 0)));
+    checks.push(check(`revenue_${name}`, `Receita por ${name} = total`, "internal", t.revenueCents, rows.reduce((n, r) => n + r.revenueCents, 0)));
+    checks.push(check(`cost_${name}`, `CMV exato por ${name} = total`, "internal", t.costMicros, rows.reduce((n, r) => n + r.costMicros, 0)));
   }
+  // Entre fontes: o que foi baixado de um pedido/venda nunca passa do valor PAGO registrado no próprio pedido/venda.
+  const perOrigin = new Map<string, { revenue: number; paid: number }>();
+  for (const f of sales) {
+    if (f.originPaidCents === null || f.originPaidCents === undefined || f.revenueCents === null) continue;
+    const e = perOrigin.get(f.origin) ?? { revenue: 0, paid: f.originPaidCents };
+    e.revenue += f.revenueCents;
+    perOrigin.set(f.origin, e);
+  }
+  checks.push(check("sold_within_paid", "Baixas de cada pedido/venda não passam do valor pago registrado nele", "cross", 0, [...perOrigin.values()].filter((e) => e.revenue > e.paid).length));
   if (report.cancellations && report.ledger) {
     const refunds = report.ledger.rows.find((r) => r.type === "order_refund")?.amountCents ?? 0;
-    checks.push(check("refunds_ledger", "Reembolsos dos cancelamentos = lançamentos order_refund da carteira", report.cancellations.totals.refundCents, refunds));
+    checks.push(check("refunds_ledger", "Reembolsos dos cancelamentos = lançamentos order_refund da carteira", "cross", report.cancellations.totals.refundCents, refunds));
   }
   if (report.ledger) {
     const net = (report.ledger.rows.find((r) => r.type === "transfer_in")?.amountCents ?? 0) + (report.ledger.rows.find((r) => r.type === "transfer_out")?.amountCents ?? 0);
-    checks.push(check("transfers_net_zero", "Transferências entre alunos se anulam (não são faturamento)", 0, net));
+    checks.push(check("transfers_net_zero", "Transferências entre alunos se anulam (não são faturamento)", "cross", 0, net));
   }
   return checks;
 }

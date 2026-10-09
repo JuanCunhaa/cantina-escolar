@@ -4,8 +4,10 @@ import { useState } from "react";
 import type { User } from "firebase/auth";
 import { errorText } from "@/lib/api-client";
 import { localDateOf } from "@/lib/dates/school-time";
+import { microsToCents } from "@/modules/inventory/cost";
 import { formatBRL } from "@/lib/money/format";
 import { brDate } from "@/modules/cash/components/cash-text";
+import { bpDecimal } from "../format";
 import { FinanceTabs } from "@/modules/fees/components/finance-tabs";
 import { useServerQuery } from "@/modules/orders/use-operations";
 import {
@@ -54,9 +56,7 @@ export function browserExport(user: User): ExportDeps {
 
 /** Pontos-base → "47,50 %" (inteiros, sem ponto flutuante). */
 export function bpText(bp: number | null): string {
-  if (bp === null) return "—";
-  const abs = Math.abs(bp);
-  return `${bp < 0 ? "-" : ""}${Math.floor(abs / 100)},${String(abs % 100).padStart(2, "0")} %`;
+  return bp === null ? "—" : `${bpDecimal(bp)} %`;
 }
 
 const PENDING = "pendente";
@@ -395,7 +395,7 @@ export function LossesSection({ report }: { report: Report }) {
                   <th scope="row">{r.name}</th>
                   <td>{labelOf(LOSS_REASON_LABEL, r.reasonCode)}</td>
                   <td>{r.units}</td>
-                  {full && "costMicros" in r && <td>{r.missingCostUnits > 0 ? `${PENDING} (${r.missingCostUnits} un.)` : formatBRL(Math.round(r.costMicros / 1_000_000))}</td>}
+                  {full && "costMicros" in r && <td>{r.missingCostUnits > 0 ? `${PENDING} (${r.missingCostUnits} un.)` : formatBRL(microsToCents(r.costMicros))}</td>}
                 </tr>
               ))}
             </tbody>
@@ -557,17 +557,25 @@ export function PurchasesSection({ report }: { report: SalesReport }) {
           <div key={x.kind} className="receipt-row">
             <dt>{labelOf(PURCHASE_KIND_LABEL, x.kind)}</dt>
             <dd>
-              {formatBRL(Math.round(x.costMicros / 1_000_000))} · {x.units} unidade(s) em {x.facts} entrada(s){x.reversedFacts > 0 ? ` · ${x.reversedFacts} estornada(s) fora do total` : ""}
+              {formatBRL(microsToCents(x.costMicros))} · {x.units} unidade(s) em {x.facts} entrada(s)
             </dd>
           </div>
         ))}
-        <dt>Total no período</dt>
+        {p.reversals.facts > 0 && (
+          <div className="receipt-row">
+            <dt>Estornos de entrada feitos no período</dt>
+            <dd>
+              − {formatBRL(microsToCents(p.reversals.costMicros))} · {p.reversals.units} unidade(s) em {p.reversals.facts} estorno(s)
+            </dd>
+          </div>
+        )}
+        <dt>Total líquido no período</dt>
         <dd>{formatBRL(p.netCostCents)}</dd>
       </dl>
       {report.adjustments && report.adjustments.rows.length > 0 && (
         <p className="muted">
           Ajustes de estoque (fora do resultado):{" "}
-          {report.adjustments.rows.map((a) => `${labelOf(ADJUSTMENT_LABEL, a.type)}: ${a.units} un. (${formatBRL(Math.round(a.costMicros / 1_000_000))})`).join("; ")}
+          {report.adjustments.rows.map((a) => `${labelOf(ADJUSTMENT_LABEL, a.type)}: ${a.units} un. (${formatBRL(microsToCents(a.costMicros))})`).join("; ")}
         </p>
       )}
     </section>
@@ -627,7 +635,7 @@ export function ChecksSection({ report }: { report: SalesReport }) {
       <h2 id="rs-checks">Conferências dos totais</h2>
       {bad.length === 0 ? (
         <p className="muted" data-testid="sales-checks">
-          {report.checks.length} conferências fecham: produto, categoria, canal, turno e dia somam o mesmo total; reembolsos e livro conferem.
+          Fecham: {report.checks.filter((c) => c.kind === "cross").length} conferência(s) entre fontes independentes (reembolsos × livro, transferências, vendas × valor pago) e {report.checks.filter((c) => c.kind === "internal").length} de consistência interna (produto, categoria, canal, turno e dia somam o mesmo total).
         </p>
       ) : (
         <ul role="alert" className="plain-list notice notice-error" data-testid="sales-checks">

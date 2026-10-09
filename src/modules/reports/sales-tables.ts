@@ -74,8 +74,9 @@ export function buildSalesTables(report: SalesReport, sales: readonly SaleFact[]
     row("Resultado", "Resultado após perdas e taxas", "não calculado", report.skipped.result);
   }
   if (full && report.purchases) {
-    for (const p of report.purchases.rows) row("Compras de estoque (fora do resultado)", labelOf(PURCHASE_KIND_LABEL, p.kind), centsCell(microsToCents(p.costMicros)), `${p.units} unidade(s) em ${p.facts} entrada(s); ${p.reversedFacts} estornada(s)`);
-    row("Compras de estoque (fora do resultado)", "Total (R$)", centsCell(report.purchases.netCostCents), report.dateBasis.purchases);
+    for (const p of report.purchases.rows) row("Compras de estoque (fora do resultado)", labelOf(PURCHASE_KIND_LABEL, p.kind), centsCell(microsToCents(p.costMicros)), `${p.units} unidade(s) em ${p.facts} entrada(s)`);
+    if (report.purchases.reversals.facts > 0) row("Compras de estoque (fora do resultado)", "Estornos de entrada no período (R$)", centsCell(-microsToCents(report.purchases.reversals.costMicros)), `${report.purchases.reversals.units} unidade(s) em ${report.purchases.reversals.facts} estorno(s), pela data do estorno`);
+    row("Compras de estoque (fora do resultado)", "Total líquido (R$)", centsCell(report.purchases.netCostCents), report.dateBasis.purchases);
   }
   if (report.pending) {
     for (const b of report.pending.buckets) row("Pedidos pagos a realizar", PENDING_LABEL[b.bucket], centsCell(b.valueCents), `${b.orders} pedido(s), ${b.units} unidade(s)`);

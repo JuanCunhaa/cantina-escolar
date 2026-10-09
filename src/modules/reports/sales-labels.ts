@@ -46,6 +46,7 @@ export const PENDENCY_LABEL: Record<string, string> = {
   loss_cost_missing: "Perdas sem custo",
   fee_unknown: "Recebimentos sem taxa conhecida",
   pending_cost_unknown: "Pedidos a realizar sem custo médio",
+  reversal_open: "Reversões externas pendentes",
 };
 export const labelOf = (map: Record<string, string>, key: string): string => map[key] ?? key;
 /** Rótulo da pendência: fixos por código, e os dinâmicos (fonte truncada / documento ilegível) com o nome da fonte. */

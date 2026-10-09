@@ -212,9 +212,9 @@ describe("F21 — recarga, compra de estoque, perda e cobrança retida não são
   it("perdas, compras, retido e carteira ficam FORA da receita e do CMV", () => {
     const sales = [sale({ productId: "p1", units: 10, revenueCents: 2000, costMicros: c(1050) })];
     const losses: LossFact[] = [{ id: "stockCosts/p1/movements/m9", date: "2026-10-05", productId: "p1", productName: "P1", categoryId: "cat_a", reasonCode: "breakage", units: 2, costMicros: c(210), origin: "loss:1" }];
-    const purchases: PurchaseFact[] = [{ id: "stockReceipts/r1", date: "2026-10-01", productId: "p1", productName: "P1", categoryId: "cat_a", kind: "purchase", units: 200, costMicros: c(21000), reversed: false }];
+    const purchases: PurchaseFact[] = [{ id: "stockReceipts/r1", date: "2026-10-01", productId: "p1", productName: "P1", categoryId: "cat_a", kind: "purchase", units: 200, costMicros: c(21000) }];
     const ledger: LedgerFact[] = [{ id: "wallets/s1/entries/e1", date: "2026-10-01", type: "topup", amountCents: 5000 }];
-    const r = buildSalesReport(input({ sales, losses, purchases, ledger, retained: [{ id: "orders/o9", date: "2026-10-06", shiftId: "turno_m", amountCents: 700, units: 2 }] }));
+    const r = buildSalesReport(input({ sales, losses, purchases, ledger, retained: [{ id: "orders/o9", date: "2026-10-06", shiftId: "turno_m", channel: "advance", amountCents: 700, units: 2 }] }));
     expect(r.realized.totals.revenueCents).toBe(2000); // recarga de R$ 50 e cobrança retida de R$ 7 não viram receita
     expect(r.realized.totals.cogsCents).toBe(1050); // perda (R$ 2,10) e compra (R$ 210) não entram no CMV
     expect(r.losses?.totals.costCents).toBe(210);
@@ -224,19 +224,22 @@ describe("F21 — recarga, compra de estoque, perda e cobrança retida não são
     expect(r.result?.resultCents).toBe(740);
   });
 
-  it("entrada estornada sai da aplicação de caixa e aparece só como estornada", () => {
-    const purchases: PurchaseFact[] = [
-      { id: "stockReceipts/a", date: "2026-10-01", productId: "p1", productName: "P1", categoryId: null, kind: "purchase", units: 10, costMicros: c(1000), reversed: false },
-      { id: "stockReceipts/b", date: "2026-10-01", productId: "p1", productName: "P1", categoryId: null, kind: "purchase", units: 5, costMicros: c(500), reversed: true },
-    ];
-    const p = buildSalesReport(input({ purchases })).purchases!;
-    expect(p.netCostCents).toBe(1000);
-    expect(p.rows[0]).toMatchObject({ facts: 1, units: 10, reversedFacts: 1, reversedCostMicros: c(500) });
+  it("estorno de entrada abate NO período do estorno; a compra do mês anterior não é reescrita", () => {
+    const purchase = { id: "stockReceipts/a", date: "2026-09-20", productId: "p1", productName: "P1", categoryId: null, kind: "purchase", units: 10, costMicros: c(1000) };
+    const reversal = { id: "stockCosts/p1/movements/m5", date: "2026-10-03", productId: "p1", productName: "P1", categoryId: null, units: 4, costMicros: c(400) };
+    // setembro: só a compra (R$ 10,00); outubro: só o estorno (−R$ 4,00). Relatórios de setembro já exportados não mudam.
+    const sep = buildSalesReport(input({ from: "2026-09-01", to: "2026-09-30", purchases: [purchase] })).purchases!;
+    expect([sep.netCostCents, sep.reversals.facts]).toEqual([1000, 0]);
+    const oct = buildSalesReport(input({ purchases: [], purchaseReversals: [reversal] })).purchases!;
+    expect([oct.netCostCents, oct.reversals]).toEqual([-400, { facts: 1, units: 4, costMicros: c(400) }]);
+    const both = buildSalesReport(input({ purchases: [purchase], purchaseReversals: [reversal] })).purchases!;
+    expect(both.netCostCents).toBe(600);
+    expect(both.byProduct).toEqual([{ productId: "p1", name: "P1", units: 6, costMicros: c(600) }]);
   });
 });
 
 describe("F21 — pedidos pagos a realizar, cancelamentos e carteira", () => {
-  const order = (id: string, date: string, lines: PendingOrderFact["lines"]): PendingOrderFact => ({ id: `orders/${id}`, consumptionDate: date, shiftId: "turno_m", status: "paid", lines });
+  const order = (id: string, date: string, lines: PendingOrderFact["lines"]): PendingOrderFact => ({ id: `orders/${id}`, consumptionDate: date, shiftId: "turno_m", channel: "advance", status: "paid", lines });
   const line = (productId: string, units: number, valueCents: number) => ({ productId, name: productId.toUpperCase(), categoryId: "cat_a", units, valueCents });
 
   it("separa por data de consumo em relação a hoje (limites exatos)", () => {
@@ -260,8 +263,8 @@ describe("F21 — pedidos pagos a realizar, cancelamentos e carteira", () => {
 
   it("cancelamentos e reembolsos por tipo; conferem com os lançamentos order_refund", () => {
     const cancellations: CancellationFact[] = [
-      { id: "orders/o1/cancellations/c1", date: "2026-10-03", orderId: "o1", kind: "family", shiftId: "turno_m", lines: [{ productId: "p1", name: "P1", categoryId: "cat_a", units: 2, refundCents: 400 }] },
-      { id: "orders/o2/cancellations/c2", date: "2026-10-04", orderId: "o2", kind: "operational", shiftId: "turno_m", lines: [{ productId: "p1", name: "P1", categoryId: "cat_a", units: 1, refundCents: 200 }, { productId: "p2", name: "P2", categoryId: "cat_b", units: 3, refundCents: 600 }] },
+      { id: "orders/o1/cancellations/c1", date: "2026-10-03", orderId: "o1", kind: "family", shiftId: "turno_m", channel: "advance", lines: [{ productId: "p1", name: "P1", categoryId: "cat_a", units: 2, refundCents: 400 }] },
+      { id: "orders/o2/cancellations/c2", date: "2026-10-04", orderId: "o2", kind: "operational", shiftId: "turno_m", channel: "advance", lines: [{ productId: "p1", name: "P1", categoryId: "cat_a", units: 1, refundCents: 200 }, { productId: "p2", name: "P2", categoryId: "cat_b", units: 3, refundCents: 600 }] },
     ];
     const ledger: LedgerFact[] = [
       { id: "wallets/s1/entries/c1_refund", date: "2026-10-03", type: "order_refund", amountCents: 400 },
@@ -286,6 +289,51 @@ describe("F21 — pedidos pagos a realizar, cancelamentos e carteira", () => {
     const r = buildSalesReport(input({ ledger, walletBalanceCents: 4500, walletCount: 2 }));
     expect(r.ledger).toMatchObject({ creditedCents: 6300, spentCents: -1800, netCents: 4500, walletBalanceCents: 4500 });
     expect(r.checks.find((x) => x.id === "transfers_net_zero")?.ok).toBe(true);
+  });
+});
+
+describe("F21 — achados da revisão: canal em todas as seções que o declaram, livro por lançamento, baixo giro e valor pago", () => {
+  const advanceOrder = { id: "orders/a", consumptionDate: "2026-10-10", shiftId: "turno_m", channel: "advance" as const, status: "paid", lines: [{ productId: "p1", name: "P1", categoryId: "cat_a", units: 2, valueCents: 400 }] };
+  const retained = { id: "orders/r", date: "2026-10-03", shiftId: "turno_m", channel: "advance" as const, amountCents: 700, units: 2 };
+  const cancel = { id: "orders/o/cancellations/c", date: "2026-10-04", orderId: "o", kind: "family", shiftId: "turno_m", channel: "advance" as const, lines: [{ productId: "p1", name: "P1", categoryId: "cat_a", units: 1, refundCents: 150 }] };
+
+  it("filtro de canal vale para a realizar, retido e cancelamentos (pedido antecipado); outro canal zera, sem mostrar o total da escola", () => {
+    const base = { pending: [advanceOrder], retained: [retained], cancellations: [cancel] };
+    const advance = buildSalesReport(input({ ...base, filters: { channel: "advance" } }));
+    expect([advance.pending!.totals.units, advance.retained!.amountCents, advance.cancellations!.totals.refundCents]).toEqual([2, 700, 150]);
+    for (const channel of ["counter", "direct"] as const) {
+      const other = buildSalesReport(input({ ...base, filters: { channel } }));
+      expect([other.pending!.totals.units, other.retained!.amountCents, other.cancellations!.totals.refundCents], channel).toEqual([0, 0, 0]);
+    }
+  });
+
+  it("créditos e débitos do livro são somados POR LANÇAMENTO (ajuste com sinais opostos não vira só crédito)", () => {
+    const ledger: LedgerFact[] = [
+      { id: "wallets/a/entries/1", date: "2026-10-01", type: "adjustment", amountCents: 500 },
+      { id: "wallets/a/entries/2", date: "2026-10-01", type: "adjustment", amountCents: -200 },
+      { id: "wallets/a/entries/3", date: "2026-10-01", type: "order_exchange", amountCents: -100 },
+      { id: "wallets/a/entries/4", date: "2026-10-01", type: "order_exchange", amountCents: 40 },
+    ];
+    expect(buildSalesReport(input({ ledger })).ledger).toMatchObject({ creditedCents: 540, spentCents: -300, netCents: 240 });
+  });
+
+  it("baixo giro: produto sem venda só aparece como zero na escola inteira; com filtro de turno/canal ele pode ter vendido em outro recorte", () => {
+    const catalog = [{ productId: "p9", name: "Suco", categoryId: null }];
+    const sales = [sale({ productId: "p1", productName: "Coxinha", units: 3, revenueCents: 300, costMicros: c(100) })];
+    expect(buildSalesReport(input({ catalog, sales })).realized.rankings.lowTurnover.map((x) => x.name)).toEqual(["Suco", "Coxinha"]);
+    expect(buildSalesReport(input({ catalog, sales, filters: { shiftId: "turno_m" } })).realized.rankings.lowTurnover.map((x) => x.name)).toEqual(["Coxinha"]);
+    expect(buildSalesReport(input({ catalog, sales, filters: { channel: "counter" } })).realized.rankings.lowTurnover.map((x) => x.name)).toEqual(["Coxinha"]);
+    expect(buildSalesReport(input({ catalog, sales, filters: { categoryId: "cat_a" } })).realized.rankings.lowTurnover.map((x) => x.name)).toEqual(["Coxinha"]); // catálogo sem categoria cat_a
+  });
+
+  it("conferência ENTRE FONTES: as baixas de um pedido nunca passam do valor pago registrado nele", () => {
+    const ok = buildSalesReport(input({ sales: [sale({ productId: "p1", units: 2, revenueCents: 400, costMicros: c(100), origin: "order:x", originPaidCents: 500 }), sale({ productId: "p2", units: 1, revenueCents: 100, costMicros: c(30), origin: "order:x", originPaidCents: 500 })] }));
+    expect(ok.checks.find((x) => x.id === "sold_within_paid")).toMatchObject({ kind: "cross", expected: 0, actual: 0, ok: true });
+    const bad = buildSalesReport(input({ sales: [sale({ productId: "p1", units: 2, revenueCents: 400, costMicros: c(100), origin: "order:y", originPaidCents: 300 })] }));
+    expect(bad.checks.find((x) => x.id === "sold_within_paid")).toMatchObject({ expected: 0, actual: 1, ok: false });
+    const noOrigin = buildSalesReport(input({ sales: [sale({ productId: "p1", units: 2, revenueCents: 400, costMicros: c(100), originFound: false })] }));
+    expect(noOrigin.checks.find((x) => x.id === "sold_within_paid")?.ok).toBe(true);
+    expect(ok.checks.filter((x) => x.kind === "internal").length).toBeGreaterThan(10);
   });
 });
 
@@ -354,7 +402,7 @@ describe("F21 — filtros, bases e seções da escola inteira", () => {
   it("agrupamentos conferem entre si (unidades, receita e CMV exato)", () => {
     const r = buildSalesReport(input({ sales: sales() }));
     expect(r.checks.every((x) => x.ok)).toBe(true);
-    expect(reconcileSales(r)).toEqual(r.checks);
+    expect(reconcileSales(r, sales())).toEqual(r.checks);
     expect(r.realized.byDay).toHaveLength(1);
     expect(r.realized.byCategory.map((x) => [x.label, x.units])).toEqual([["Salgados", 2], ["Doces", 4]]);
     expect(r.realized.byShift.map((x) => x.label)).toEqual(["Manhã", "Tarde"]);
@@ -375,11 +423,11 @@ describe("F21 — visão da cantina não tem custo, margem, lucro, taxa nem cart
       input({
         sales: [sale({ productId: "p1", units: 2, revenueCents: 400, costMicros: c(100) })],
         losses: [{ id: "l1", date: "2026-10-04", productId: "p1", productName: "P1", categoryId: "cat_a", reasonCode: "expiry", units: 1, costMicros: c(50), origin: "x" }],
-        purchases: [{ id: "r1", date: "2026-10-01", productId: "p1", productName: "P1", categoryId: null, kind: "purchase", units: 9, costMicros: c(900), reversed: false }],
+        purchases: [{ id: "r1", date: "2026-10-01", productId: "p1", productName: "P1", categoryId: null, kind: "purchase", units: 9, costMicros: c(900) }],
         ledger: [{ id: "e1", date: "2026-10-01", type: "topup", amountCents: 1000 }],
         fees: { effectiveCents: 33, unknownCount: 1, unknownGrossCents: 100, fictitiousCount: 1 },
         avgCost: new Map([["p1", c(50)]]),
-        pending: [{ id: "orders/a", consumptionDate: TODAY, shiftId: "turno_m", status: "paid", lines: [{ productId: "p1", name: "P1", categoryId: null, units: 1, valueCents: 200 }] }],
+        pending: [{ id: "orders/a", consumptionDate: TODAY, shiftId: "turno_m", channel: "advance", status: "paid", lines: [{ productId: "p1", name: "P1", categoryId: null, units: 1, valueCents: 200 }] }],
         walletBalanceCents: 777,
       }),
     );

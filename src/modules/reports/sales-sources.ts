@@ -1,6 +1,6 @@
 import { localDateOf, type LocalDate } from "@/lib/dates/school-time";
 import { remainingOf, remainingValueOf } from "@/modules/orders/fulfillment-model";
-import type { AdjustmentFact, CancellationFact, LedgerFact, LossFact, PendingOrderFact, PurchaseFact, RetainedFact, ReversalFact, SaleChannel, SaleFact } from "./sales-model";
+import type { AdjustmentFact, CancellationFact, LedgerFact, LossFact, PendingOrderFact, PurchaseFact, PurchaseReversalFact, RetainedFact, ReversalFact, SaleChannel, SaleFact } from "./sales-model";
 
 /**
  * Leitura PURA dos documentos de origem (F21): transforma o que o Firestore devolve em fatos tipados. Nada aqui acessa a rede.
@@ -17,7 +17,7 @@ const text = (v: unknown, fallback = ""): string => (typeof v === "string" ? v :
 export type ProductInfo = { name: string; categoryId: string | null };
 
 /** Dados do pedido/venda direta de origem usados para canal, turno e o snapshot de nome/categoria da época da venda. */
-export type OriginInfo = { channel: SaleChannel; shiftId: string | null; items: Map<string, ProductInfo> };
+export type OriginInfo = { channel: SaleChannel; shiftId: string | null; items: Map<string, ProductInfo>; paidCents: number | null };
 
 function snapshotItems(items: unknown): Map<string, ProductInfo> {
   const map = new Map<string, ProductInfo>();
@@ -31,9 +31,9 @@ function snapshotItems(items: unknown): Map<string, ProductInfo> {
 
 export function originOfOrder(d: Data): OriginInfo {
   const channel: SaleChannel = d.channel === "advance" ? "advance" : d.channel === "counter" ? "counter" : "unknown";
-  return { channel, shiftId: typeof d.shiftId === "string" ? d.shiftId : null, items: snapshotItems(d.items) };
+  return { channel, shiftId: typeof d.shiftId === "string" ? d.shiftId : null, items: snapshotItems(d.items), paidCents: int(d.totalCents) };
 }
-export const originOfDirectSale = (d: Data): OriginInfo => ({ channel: "direct", shiftId: typeof d.shiftId === "string" ? d.shiftId : null, items: snapshotItems(d.items) });
+export const originOfDirectSale = (d: Data): OriginInfo => ({ channel: "direct", shiftId: typeof d.shiftId === "string" ? d.shiftId : null, items: snapshotItems(d.items), paidCents: int(d.totalCents) });
 
 const MOVEMENT_PATH = /^stockCosts\/([^/]+)\/movements\/([^/]+)$/;
 export const productOfMovementPath = (path: string): string | null => MOVEMENT_PATH.exec(path)?.[1] ?? null;
@@ -66,6 +66,7 @@ export function saleFactOf(path: string, d: Data, origins: ReadonlyMap<string, O
     costMicros: cost === null ? null : Math.abs(cost),
     origin: key,
     originFound: origin !== undefined,
+    originPaidCents: origin?.paidCents ?? null,
   };
 }
 
@@ -96,7 +97,18 @@ export function purchaseFactOf(id: string, d: Data, products: ReadonlyMap<string
   const cost = int(d.totalCostMicros);
   if (!productId || !date || qty === null || cost === null) return null;
   const info = products.get(productId) ?? { name: productId, categoryId: null };
-  return { id: `stockReceipts/${id}`, date, productId, productName: info.name, categoryId: info.categoryId, kind: text(d.kind, "purchase"), units: qty, costMicros: cost, reversed: d.status === "reversed" };
+  return { id: `stockReceipts/${id}`, date, productId, productName: info.name, categoryId: info.categoryId, kind: text(d.kind, "purchase"), units: qty, costMicros: cost };
+}
+
+/** Estorno de entrada: movimento `receipt_reversal` (quantidade e custo negativos), na data em que o estorno aconteceu. */
+export function purchaseReversalFactOf(path: string, d: Data, products: ReadonlyMap<string, ProductInfo>): PurchaseReversalFact | null {
+  const productId = productOfMovementPath(path);
+  const date = dateOfStamp(d.createdAt);
+  const qty = int(d.quantity);
+  const cost = int(d.totalCostMicros);
+  if (!productId || !date || qty === null || cost === null) return null;
+  const info = products.get(productId) ?? { name: productId, categoryId: null };
+  return { id: path, date, productId, productName: info.name, categoryId: info.categoryId, units: Math.abs(qty), costMicros: Math.abs(cost) };
 }
 
 /** Pedido aberto (ou não retirado a resolver): restante a entregar e seu valor PAGO (rateio por acumulado, nunca o preço atual). */
@@ -113,7 +125,7 @@ export function pendingOrderOf(id: string, d: Data, products: ReadonlyMap<string
     const productId = text(it.productId);
     return [{ productId, name: text(it.name, productId), categoryId: typeof it.categoryId === "string" ? it.categoryId : (products.get(productId)?.categoryId ?? null), units, valueCents: remainingValueOf(progress) }];
   });
-  return { id: `orders/${id}`, consumptionDate, shiftId: typeof d.shiftId === "string" ? d.shiftId : null, status: text(d.status), lines };
+  return { id: `orders/${id}`, consumptionDate, shiftId: typeof d.shiftId === "string" ? d.shiftId : null, channel: originOfOrder(d).channel, status: text(d.status), lines };
 }
 
 /** Não retirado encerrado COM cobrança mantida (`close_charged`): linha própria, não é venda entregue nem reembolso. */
@@ -124,7 +136,7 @@ export function retainedFactOf(id: string, d: Data): RetainedFact | null {
   const date = dateOfStamp(res.resolvedAt);
   const amount = int(res.amountCents);
   if (!date || amount === null) return null;
-  return { id: `orders/${id}`, date, shiftId: typeof d.shiftId === "string" ? d.shiftId : null, amountCents: amount, units: (int(res.returnedUnits) ?? 0) + (int(res.discardedUnits) ?? 0) };
+  return { id: `orders/${id}`, date, shiftId: typeof d.shiftId === "string" ? d.shiftId : null, channel: originOfOrder(d).channel, amountCents: amount, units: (int(res.returnedUnits) ?? 0) + (int(res.discardedUnits) ?? 0) };
 }
 
 const CANCELLATION_PATH = /^orders\/([^/]+)\/cancellations\/([^/]+)$/;
@@ -143,7 +155,7 @@ export function cancellationFactOf(path: string, d: Data, orders: ReadonlyMap<st
     const snapshot = orders.get(orderId)?.items.get(productId);
     return [{ productId, name: text(l.name, productId), categoryId: snapshot ? snapshot.categoryId : (products.get(productId)?.categoryId ?? null), units, refundCents: refund }];
   });
-  return { id: path, date, orderId, kind: text(d.kind, "unknown"), shiftId: orders.get(orderId)?.shiftId ?? null, lines };
+  return { id: path, date, orderId, kind: text(d.kind, "unknown"), shiftId: orders.get(orderId)?.shiftId ?? null, channel: orders.get(orderId)?.channel ?? "unknown", lines };
 }
 
 export function reversalFactOf(id: string, d: Data): ReversalFact | null {

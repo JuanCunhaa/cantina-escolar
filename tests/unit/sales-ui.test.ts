@@ -231,15 +231,15 @@ describe("F21 — administração vê custo, lucro e margem; parcial nunca vira 
       buildSalesReport(
         input({
           sales: [sale({ productId: "p1", units: 1, revenueCents: 100, costMicros: c(40) })],
-          purchases: [{ id: "r1", date: "2026-10-01", productId: "p1", productName: "P1", categoryId: null, kind: "purchase", units: 5, costMicros: c(500), reversed: false }],
+          purchases: [{ id: "r1", date: "2026-10-01", productId: "p1", productName: "P1", categoryId: null, kind: "purchase", units: 5, costMicros: c(500) }],
           ledger: [{ id: "e1", date: "2026-10-01", type: "topup", amountCents: 5000 }, { id: "e2", date: "2026-10-04", type: "order_refund", amountCents: 150 }],
           walletBalanceCents: 5000,
           walletCount: 3,
           losses: [{ id: "l1", date: "2026-10-02", productId: "p1", productName: "P1", categoryId: null, reasonCode: "breakage", units: 2, costMicros: c(80), origin: "x" }],
-          pending: [{ id: "orders/a", consumptionDate: "2026-10-09", shiftId: "turno_m", status: "paid", lines: [{ productId: "p1", name: "P1", categoryId: null, units: 1, valueCents: 200 }] }],
+          pending: [{ id: "orders/a", consumptionDate: "2026-10-09", shiftId: "turno_m", channel: "advance", status: "paid", lines: [{ productId: "p1", name: "P1", categoryId: null, units: 1, valueCents: 200 }] }],
           avgCost: new Map([["p1", c(40)]]),
-          retained: [{ id: "orders/r", date: "2026-10-03", shiftId: "turno_m", amountCents: 700, units: 2 }],
-          cancellations: [{ id: "orders/o/cancellations/c", date: "2026-10-04", orderId: "o", kind: "family", shiftId: "turno_m", lines: [{ productId: "p1", name: "P1", categoryId: null, units: 1, refundCents: 150 }] }],
+          retained: [{ id: "orders/r", date: "2026-10-03", shiftId: "turno_m", channel: "advance", amountCents: 700, units: 2 }],
+          cancellations: [{ id: "orders/o/cancellations/c", date: "2026-10-04", orderId: "o", kind: "family", shiftId: "turno_m", channel: "advance", lines: [{ productId: "p1", name: "P1", categoryId: null, units: 1, refundCents: 150 }] }],
         }),
       ),
     );
@@ -252,7 +252,8 @@ describe("F21 — administração vê custo, lucro e margem; parcial nunca vira 
     expect(full).toContain("Margem estimada (não é resultado)");
     expect(full).toContain("Cobrança retida");
     expect(full).toContain("Pela família");
-    expect(full).toContain("conferências fecham");
+    expect(full).toContain("de consistência interna");
+    expect(full).toContain("entre fontes independentes");
     expect(full).toContain("Baixo giro");
   });
 
@@ -268,7 +269,7 @@ describe("F21 — administração vê custo, lucro e margem; parcial nunca vira 
 
   it("conferência que diverge aparece como alerta com os números", () => {
     const r = a20();
-    r.checks = [{ id: "units_produto", label: "Unidades por produto = total", expected: 10, actual: 9, ok: false }];
+    r.checks = [{ id: "units_produto", label: "Unidades por produto = total", kind: "internal", expected: 10, actual: 9, ok: false }];
     const out = view(r);
     expect(out).toContain("esperado 10, obtido 9");
     expect(out).toContain('role="alert"');

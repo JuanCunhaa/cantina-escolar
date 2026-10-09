@@ -9,6 +9,7 @@ import { forecastOriginText } from "@/modules/payments/topup-model";
 import { POINT_LABEL, RECEIPT_KIND_LABEL, receiptOfDirectSale, receiptOfIntent, receiptOfTopup, type Receipt } from "@/modules/fees/receipts";
 import { PAYMENT_LABEL, type PaymentMethod } from "@/modules/payments/methods";
 import { csvCell } from "@/modules/orders/fulfillment-model";
+import { brl } from "./format";
 
 /**
  * Relatório financeiro base (F20, docs/domains/reports-cash.md §16.3) — SÓ administração (`finance.manage`). Fonte: os próprios
@@ -146,12 +147,7 @@ export async function financeReport(db: Firestore, actor: Actor, raw: unknown, c
 
 /* --------------------------------------------------------------------------------------------- exportação */
 
-/** Moeda pt-BR a partir de centavos INTEIROS (12345 → "123,45"); texto gerado aqui, nunca vindo de usuário. */
-export function brl(cents: number): string {
-  const sign = cents < 0 ? "-" : "";
-  const abs = Math.abs(cents);
-  return `${sign}${Math.floor(abs / 100)},${String(abs % 100).padStart(2, "0")}`;
-}
+export { brl };
 const date = (d: LocalDate) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
 
 type Raw = { raw: string };

@@ -400,6 +400,12 @@ describe("canais, entrega parcial, cancelamento e reembolso, pedido futuro, não
     const r = await report(admin, { shiftId: ST });
     const retained = r.body.retained as { orders: number; units: number; amountCents: number };
     expect(retained).toEqual({ orders: 1, units: 1, amountCents: 500 });
+    // o filtro de canal vale para a cobrança retida (pedido antecipado) e para a realizar e os cancelamentos
+    expect((await report(admin, { shiftId: ST, channel: "advance" })).body.retained).toEqual(retained);
+    expect((await report(admin, { shiftId: ST, channel: "counter" })).body.retained).toEqual({ orders: 0, units: 0, amountCents: 0 });
+    expect((await report(admin, { productId: F.pb, channel: "counter" })).body.pending).toMatchObject({ totals: { orders: 0, units: 0, valueCents: 0 } });
+    expect((await report(admin, { productId: F.pb, channel: "direct" })).body.cancellations).toMatchObject({ totals: { events: 0, refundCents: 0 } });
+    expect((await report(admin, { productId: F.pb, channel: "advance" })).body.cancellations).toMatchObject({ totals: { events: 1, refundCents: 500 } });
     expect(realizedOf(await report(admin, { productId: F.pb })).totals.revenueCents).toBe(3000); // continua sem os R$ 5,00 retidos
     expect((await report(admin, { productId: F.pb })).body.retained).toBeNull(); // filtro de produto: seção da escola/turno omitida
     expect(((await report(admin, { productId: F.pb })).body.skipped as Record<string, string>).retained).toContain("produto");
@@ -438,6 +444,19 @@ describe("perdas, compras de estoque e ajustes: separados do CMV e do resultado"
     const purchases = r.body.purchases as { rows: { kind: string; units: number; costMicros: number }[]; netCostCents: number };
     expect(purchases.rows).toEqual([expect.objectContaining({ kind: "purchase", units: 10, costMicros: 2_000_000_000 })]);
     expect(purchases.netCostCents).toBe(2000);
+  });
+
+  it("estorno de entrada abate no período do estorno, pela data do ESTORNO (a compra não é reescrita)", async () => {
+    const pr = await newProduct({ price: 100, stock: 0, cat: CAT3, name: "Produto de estorno" });
+    const created = await receive(pr, 5, "2,00");
+    const receiptId = String(created.body.receiptId);
+    expect((await report(admin, { productId: pr })).body.purchases).toMatchObject({ netCostCents: 1000, reversals: { facts: 0 } });
+    const reversal = await call("POST receipts", admin, "POST", "/api/inventory/receipts", { key: randomUUID(), action: "reverse", receiptId, reason: "Entrada lançada por engano" });
+    expect(reversal.status, JSON.stringify(reversal.body)).toBe(200);
+    const after = (await report(admin, { productId: pr })).body.purchases as { netCostCents: number; reversals: { facts: number; units: number; costMicros: number }; rows: { facts: number; costMicros: number }[] };
+    expect(after.rows[0]).toMatchObject({ facts: 1, costMicros: 1_000_000_000 }); // a compra continua inteira
+    expect(after.reversals).toEqual({ facts: 1, units: 5, costMicros: 1_000_000_000 });
+    expect(after.netCostCents).toBe(0);
   });
 
   it("ajuste de contagem aparece à parte (fora de perda, CMV e resultado)", async () => {
@@ -608,6 +627,7 @@ describe("carteira, taxas e conferências da escola inteira (administração)", 
     expect(checks.find((c) => c.id === "refunds_ledger")).toMatchObject({ expected: rawCancel, actual: sumOf("order_refund"), ok: rawCancel === sumOf("order_refund") });
     expect(checks.find((c) => c.id === "transfers_net_zero")).toMatchObject({ expected: 0, actual: sumOf("transfer_in") + sumOf("transfer_out") });
     expect(checks.filter((c) => /^(units|revenue|cost)_/.test(c.id)).every((c) => c.ok)).toBe(true); // agrupamentos fecham entre si
+    expect(checks.find((c) => c.id === "sold_within_paid")).toMatchObject({ kind: "cross", expected: 0, actual: 0, ok: true }); // nenhuma baixa passa do valor pago do pedido
     expect(checks.find((c) => c.id === "refunds_ledger")?.ok).toBe(true); // nesta suíte todo reembolso nasce junto do cancelamento
     // saldo agregado das carteiras conferido por soma independente dos documentos
     const wallets = await db().collection("wallets").get();

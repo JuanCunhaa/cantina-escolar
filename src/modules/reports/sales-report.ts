@@ -25,6 +25,7 @@ import {
   type OperationalReport,
   type PendingOrderFact,
   type PurchaseFact,
+  type PurchaseReversalFact,
   type RetainedFact,
   type ReversalFact,
   type SaleFact,
@@ -43,6 +44,7 @@ import {
   pendingOrderOf,
   productOfMovementPath,
   purchaseFactOf,
+  purchaseReversalFactOf,
   retainedFactOf,
   reversalFactOf,
   saleFactOf,
@@ -114,16 +116,23 @@ export async function loadSalesSources(db: Firestore, query: SalesQuery, scope: 
   const start = Timestamp.fromDate(localInstant(query.from, "00:00"));
   const end = Timestamp.fromDate(localInstant(addDays(query.to, 1), "00:00"));
   const full = scope === "full";
-  const range = (name: string) => db.collectionGroup(name).where("createdAt", ">=", start).where("createdAt", "<", end).limit(cap + 1);
+  const range = (name: string, fields: string[]) =>
+    db
+      .collectionGroup(name)
+      .where("createdAt", ">=", start)
+      .where("createdAt", "<", end)
+      .select(...fields)
+      .limit(cap + 1);
 
   const [movements, cancellations, productsSnap, categoriesSnap, shiftsSnap, openSnaps, closedSnap] = await Promise.all([
-    range("movements").get(),
-    range("cancellations").get(),
+    range("movements", ["type", "quantity", "totalCostMicros", "revenueCents", "referenceType", "referenceId", "reasonCode", "createdAt"]).get(),
+    range("cancellations", ["kind", "lines", "createdAt"]).get(),
     db.collection("products").limit(5000).get(),
     db.collection("categories").limit(1000).get(),
     db.collection("shifts").limit(200).get(),
     Promise.all([...OPEN_STATUSES, "not_picked_up"].map((status) => db.collection("orders").where("status", "==", status).limit(cap + 1).get())),
-    db.collection("orders").where("status", "==", "not_picked_up_closed").limit(cap + 1).get(),
+    // Só as resoluções do PERÍODO (intervalo em campo único), não o histórico inteiro de não retirados encerrados.
+    db.collection("orders").where("nonPickup.resolution.resolvedAt", ">=", start).where("nonPickup.resolution.resolvedAt", "<", end).limit(cap + 1).get(),
   ]);
   const truncated: string[] = [];
   if (movements.size > cap) truncated.push("movimentos de estoque");
@@ -166,6 +175,7 @@ export async function loadSalesSources(db: Firestore, query: SalesQuery, scope: 
   const sales: SaleFact[] = [];
   const losses: LossFact[] = [];
   const adjustments: AdjustmentFact[] = [];
+  const purchaseReversals: PurchaseReversalFact[] = [];
   for (const d of moves) {
     const type = d.get("type");
     if (type === "sale_exit") {
@@ -176,6 +186,10 @@ export async function loadSalesSources(db: Firestore, query: SalesQuery, scope: 
       const f = lossFactOf(d.ref.path, dataOf(d), products);
       if (f) losses.push(f);
       else bad("perdas");
+    } else if (type === "receipt_reversal" && full) {
+      const f = purchaseReversalFactOf(d.ref.path, dataOf(d), products);
+      if (f) purchaseReversals.push(f);
+      else bad("estornos de entrada");
     } else if ((type === "count_adjustment" || type === "adjustment") && full) {
       const f = adjustmentFactOf(d.ref.path, dataOf(d), products);
       if (f) adjustments.push(f);
@@ -225,7 +239,7 @@ export async function loadSalesSources(db: Firestore, query: SalesQuery, scope: 
   if (full) {
     const [receipts, entries, receiptDocs, pendencyDocs, wallets] = await Promise.all([
       readReceiptsInRange(db, query),
-      range("entries").get(),
+      range("entries", ["type", "amountCents", "createdAt"]).get(),
       db.collection("stockReceipts").where("createdAt", ">=", start).where("createdAt", "<", end).limit(cap + 1).get(),
       db.collection("paymentPendencies").limit(cap + 1).get(),
       db
@@ -286,6 +300,7 @@ export async function loadSalesSources(db: Firestore, query: SalesQuery, scope: 
     losses,
     adjustments,
     purchases,
+    purchaseReversals,
     pending,
     retained,
     cancellations: cancellationFacts,
