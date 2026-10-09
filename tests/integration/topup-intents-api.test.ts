@@ -118,6 +118,8 @@ function scripted(script?: Script) {
       calls.find += 1;
       return charges.get(ref) ?? null;
     },
+    getOrder: async () => null, // a confirmação (F19) tem arquivo próprio; aqui nenhuma order é consultada
+    accountId: async () => "acc_fake",
   };
   const card: CardProvider = {
     id: "fake",
@@ -125,6 +127,8 @@ function scripted(script?: Script) {
     publicConfig: {},
     createCardCharge: (req) => create(req),
     findCharge: pix.findCharge,
+    getOrder: pix.getOrder,
+    accountId: pix.accountId,
   };
   return { pix, card, calls, charges, pixCharge };
 }

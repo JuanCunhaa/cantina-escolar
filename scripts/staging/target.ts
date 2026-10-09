@@ -88,6 +88,9 @@ export function stagingPayments(file: Dict): Dict {
     MERCADOPAGO_ENV: "sandbox",
     MERCADOPAGO_ACCESS_TOKEN: file.MERCADOPAGO_ACCESS_TOKEN!.trim(),
     MERCADOPAGO_PUBLIC_KEY: file.MERCADOPAGO_PUBLIC_KEY?.trim() ?? "",
+    // F19: chave secreta do webhook do MODO DE TESTE (opcional; sem ela o endpoint recusa tudo) e segredo da rotina agendada.
+    MERCADOPAGO_WEBHOOK_SECRET: file.MERCADOPAGO_WEBHOOK_SECRET?.trim() ?? "",
+    CRON_SECRET: file.CRON_SECRET?.trim() ?? "",
   };
 }
 

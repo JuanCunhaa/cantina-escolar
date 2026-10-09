@@ -135,6 +135,12 @@ const MESSAGES: Record<string, string> = {
   payment_unavailable: "Pagamento online indisponível no momento para este meio. Nada foi cobrado; a recarga pode ser feita na secretaria.",
   too_many_open_intents: "Já há recargas em aberto para este aluno. Pague ou aguarde a validade delas antes de gerar outra.",
   intent_not_found: "Recarga não encontrada.",
+  wallet_blocked: "A carteira tem uma pendência de pagamento (reembolso ou contestação) e está bloqueada para novas compras. Procure a secretaria.",
+  pendency_not_found: "Pendência não encontrada.",
+  pendency_closed: "Esta pendência já foi regularizada.",
+  stale_pendency: "A pendência mudou. A lista foi atualizada: confira o valor antes de regularizar.",
+  nothing_to_recover: "A carteira não tem saldo para regularizar agora. Aguarde uma nova recarga ou absorva o valor.",
+  exceeds_available: "O valor passa do que pode ser tratado agora.",
   internal: "Não foi possível concluir agora. Tente novamente.",
 };
 

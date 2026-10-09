@@ -9,6 +9,7 @@
       "wallet-api.test.ts",
       "catalog-api.test.ts",
       "topup-intents-api.test.ts",
+      "online-confirmation-api.test.ts",
       "school-calendar.test.ts",
       "probe-route.test.ts"
     ],

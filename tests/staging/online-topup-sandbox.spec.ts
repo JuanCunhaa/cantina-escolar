@@ -3,7 +3,9 @@
 // PULADOS (e não contam como evidência). Prova, com o provedor de verdade: Pix criado pela nossa API com QR + copia e cola +
 // validade, replay sem segunda order, mesma chave no provedor sem segunda order, busca por external_reference (conciliação),
 // cartão 1x tokenizado com o cartão de TESTE documentado (aprovado = "em análise"; recusado = falha), tela com o QR e o
-// componente oficial do cartão carregado. NÃO prova: confirmação/crédito (F19), webhook, nem pagamento real.
+// componente oficial do cartão carregado. NÃO prova: pagamento real. Confirmação, crédito, webhook e reversão (F19) estão em
+// tests/staging/online-confirmation-sandbox.spec.ts (a F18 provava que "pago no provedor não credita"; com a F19 o pagamento
+// confirmado PELO SERVIDOR credita, então essa asserção foi removida daqui e substituída pelas da F19).
 // Credenciais: só de TESTE, lidas de .env.staging.local (ou STAGING_ENV_FILE) e nunca impressas.
 import { existsSync, readFileSync } from "node:fs";
 import { expect, test, type APIRequestContext } from "@playwright/test";
@@ -124,21 +126,9 @@ test("sandbox cartão 1x: token de teste aprovado = em análise (sem crédito); 
   cardIntents.push({ id: String(ok.body.intentId), createdAt: new Date(String(ok.body.createdAt)), expected: "processing" }, { id: String(declined.body.intentId), createdAt: new Date(String(declined.body.createdAt)), expected: "declined" });
 });
 
-test("pago no sandbox NÃO credita (F19): Pix aprovado pelo provedor, carteira e livro intactos; conciliação do cartão pelo adapter real", async ({ request }) => {
+test("conciliação do cartão pelo adapter real (aprovado = em análise; recusado = recusado)", async () => {
   test.setTimeout(240_000);
   expect(pixIntent, "depende do teste de Pix").not.toBeNull();
-  const pixAdapter = mercadoPagoPix({ accessToken: sandboxAccessToken(), publicKey: "", env: "sandbox" });
-  // O sandbox aprova sozinho o Pix do pagador APRO; a order passa a "processed" (mapeada como "em análise").
-  await expect.poll(async () => (await pixAdapter.findCharge(pixIntent!.id, pixIntent!.createdAt))?.outcome, { timeout: 180_000, intervals: [5_000] }).toBe("processing");
-
-  const intent = await call(request, fam.guardian, "GET", `/api/topups/online/${pixIntent!.id}`);
-  expect(intent.body).toMatchObject({ intentId: pixIntent!.id, credited: false });
-  expect(intent.body.status).not.toBe("credited");
-  const wallet = await call(request, fam.guardian, "GET", `/api/wallets?studentId=${fam.studentId}`);
-  expect(wallet.body).toMatchObject({ balanceCents: 0, entries: [] });
-  const ledger = await call(request, fam.admin, "GET", `/api/wallets/reconcile?studentId=${fam.studentId}`);
-  expect(ledger.body).toMatchObject({ ok: true, entryCount: 0, problems: [] });
-
   const cardAdapter = mercadoPagoCard({ accessToken: sandboxAccessToken(), publicKey: "", env: "sandbox" });
   for (const c of cardIntents) {
     await expect.poll(async () => (await cardAdapter.findCharge(c.id, c.createdAt))?.outcome, { timeout: 30_000, intervals: [2_000] }).toBe(c.expected);

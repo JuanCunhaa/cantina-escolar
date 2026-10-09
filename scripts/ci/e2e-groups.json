@@ -18,6 +18,7 @@
       "wallet.spec.ts",
       "topups.spec.ts",
       "online-topup.spec.ts",
+      "payments-confirmation.spec.ts",
       "checkout.spec.ts",
       "my-orders.spec.ts",
       "amend.spec.ts",

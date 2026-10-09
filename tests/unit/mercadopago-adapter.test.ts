@@ -194,3 +194,81 @@ describe("configuração do Mercado Pago por ambiente", () => {
     expect(onlinePaymentConfig({ ...base, APP_ENV: "staging" }).pix).toMatchObject({ available: false, reason: "missing_credentials" });
   });
 });
+
+describe("consulta confirmatória e conta recebedora (F19)", () => {
+  // Formato medido em GET /v1/orders/{id} no sandbox, 07/10/2026 (campos relevantes; sem dados do pagador).
+  const sandboxOrder = {
+    id: "ORDTST01M49WSD2C20Y1PGN55PTY7SW3",
+    type: "online",
+    external_reference: "tpi_c4b97e8d36fb5924869a",
+    total_amount: "10.00",
+    total_paid_amount: "10.00",
+    user_id: "3745150346",
+    status: "processed",
+    status_detail: "accredited",
+    currency: "BRL",
+    last_updated_date: "2026-10-07T00:39:06.403Z",
+    transactions: { payments: [{ id: "PAY01M49WSD2ZE69ZWHYDNJ7K4DS0", amount: "10.00", paid_amount: "10.00", status: "processed", status_detail: "accredited", payment_method: { id: "master", type: "credit_card", installments: 1 } }] },
+  };
+
+  it("GET /v1/orders/{id} com o token do servidor; order paga vira PAGA com conta, moeda e centavos exatos", async () => {
+    const http = fakeHttp([{ status: 200, body: sandboxOrder }]);
+    const order = await mercadoPagoPix(cfg(http.fetchFn)).getOrder("ORDTST01M49WSD2C20Y1PGN55PTY7SW3");
+    expect(order).toMatchObject({ orderId: "ORDTST01M49WSD2C20Y1PGN55PTY7SW3", externalReference: "tpi_c4b97e8d36fb5924869a", accountId: "3745150346", currency: "BRL", totalCents: 1000, paidCents: 1000, state: "paid", paymentId: "PAY01M49WSD2ZE69ZWHYDNJ7K4DS0" });
+    expect(http.calls[0]).toMatchObject({ method: "GET" });
+    expect(http.calls[0]!.url).toMatch(/\/v1\/orders\/ORDTST01M49WSD2C20Y1PGN55PTY7SW3$/);
+    expect(http.calls[0]!.headers.authorization).toMatch(/^Bearer /);
+  });
+
+  it("404 = o provedor não conhece a order; 5xx/429/rede/corpo ilegível = incerto (nunca crédito por palpite)", async () => {
+    expect(await mercadoPagoCard(cfg(fakeHttp([{ status: 404, body: { errors: [{ code: "order_not_found" }] } }]).fetchFn)).getOrder("ORDX")).toBeNull();
+    for (const response of [{ status: 500 }, { status: 429 }, { status: 401, body: { error: "unauthorized" } }, new Error("socket")] as const) {
+      const error = await failure(mercadoPagoPix(cfg(fakeHttp([response as { status: number }]).fetchFn)).getOrder("ORDX"));
+      expect(error.kind).toBe("uncertain");
+    }
+    const garbled = await failure(mercadoPagoPix(cfg(fakeHttp([{ status: 200, body: { id: "ORDX", total_amount: "abc" } }]).fetchFn)).getOrder("ORDX"));
+    expect(garbled).toMatchObject({ kind: "uncertain", code: "unreadable_order" });
+  });
+
+  it("ID malformado para o provedor (400 invalid_path_param, medido no sandbox) = order inexistente; outros 400 continuam incertos", async () => {
+    const invalid = { errors: [{ code: "invalid_path_param", message: "path param order id is invalid" }] };
+    expect(await mercadoPagoPix(cfg(fakeHttp([{ status: 400, body: invalid }]).fetchFn)).getOrder("123456")).toBeNull();
+    const other = await failure(mercadoPagoPix(cfg(fakeHttp([{ status: 400, body: { errors: [{ code: "bad_request" }] } }]).fetchFn)).getOrder("ORDX"));
+    expect(other.kind).toBe("uncertain");
+  });
+
+  it("ID de order fora do formato nem chega à rede (sem injeção de caminho)", async () => {
+    const http = fakeHttp([]);
+    expect(await mercadoPagoPix(cfg(http.fetchFn)).getOrder("../users/me")).toBeNull();
+    expect(http.calls).toHaveLength(0);
+  });
+
+  it("conta recebedora vem de GET /users/me e fica em cache por credencial (uma chamada)", async () => {
+    const http = fakeHttp([{ status: 200, body: { id: 3745150346, site_id: "MLB" } }]);
+    const provider = mercadoPagoPix({ ...cfg(http.fetchFn), accessToken: credential("cache-test") });
+    expect(await provider.accountId()).toBe("3745150346");
+    expect(await provider.accountId()).toBe("3745150346");
+    expect(http.calls).toHaveLength(1);
+    expect(http.calls[0]!.url).toMatch(/\/users\/me$/);
+    const failed = await failure(mercadoPagoPix({ ...cfg(fakeHttp([{ status: 401, body: { message: "invalid_token" } }]).fetchFn), accessToken: credential("sem-cache") }).accountId());
+    expect(failed.kind).toBe("uncertain");
+  });
+});
+
+describe("provedor de cartão e demonstração na consulta confirmatória (F19)", () => {
+  it("o provedor de cartão consulta a mesma order e a mesma conta recebedora", async () => {
+    const http = fakeHttp([{ status: 200, body: { id: 3745150346 } }, { status: 404 }]);
+    const card = mercadoPagoCard({ ...cfg(http.fetchFn), accessToken: credential("card-account") });
+    expect(await card.accountId()).toBe("3745150346");
+    expect(await card.getOrder("ORDINEXISTENTE")).toBeNull();
+    expect(http.calls.map((c) => c.url.replace(/^https?:\/\/[^/]+/, ""))).toEqual(["/users/me", "/v1/orders/ORDINEXISTENTE"]);
+  });
+
+  it("a demonstração NUNCA confirma pagamento: nenhuma order paga existe para consultar", async () => {
+    const { demoCardProvider, demoPixProvider } = await import("@/modules/payments/online/demo-provider");
+    for (const provider of [demoPixProvider, demoCardProvider]) {
+      expect(await provider.getOrder("qualquer")).toBeNull();
+      expect(await provider.accountId()).toBe("demo");
+    }
+  });
+});

@@ -693,6 +693,21 @@ describe("troca: só a diferença na carteira, só o remanescente (A24/A22)", ()
     expect((await db().collection(`orders/${orderId}/exchanges`).get()).size).toBe(0);
   });
 
+  it("troca COM cobrança é despesa: carteira com pendência de reembolso/chargeback (F19) recusa sem efeito parcial; troca sem diferença e devolução seguem permitidas", async () => {
+    const a = await newProduct({ price: 500, stock: 30 });
+    const b = await newProduct({ price: 900, stock: 30 });
+    const student = await newStudent({ cents: 5000 });
+    const { orderId } = await placeOrder([{ productId: a }], { student });
+    await db().doc(`wallets/${student}`).set({ pendingReversalCents: 700 }, { merge: true });
+    const before = await state(student, [a, b], [d(3)]);
+    const r = await exchangeAs(cantina, "cantina", orderId, { remove: [{ lineNo: 1, quantity: 1 }], add: [{ productId: b, quantity: 1 }] }, 400);
+    expect(r).toMatchObject({ status: 409, body: { error: "wallet_blocked", details: { pendingCents: 700 } } });
+    expect(await state(student, [a, b], [d(3)])).toEqual(before);
+    expect((await db().collection(`orders/${orderId}/exchanges`).get()).size).toBe(0);
+    await db().doc(`wallets/${student}`).set({ pendingReversalCents: 0 }, { merge: true });
+    expect((await exchangeAs(cantina, "cantina", orderId, { remove: [{ lineNo: 1, quantity: 1 }], add: [{ productId: b, quantity: 1 }] }, 400)).status).toBe(200);
+  });
+
   it("diferença calculada no SERVIDOR: valor diferente do confirmado ou preço alterado depois da prévia recusam e devolvem a nova prévia", async () => {
     const a = await newProduct({ price: 500, stock: 30 });
     const b = await newProduct({ price: 700, stock: 30 });

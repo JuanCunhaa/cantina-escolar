@@ -86,8 +86,14 @@
   },
   "A05": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/integration/online-confirmation-api.test.ts (F19, emulador, provedor ROTEIRIZADO — não é provedor real): assinatura inválida/ausente/antiga/de outra chave = 401 sem leitura nem gravação; sem chave = 503; status do corpo ignorado (a order é consultada); redirect/tela não creditam; duplicidade ×4 e 8 notificações + conciliação + varredura simultâneas = 1 crédito e 1 consulta por gatilho; valor (menos/mais/total), moeda, conta, ambiente e order divergentes = revisão SEM crédito; assinatura reaproveitada com outro corpo = mesmo evento, nenhum estado alterado; fora de ordem (pendente/falha/expirada/desconhecida depois de pago) não regride; order desconhecida (Simular notificação) = 200 sem crédito",
+      "tests/unit/online-confirmation.test.ts: manifesto e HMAC-SHA256 do x-signature conforme a documentação oficial, janela de ts, cabeçalho malformado, data.id do corpo ≠ query, decisão pura por estado e mapeamento da order no formato medido no sandbox",
+      "Mutação dirigida (F19): crédito sem conferir conta/moeda/valor (7 testes caem), webhook sem verificar assinatura (1), pendente depois de pago regride (1), falha/expiração encerram intenção confirmada (1)",
+      "Sandbox REAL do Mercado Pago (conta de teste), servidor local × Firestore HML e preview Vercel do PR #30 × HML (tests/staging/online-confirmation-sandbox.spec.ts, 07/10/2026, 4 passaram + 1 pulado: webhook com a chave real): Pix aprovado pelo sandbox confirmado pelo servidor e creditado UMA vez (1 lançamento, 1 auditoria); notificação repetida com a chave real não duplica — não executada ainda (chave não cadastrada)",
+      "Webhook SIMULADO pelo painel do Mercado Pago associado a uma order REAL do sandbox (08/10/2026, preview × HML; tests/staging/online-confirmation-webhook-simulated.spec.ts 3/3): antes carteira/livro/auditoria/eventos sem crédito; 1ª simulação = assinatura válida, evento autêntico, consulta confirmatória e crédito de R$ 13,00 da ORDER (não do corpo fictício), origem webhook, 1 lançamento e 1 auditoria; 2ª simulação = noop/already_credited, nada duplicado. NÃO é entrega automática"
+    ],
+    "notes": "Provado: emulador (roteirizado), sandbox real pela consulta confirmatória e, apenas por SIMULAÇÃO do painel com order real, o crédito originado pelo webhook (assinatura, evento, consulta, crédito único, duplicidade). NÃO provado: a entrega AUTOMÁTICA do Mercado Pago (as notificações automáticas chegam e são recusadas por assinatura; chave/manifesto a esclarecer com o suporte — rascunho em docs/status/mercadopago-webhook-support-draft.md). Segue not_run."
   },
   "A06": {
     "status": "not_run",
@@ -95,9 +101,11 @@
       "tests/integration/topup-intents-api.test.ts (F18, emulador, provedor ROTEIRIZADO — não é provedor real): timeout depois de criar → creation_uncertain → conciliação por consulta encontra a cobrança, 1 única criação; timeout antes de criar → consulta não encontra e nada é recriado sozinho (3 conciliações, 1 criação); reenvio explícito usa a MESMA chave/referência; cartão incerto não é reenviado e encerra como not_created após 30 min; falha na consulta não muda nada; resposta original atrasada não regride o estado conciliado; replay e clique duplo ×6 = 1 chamada externa",
       "tests/unit/topup-intents.test.ts: decideReconcile (nunca reenvio automático; só explícito, Pix, dentro da janela), needsReconcile, validade derivada",
       "tests/e2e/online-topup.spec.ts (provedor de demonstração, só emulador): criação incerta conciliada pela tela; reenvio explícito do mesmo Pix; clique duplo = 1 cobrança",
-      "Mutação dirigida (F18): provedor chamado também no replay (1 teste cai), reenvio sem pedido explícito (1), desfecho sem guarda de estado (1)"
+      "Mutação dirigida (F18): provedor chamado também no replay (1 teste cai), reenvio sem pedido explícito (1), desfecho sem guarda de estado (1)",
+      "tests/integration/online-confirmation-api.test.ts (F19, emulador): timeout na criação (cobrança EXISTE, resposta perdida) + pagamento confirmado = crédito único e conciliação posterior sem cobrança nem crédito novos; conciliação encontra a cobrança e a consulta confirmatória credita em uma chamada; Pix vencido pela validade LOCAL e pago depois = creditado (afterExpiry); intenção expirada/falha pelo provedor e depois paga = creditada uma vez; varredura (rotina agendada/manual) recupera pagamento tardio, falha e reembolso, idempotente; falha do provedor na consulta = 503 e a reentrega credita uma vez",
+      "Sandbox REAL do Mercado Pago (conta de teste), servidor local × Firestore HML e preview Vercel do PR #30 × HML (tests/staging/online-confirmation-sandbox.spec.ts, 07/10/2026, 4 passaram + 1 pulado: webhook com a chave real): pagamento confirmado depois da criação, sem webhook, creditado pela conciliação da tela e da API"
     ],
-    "notes": "F18 cobre a metade da CRIAÇÃO (timeout de criação conciliado sem cobrança dupla). Pagamento confirmado depois da expiração local e crédito único são da F19 (webhook/consulta). Sem provedor aprovado nem sandbox: nada homologado com provedor real. Segue not_run."
+    "notes": "Criação (F18) e confirmação tardia/crédito único (F19) provadas no emulador; confirmação pelo sandbox real. NÃO provado com provedor real: timeout de criação (só simulado + busca real), Pix vencido pelo provedor, pagamento real, execução da rotina agendada da Vercel (CRON_SECRET não cadastrado). Segue not_run."
   },
   "A07": {
     "status": "not_run",
@@ -470,8 +478,16 @@
   },
   "A31": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "tests/integration/online-confirmation-api.test.ts (F19, emulador): reembolso total com saldo = novo lançamento negativo, carteira regularizada, sem pendência; reembolso parcial acumulado (cada acréscimo um lançamento, repetição sem duplicar, acumulado nunca diminui); reversão duplicada/concorrente ×6 aplicada uma vez; crédito JÁ consumido = recupera só o saldo, abre pendência, bloqueia novas despesas (transferência) e NUNCA deixa saldo negativo (reconciliação carteira × livro); chargeback abre pendência com causa; reversão antes do crédito (total = sem crédito; chargeback = revisão); status desconhecido não altera a carteira; revisão administrativa (lista só da administração, regularizar após novo crédito, absorver com motivo, ×4 concorrentes, desatualizado = 409)",
+      "tests/integration/{checkout,pos,amend}-api.test.ts (F19): carteira com pendência recusa compra antecipada, balcão e troca com cobrança (wallet_blocked) sem efeito parcial; tests/rules/wallet.rules.test.ts: eventos e pendências fechados ao cliente e o cliente não altera o bloqueio; tests/e2e/payments-confirmation.spec.ts: aviso na carteira, transferência recusada e tela de revisão administrativa (emulador)",
+      "Mutação dirigida (F19): recuperar mais que o saldo (4 testes caem), transferência sem bloqueio (1), reversão repetida não detectada (1, depois do teste parcial acumulado)",
+      "Sandbox REAL do Mercado Pago (conta de teste), servidor local × Firestore HML e preview Vercel do PR #30 × HML (tests/staging/online-confirmation-sandbox.spec.ts, 07/10/2026, 4 passaram + 1 pulado: webhook com a chave real): reembolso REAL do sandbox → reversão negativa e carteira regularizada; com o crédito consumido → pendência, carteira bloqueada, lista da administração e regularização (absorver)",
+      "Sandbox REAL (07/10/2026, preview Vercel do PR #30 × Firestore HML): reembolso PARCIAL acumulado (R$ 1,00 + R$ 2,50 + restante R$ 6,50) = três topup_reversal, recusa do provedor acima do restante (refund_amount_exceeds), recarga reversed, carteira × livro reconciliados (tests/staging/online-confirmation-sandbox.spec.ts)",
+      "Contestação pelo contrato OFICIAL da API Orders (charged_back/in_process = em andamento, SEM débito; settled = perdida, debita o valor contestado até o saldo; reimbursed = ganha; ganha depois de debitada = sinal para a administração, sem devolução automática): tests/unit/online-confirmation.test.ts e tests/integration/online-confirmation-api.test.ts (emulador, provedor roteirizado) — NÃO é integração real",
+      "Pagamento numa order da conta sem recarga correspondente fica visível para a administração (sem crédito nem devolução): tests/integration/online-confirmation-api.test.ts"
+    ],
+    "notes": "Reembolso total e parcial provados no emulador e no sandbox real; chargeback só por contrato oficial + emulador roteirizado (o sandbox não o gera). Política da homologação proposta pelo dono em 07/10/2026 conferida (docs/decisions.md): recuperar até o saldo, pendência + bloqueio de despesas/transferências de saída, só a administração absorve, divergência em revisão, contestação aberta não é perda. Ainda sem decisão: limite de absorção e contestação ganha depois de debitada. Segue not_run."
   },
   "A32": {
     "status": "not_run",
@@ -570,7 +586,8 @@
       "tests/integration/cancellation-api.test.ts (F14, emulador): replay devolve a resposta original sem novo crédito, payload diferente = conflito, clique duplo com chaves diferentes = 1 crédito, falha forçada no último passo (auditoria) e falha de estoque (descarte impossível) desfazem tudo (carteira, livro, reserva, cota, uso, pedido) e o retry credita uma vez; uso diário/semanal liberado na mesma transação (F09)",
       "tests/integration/cancellation-api.test.ts: liberação de reserva/cota sem entrada física (onHand/movimentos/valor intactos) e descarte como perda explícita com custo e motivo",
       "F14 (04/10/2026, branch feat/f14-cancelamentos-reembolsos): typecheck 0; lint 0; npm test 211/211; npm run test:rules 49/49; npm run test:integration 301/301; npm run test:e2e 56/56; build:webpack 0; audit:prod 0; gitleaks dir src/tests/scripts/docs/firebase e git --redact: sem vazamentos (logs .agent-logs/f14-check-*.log)",
-      "F16: reagendar/trocar idempotentes — mesma chave = resposta original (resposta perdida), payload diferente = conflito, clique duplo com chave nova recusado; operador desativado/rebaixado negado inclusive no replay; falha no último passo e falha intermediária de estoque sem efeito; corridas entrega × reagendamento (6), cancelamento × reagendamento, dois reagendamentos, troca × reagendamento, troca × entrega (6), troca × cancelamento, duas trocas da mesma unidade (×4) com dinheiro/uso/estoque coerentes; uso dia/semana gravado uma vez com o líquido (tests/integration/amend-api.test.ts, tests/unit/amend.test.ts). Emulador apenas."
+      "F16: reagendar/trocar idempotentes — mesma chave = resposta original (resposta perdida), payload diferente = conflito, clique duplo com chave nova recusado; operador desativado/rebaixado negado inclusive no replay; falha no último passo e falha intermediária de estoque sem efeito; corridas entrega × reagendamento (6), cancelamento × reagendamento, dois reagendamentos, troca × reagendamento, troca × entrega (6), troca × cancelamento, duas trocas da mesma unidade (×4) com dinheiro/uso/estoque coerentes; uso dia/semana gravado uma vez com o líquido (tests/integration/amend-api.test.ts, tests/unit/amend.test.ts). Emulador apenas.",
+      "tests/integration/online-confirmation-api.test.ts (F19): o provedor é consultado FORA do callback — 6 confirmações concorrentes = 6 consultas (retentativas da transação não chamam o provedor) e 1 crédito; falha intermediária (auditoria já existente) não grava nada e o reprocessamento credita uma vez; carteira × livro reconciliados após cada cenário"
     ],
     "notes": "Parcial: retry/falha/replay e liberação de uso do cancelamento provados no emulador; sem chamada externa no callback (não há gateway). Pagamento/e-mail e Firestore real seguem pendentes (F17–F19). Permanece not_run."
   },

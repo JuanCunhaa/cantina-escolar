@@ -511,6 +511,19 @@ describe("política do responsável aplicada no checkout (A10/A11)", () => {
 /* ------------------------------------------------------------------------------------------- carteira / saldo */
 
 describe("saldo da carteira (A17/A18)", () => {
+  it("carteira com pendência de reembolso/chargeback (F19) NÃO faz compra antecipada, mesmo com saldo; nada é gravado e a liberação reabre a compra", async () => {
+    const student = await newStudent({ cents: 5000 });
+    const p = await newProduct({ price: 700, stock: 100 });
+    await adminDb().doc(`wallets/${student}`).set({ pendingReversalCents: 1200 }, { merge: true });
+    const before = await state(student, [p], [d(1)]);
+    const r = await buy(guardianA, cart(student, SM, { [d(1)]: [{ productId: p }] }));
+    expect(r).toMatchObject({ status: 409, body: { error: "wallet_blocked", details: { pendingCents: 1200 } } });
+    expect(await state(student, [p], [d(1)])).toEqual(before);
+    await adminDb().doc(`wallets/${student}`).set({ pendingReversalCents: 0 }, { merge: true });
+    expect((await buy(guardianA, cart(student, SM, { [d(1)]: [{ productId: p }] }))).status).toBe(200);
+    await expectLedger(student);
+  });
+
   it("saldo insuficiente recusa o lote inteiro sem gravar; saldo exato fecha em zero, nunca negativo", async () => {
     const student = await newStudent({ cents: 1500 });
     const p = await newProduct({ price: 700, stock: 100 });

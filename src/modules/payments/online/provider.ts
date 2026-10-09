@@ -31,6 +31,34 @@ export type ProviderCharge = {
   declineCode?: string;
 };
 
+/**
+ * Estado NORMALIZADO da order/cobrança no provedor, lido pelo servidor (nunca o que veio na notificação):
+ * - `paid`: recebimento confirmado pelo provedor (única base de crédito);
+ * - `pending`: ainda a pagar/em análise; `failed`/`expired`: encerrada sem pagamento;
+ * - `refunded`/`partially_refunded`: valor devolvido ao pagador (`reversedCents` acumulado, ≤ total);
+ * - `chargeback`: contestação PERDIDA, valor efetivamente debitado pelo provedor (`charged_back/settled`; `reversedCents` = valor
+ *   contestado); `dispute_open`: contestação em andamento (`charged_back/in_process`), AINDA sem perda definitiva; `dispute_won`:
+ *   contestação ganha pelo vendedor (`charged_back/reimbursed`);
+ * - `unknown`: status que o adapter não reconhece — NUNCA credita nem muda uma intenção por isso (falha segura).
+ */
+export type ProviderOrderState = "pending" | "paid" | "failed" | "expired" | "refunded" | "partially_refunded" | "chargeback" | "dispute_open" | "dispute_won" | "unknown";
+
+export type ProviderOrder = {
+  orderId: string;
+  /** `external_reference` da order (= ID da intenção); `null` se o provedor não devolveu. */
+  externalReference: string | null;
+  /** Conta recebedora dona da order (no Mercado Pago, `user_id`). */
+  accountId: string;
+  currency: string;
+  totalCents: number;
+  paidCents: number;
+  state: ProviderOrderState;
+  providerStatus: string;
+  reversedCents: number;
+  paymentId: string | null;
+  updatedAt: string | null;
+};
+
 export type ChargeRequest = {
   intentId: string;
   idempotencyKey: string;
@@ -66,6 +94,13 @@ type ProviderBase = {
    * datas na busca). `null` = o provedor afirma não conhecer a cobrança.
    */
   findCharge(externalReference: string, createdAt: Date): Promise<ProviderCharge | null>;
+  /**
+   * Consulta confirmatória (F19): a order pelo ID do provedor, estado atual e valores. `null` = o provedor afirma que não
+   * existe (404). Falha de rede/5xx/resposta ilegível = `ProviderError("uncertain")`. Chamada FORA de qualquer transação.
+   */
+  getOrder(orderId: string): Promise<ProviderOrder | null>;
+  /** Conta recebedora das credenciais configuradas (comparada com a dona da order e com a notificação). */
+  accountId(): Promise<string>;
 };
 
 export type PixProvider = ProviderBase & {
