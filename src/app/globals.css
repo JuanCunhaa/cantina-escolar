@@ -392,3 +392,7 @@ fieldset { min-width: 0; }
 .pix-box { display: grid; gap: var(--space-2); max-width: 28rem; }
 .pix-qr { width: 13.75rem; height: 13.75rem; image-rendering: pixelated; border: 1px solid var(--color-line); background: #fff; }
 .pix-box textarea { width: 100%; font-family: ui-monospace, monospace; word-break: break-all; }
+
+/* F20: campos em grade nunca passam da largura da tela (select com opção longa não alarga a coluna). */
+.form-grid > .field, .toolbar > .field { min-width: 0; }
+.form-grid > .field select, .toolbar > .field select { width: 100%; }

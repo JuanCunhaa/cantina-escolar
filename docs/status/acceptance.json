@@ -80,9 +80,10 @@
       "tests/unit/topups.test.ts: amountsOf (crédito = bruto; líquido = bruto − taxa; dinheiro sem taxa)",
       "tests/e2e/topups.spec.ts: revisão mostra crédito R$ 50,00 e líquido R$ 48,50; carteira R$ 50,00; comprovante creditado R$ 50,00 / líquido R$ 48,50",
       "tests/staging/topups-hml.spec.ts: mesmo caso com recebimento SIMULADO pelo fluxo normal: ensaio no emulador 8/8 e URL publicada (Vercel + Firebase cantina-escolar-hml, 05/10/2026) 8/8 — crédito R$ 50, líquido R$ 48,50 e compra/troca/reembolso posteriores sem taxa, reconciliação OK e releitura independente dos registros",
-      "F18 (06/10/2026, emulador, provedor roteirizado): intenção online guarda o valor BRUTO em centavos (amountCents = valor pedido, sem taxa para a família) e NÃO credita — tests/integration/topup-intents-api.test.ts verifica carteira sem lançamento em todos os estados; crédito integral do pagamento online é da F19"
+      "F18 (06/10/2026, emulador, provedor roteirizado): intenção online guarda o valor BRUTO em centavos (amountCents = valor pedido, sem taxa para a família) e NÃO credita — tests/integration/topup-intents-api.test.ts verifica carteira sem lançamento em todos os estados; crédito integral do pagamento online é da F19",
+      "F20 (09/10/2026, emulador): tests/integration/finance-fees-api.test.ts — recarga no cartão de R$ 50,00 com regra FICTÍCIA de 3,00% estima R$ 1,50 (crédito segue R$ 50,00; estimativa congelada com a versão da regra); a taxa informada vale como real e a estimativa não soma; a compra com saldo debita só o preço e NÃO carrega taxa (pedido sem campos de taxa, livro [topup +5000, counter_purchase −1000]) e o relatório do dia não muda; online: crédito bruto integral com estimativa congelada e taxa/liquidação reais pendentes até a conferência (carteira e livro intactos); tests/unit/fees.test.ts: R$ 50,00 a 3,00% = R$ 1,50 e líquido R$ 48,50"
     ],
-    "notes": "F17 cobre a recarga MANUAL (secretaria). Recarga online (Pix/cartão pelo site, F18/F19) e cadastro/regras de taxa (F20) não existem: o enunciado vale para o canal manual; segue not_run globalmente. Na homologação só há recebimentos SIMULADOS (nenhum pagamento real homologado). F18: recarga online cria só a intenção/cobrança (sem crédito); o enunciado para Pix/cartão online depende da confirmação (F19) e de provedor aprovado."
+    "notes": "F17 cobre a recarga MANUAL (secretaria). Recarga online (Pix/cartão pelo site, F18/F19) e cadastro/regras de taxa (F20) não existem: o enunciado vale para o canal manual; segue not_run globalmente. Na homologação só há recebimentos SIMULADOS (nenhum pagamento real homologado). F18: recarga online cria só a intenção/cobrança (sem crédito); o enunciado para Pix/cartão online depende da confirmação (F19) e de provedor aprovado. F20: o enunciado vale agora também para a taxa estimada por regra cadastrada (fictícia na homologação) e para a conferência da taxa real; nenhuma taxa/prazo REAL foi cadastrado e nada foi homologado com dinheiro real — segue not_run globalmente."
   },
   "A05": {
     "status": "not_run",
@@ -114,7 +115,8 @@
       "tests/rules/wallet.rules.test.ts: topups, reversals e uniquenessKeys fechados ao cliente (família, secretaria, cantina, administração, anônimo); lançamentos de recarga só leitura da família vinculada",
       "tests/e2e/topups.spec.ts: busca nominal com homônimos, revisão + confirmação da conferência, clique duplo, resposta perdida com a MESMA chave, referência repetida recusada, comprovante sem botão de estorno para a secretaria comum, estorno com permissão separada (novo movimento, histórico) e celular sem rolagem lateral",
       "Mutação dirigida: sem checagem da referência (3 testes caem), sem expectedReversedCents (3), allow do estorno trocado para topup.register (1)",
-      "F17 (05/10/2026, emulador): npm test 239/239, test:rules 55/55, test:integration 400 (1ª execução 399/400: timeout em policies-api A35 sob carga paralela; arquivo reexecutado 17/17), test:e2e 68/68, lint/typecheck 0, build:webpack 0, audit:prod 0, gitleaks sem vazamentos nos arquivos novos"
+      "F17 (05/10/2026, emulador): npm test 239/239, test:rules 55/55, test:integration 400 (1ª execução 399/400: timeout em policies-api A35 sob carga paralela; arquivo reexecutado 17/17), test:e2e 68/68, lint/typecheck 0, build:webpack 0, audit:prod 0, gitleaks sem vazamentos nos arquivos novos",
+      "F20 (emulador): fechamento de caixa por operador com auditoria e versões imutáveis; estorno de recarga continua novo movimento e é identificado como movimento posterior ao fechamento (tests/integration/cash-api.test.ts)"
     ],
     "notes": "Enunciado provado no Emulator Suite para a recarga manual (F17). Homologação (05/10/2026, URL publicada, 8/8): recebimentos SIMULADOS pelo fluxo normal (sem dinheiro/provedor) — autorização e permissão separada na nuvem, Rules publicadas, estorno como novo movimento, stale_topup e recusa acima do saldo, reconciliação; detalhes em docs/status/firebase-homologation.md. Não é pagamento real homologado. Segue not_run globalmente até a revisão F23."
   },
@@ -440,13 +442,18 @@
   },
   "A28": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "F20 (emulador): tests/unit/finance-report.test.ts + tests/integration/finance-fees-api.test.ts — relatório financeiro por data do recebimento: recarga manual, recarga online confirmada e venda direta contadas UMA vez; bruto, estornado, taxa por base (conferida/informada/estimada/sem valor), líquido previsto × real e liquidação (liquidada/a liquidar/vencida) separados; compra com saldo da carteira, transferência e reserva NÃO entram (relatório do dia inalterado após compra com saldo); caixa: dinheiro, Pix e cartão separados e consumo com carteira à parte (tests/integration/cash-api.test.ts)"
+    ],
+    "notes": "F20 cobre recarga, venda direta, taxa e recebimento líquido; CMV, compra de estoque, perda e vendas realizadas/pedidos futuros são da F21 — critério parcial, segue not_run."
   },
   "A29": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "F20 (emulador): tests/integration/finance-fees-api.test.ts — regra versionada e imutável (vigência nunca retroativa, estritamente posterior, retirada só de versão futura, versões antigas intactas); mudar a regra NÃO altera o lançamento antigo (estimativa v1 de R$ 3,00 preservada com a v2 vigente; recebimento novo usa a v2); estimativa × real sem soma dupla (a taxa efetiva é UMA: conferida > informada > estimada; soma por base = taxa efetiva); exportação mensal: o resumo CSV bate com o detalhe (recebimentos, bruto, estornado, taxa efetiva) e com o relatório do período; fórmulas neutralizadas; tests/unit/fees.test.ts e finance-report.test.ts",
+      "F20 — mutação dirigida (15 mutações em fee-model/cash-model/reconcile/commands/finance-report; log .agent-logs/f20-mutation-1.log): estimativa somada ao real, vigência ignorada, arredondamento para baixo, estimativa não gravada, regra fictícia valendo em produção e CSV sem neutralização derrubaram testes"
+    ],
+    "notes": "F20: a homologação usa só regras FICTÍCIAS (nenhuma taxa real cadastrada) — segue not_run globalmente."
   },
   "A30": {
     "status": "not_run",
@@ -472,7 +479,8 @@
       "npm run test:integration 73/73",
       "npm run test:e2e 15/15",
       "npm run build:webpack exit 0",
-      "npm run audit:prod 0 vulnerabilidades"
+      "npm run audit:prod 0 vulnerabilidades",
+      "F20 (emulador e Rules): secretaria e cantina fecham só o PRÓPRIO caixa e não veem regras de taxa, relatório, exportação nem caixas alheios (403); lista de maquininhas sem percentuais; coleções financeiras novas fechadas ao cliente (tests/integration/cash-api.test.ts, finance-fees-api.test.ts, tests/rules/finance.rules.test.ts)"
     ],
     "notes": "Parcial: negação por API administrativa (usuários F03; turmas, alunos, importação, vínculos e convites F04) e matriz provadas; ainda não há rotas/telas de custos, lucro e relatórios (F06/F10/F21) para provar a negação da secretaria nelas; manter not_run."
   },
@@ -485,9 +493,10 @@
       "Sandbox REAL do Mercado Pago (conta de teste), servidor local × Firestore HML e preview Vercel do PR #30 × HML (tests/staging/online-confirmation-sandbox.spec.ts, 07/10/2026, 4 passaram + 1 pulado: webhook com a chave real): reembolso REAL do sandbox → reversão negativa e carteira regularizada; com o crédito consumido → pendência, carteira bloqueada, lista da administração e regularização (absorver)",
       "Sandbox REAL (07/10/2026, preview Vercel do PR #30 × Firestore HML): reembolso PARCIAL acumulado (R$ 1,00 + R$ 2,50 + restante R$ 6,50) = três topup_reversal, recusa do provedor acima do restante (refund_amount_exceeds), recarga reversed, carteira × livro reconciliados (tests/staging/online-confirmation-sandbox.spec.ts)",
       "Contestação pelo contrato OFICIAL da API Orders (charged_back/in_process = em andamento, SEM débito; settled = perdida, debita o valor contestado até o saldo; reimbursed = ganha; ganha depois de debitada = sinal para a administração, sem devolução automática): tests/unit/online-confirmation.test.ts e tests/integration/online-confirmation-api.test.ts (emulador, provedor roteirizado) — NÃO é integração real",
-      "Pagamento numa order da conta sem recarga correspondente fica visível para a administração (sem crédito nem devolução): tests/integration/online-confirmation-api.test.ts"
+      "Pagamento numa order da conta sem recarga correspondente fica visível para a administração (sem crédito nem devolução): tests/integration/online-confirmation-api.test.ts",
+      "F20 (emulador): reversão externa/estorno visíveis nas contas — o relatório mostra o valor estornado/devolvido à parte e a taxa NÃO é devolvida; a reversão da recarga online (F19) entra como `reversedCents` do recebimento; o caixa abate estorno do recebimento a que pertence e identifica estorno posterior ao fechamento sem reescrevê-lo (tests/integration/cash-api.test.ts, finance-fees-api.test.ts)"
     ],
-    "notes": "Reembolso total e parcial provados no emulador e no sandbox real; chargeback só por contrato oficial + emulador roteirizado (o sandbox não o gera). Política da homologação proposta pelo dono em 07/10/2026 conferida (docs/decisions.md): recuperar até o saldo, pendência + bloqueio de despesas/transferências de saída, só a administração absorve, divergência em revisão, contestação aberta não é perda. Ainda sem decisão: limite de absorção e contestação ganha depois de debitada. Segue not_run."
+    "notes": "Reembolso total e parcial provados no emulador e no sandbox real; chargeback só por contrato oficial + emulador roteirizado (o sandbox não o gera). Política da homologação proposta pelo dono em 07/10/2026 conferida (docs/decisions.md): recuperar até o saldo, pendência + bloqueio de despesas/transferências de saída, só a administração absorve, divergência em revisão, contestação aberta não é perda. Ainda sem decisão: limite de absorção e contestação ganha depois de debitada. Segue not_run. F20 acrescenta a visibilidade nas contas; a idempotência e a pendência/bloqueio são da F19 (ver evidências acima). Chargeback em integração real segue não provado (o sandbox não o gera)."
   },
   "A32": {
     "status": "not_run",
@@ -621,7 +630,9 @@
   },
   "A38": {
     "status": "not_run",
-    "evidence": [],
-    "notes": ""
+    "evidence": [
+      "F20 (parcial, emulador): relatório, exportação e alertas de caixa são projeções reconstruíveis lidas dos documentos de recebimento (nenhum estado próprio); a conferência repetida (mesma chave) e a corrida de duas conferências não duplicam taxa nem evento (tests/integration/finance-fees-api.test.ts)"
+    ],
+    "notes": "Parcial: gatilho/replay de venda e CMV nos relatórios é da F21."
   }
 }

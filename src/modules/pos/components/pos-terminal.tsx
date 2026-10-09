@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { TerminalOption } from "@/modules/fees/fee-queries";
 import type { User } from "firebase/auth";
 import { errorText } from "@/lib/api-client";
 import { formatBRL } from "@/lib/money/format";
@@ -40,6 +41,7 @@ export function PosTerminal({ user }: { user: User }) {
   const detail = useServerQuery<PosStudent>(user, "/api/pos/students", `id=${studentId ?? ""}`, studentId !== null);
   const [directShift, setDirectShift] = useState("");
   const [direct, setDirect] = useState<DirectFields>(EMPTY_DIRECT);
+  const terminals = useServerQuery<{ terminals: TerminalOption[] }>(user, "/api/finance/terminals", "", true, false);
   const [cart, setCart] = useState<CartLine[]>([]);
   // Preços devolvidos numa mudança de preço valem só para o cardápio carregado naquele momento: um cardápio recarregado os substitui.
   const [priceOverride, setPriceOverride] = useState<{ base: PosCatalog | null; map: Record<string, number> }>({ base: null, map: {} });
@@ -190,6 +192,7 @@ export function PosTerminal({ user }: { user: User }) {
         buyerKind: direct.buyerKind,
         ...(direct.buyerNote.trim() ? { buyerNote: direct.buyerNote.trim() } : {}),
         ...(typeof fee === "number" ? { feeCents: fee } : {}),
+        ...(direct.sourceId ? { sourceId: direct.sourceId } : {}),
       });
       if (!result) return;
       if (!result.ok) {
@@ -324,6 +327,7 @@ export function PosTerminal({ user }: { user: User }) {
             reviewing={reviewing}
             exceptionId={exceptionId}
             direct={direct}
+            terminals={terminals.data?.terminals}
             message={message}
             onQty={setQty}
             onRemove={(id) => setQty(id, 0)}

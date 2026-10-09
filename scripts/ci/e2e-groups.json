@@ -12,7 +12,8 @@
       "policies.spec.ts",
       "pos.spec.ts",
       "fulfillment.spec.ts",
-      "shell-photos.spec.ts"
+      "shell-photos.spec.ts",
+      "finance.spec.ts"
     ],
     "g2": [
       "wallet.spec.ts",

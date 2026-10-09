@@ -59,6 +59,8 @@ export const topupSchema = z
     feeCents: z.number().int().min(0).max(MAX_TOPUP_CENTS).optional(),
     /** Cartão: data prevista da liquidação bancária (opcional). */
     expectedSettlementOn: z.string().refine(isLocalDate).optional(),
+    /** Maquininha cadastrada (F20) usada no recebimento por cartão/Pix; ausente = fonte padrão do meio. */
+    sourceId: z.string().regex(/^term_[a-z0-9]{2,24}$/).optional(),
     payerName: text(80).optional(),
     note: text(200).optional(),
   })
@@ -69,6 +71,7 @@ export const topupSchema = z
     if (v.reference && v.reference.trim() !== "" && normalized.length < 4) ctx.addIssue({ code: "custom", path: ["reference"], message: "Referência curta demais." });
     if (v.method === "cash" && v.feeCents) ctx.addIssue({ code: "custom", path: ["feeCents"], message: "Dinheiro não tem taxa." });
     if (v.feeCents !== undefined && v.feeCents > v.amountCents) ctx.addIssue({ code: "custom", path: ["feeCents"], message: "Taxa acima do valor." });
+    if (v.sourceId && v.method === "cash") ctx.addIssue({ code: "custom", path: ["sourceId"], message: "Dinheiro não usa maquininha." });
     if (v.expectedSettlementOn && v.method !== "card_debit" && v.method !== "card_credit") ctx.addIssue({ code: "custom", path: ["expectedSettlementOn"], message: "Só cartão tem liquidação prevista." });
   });
 export type TopupInput = z.infer<typeof topupSchema>;
@@ -78,12 +81,19 @@ export type Settlement = {
   status: "cash_on_hand" | "settled" | "pending";
   expectedOn: LocalDate | null;
   settledOn: LocalDate | null;
+  /** De onde veio a data prevista (F20): digitada pelo operador ou calculada pela regra de taxa/prazo em vigor. */
+  expectedSource?: "operator" | "rule" | null;
 };
 
-export function settlementOf(method: PaymentMethod, receivedOn: LocalDate, expectedOn: LocalDate | undefined): Settlement {
-  if (method === "cash") return { status: "cash_on_hand", expectedOn: null, settledOn: null };
-  if (method === "pix") return { status: "settled", expectedOn: null, settledOn: receivedOn };
-  return { status: "pending", expectedOn: expectedOn ?? null, settledOn: null };
+/**
+ * Liquidação ao registrar: dinheiro no caixa; Pix MANUAL conferido na conta = liquidado; cartão = pendente. A previsão digitada pelo
+ * operador vale; sem ela, a da regra em vigor (`ruleExpectedOn`, F20); sem nenhuma, fica sem previsão (nunca inventada).
+ */
+export function settlementOf(method: PaymentMethod, receivedOn: LocalDate, expectedOn: LocalDate | undefined, ruleExpectedOn: LocalDate | null = null): Settlement {
+  if (method === "cash") return { status: "cash_on_hand", expectedOn: null, settledOn: null, expectedSource: null };
+  if (method === "pix") return { status: "settled", expectedOn: null, settledOn: receivedOn, expectedSource: null };
+  const expected = expectedOn ?? ruleExpectedOn;
+  return { status: "pending", expectedOn: expected, settledOn: null, expectedSource: expectedOn ? "operator" : ruleExpectedOn ? "rule" : null };
 }
 
 /** Data prevista de liquidação: de hoje até +90 dias. */

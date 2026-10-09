@@ -68,6 +68,8 @@ export const directSaleSchema = z
     paymentMethod: z.enum(PAYMENT_METHODS),
     receivedConfirmed: z.literal(true),
     feeCents: z.number().int().min(0).max(PRICE_MAX_CENTS * MAX_POS_QUANTITY * MAX_POS_LINES).optional(),
+    /** Maquininha cadastrada (F20); ausente = fonte padrão do meio. */
+    sourceId: z.string().regex(/^term_[a-z0-9]{2,24}$/).optional(),
     buyerKind: z.enum(BUYER_KINDS).default("other"),
     buyerNote: z
       .string()

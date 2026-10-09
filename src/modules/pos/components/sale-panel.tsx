@@ -1,13 +1,15 @@
 "use client";
 
 import { formatBRL } from "@/lib/money/format";
+import { TerminalField } from "@/modules/fees/components/terminal-field";
+import type { TerminalOption } from "@/modules/fees/fee-queries";
 import { parseBRLInput } from "@/modules/catalog/model";
 import { BUYER_KINDS, BUYER_LABEL, MAX_POS_QUANTITY, PAYMENT_LABEL, PAYMENT_METHODS, type BuyerKind, type PaymentMethod } from "../model";
 import type { PosProduct, PosStudent } from "../queries";
 import { precheck, type CartLine } from "../view";
 
-export type DirectFields = { paymentMethod: PaymentMethod; buyerKind: BuyerKind; buyerNote: string; feeText: string; received: boolean };
-export const EMPTY_DIRECT: DirectFields = { paymentMethod: "cash", buyerKind: "teacher", buyerNote: "", feeText: "", received: false };
+export type DirectFields = { paymentMethod: PaymentMethod; buyerKind: BuyerKind; buyerNote: string; feeText: string; received: boolean; sourceId: string };
+export const EMPTY_DIRECT: DirectFields = { paymentMethod: "cash", buyerKind: "teacher", buyerNote: "", feeText: "", received: false, sourceId: "" };
 
 /** Taxa digitada (R$) → centavos; vazio = não informada (`undefined`); inválido = `null`. */
 export function feeCentsOf(fields: DirectFields): number | undefined | null {
@@ -29,6 +31,8 @@ type Props = {
   reviewing: boolean;
   exceptionId: string | null;
   direct: DirectFields;
+  /** Maquininhas ativas (F20); vazio = sem escolha. */
+  terminals?: readonly TerminalOption[];
   message: { kind: "ok" | "error"; text: string } | null;
   onQty: (productId: string, quantity: number) => void;
   onRemove: (productId: string) => void;
@@ -174,7 +178,7 @@ export function SalePanel(p: Props) {
           <div className="choice-group" role="radiogroup" aria-label="Forma de pagamento">
             {PAYMENT_METHODS.map((m) => (
               <label key={m}>
-                <input type="radio" name="pos-method" value={m} checked={p.direct.paymentMethod === m} disabled={p.locked} onChange={() => p.onDirect({ ...p.direct, paymentMethod: m, feeText: m === "cash" ? "" : p.direct.feeText })} data-testid={`pos-method-${m}`} />
+                <input type="radio" name="pos-method" value={m} checked={p.direct.paymentMethod === m} disabled={p.locked} onChange={() => p.onDirect({ ...p.direct, paymentMethod: m, feeText: m === "cash" ? "" : p.direct.feeText, sourceId: "" })} data-testid={`pos-method-${m}`} />
                 {PAYMENT_LABEL[m]}
               </label>
             ))}
@@ -186,6 +190,7 @@ export function SalePanel(p: Props) {
               {feeInvalid && <span role="alert" className="notice-error">Informe um valor válido (ex.: 0,35) que não passe do total.</span>}
             </div>
           )}
+          <TerminalField id="pos-terminal" terminals={p.terminals ?? []} method={p.direct.paymentMethod} value={p.direct.sourceId} disabled={p.locked} onChange={(sourceId) => p.onDirect({ ...p.direct, sourceId })} />
           <div className="form-grid">
             <div className="field">
               <label htmlFor="pos-buyer-kind">Quem comprou</label>

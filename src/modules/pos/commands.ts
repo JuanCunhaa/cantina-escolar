@@ -7,12 +7,14 @@ import { decideStudentAction, studentAccessRefs, authorize } from "@/modules/acc
 import { ForbiddenError } from "@/modules/access/errors";
 import { can } from "@/modules/access/permissions";
 import { auditInTransaction } from "@/modules/audit/log";
+import { assertTerminalFor, feeApplicationOf, feeRefs, refsToRead } from "@/modules/fees/fee-store";
 import { openStockSession } from "@/modules/inventory/session";
 import { readMenuForSale } from "@/modules/menu/queries";
 import { priceChanges, reviewedCart, subtotalOf, totalOf, type ResolvedLine } from "@/modules/orders/model";
 import { commitPurchaseUsage, decidePurchase, readPurchaseGuard } from "@/modules/policies/purchase-guard";
 import { checkCounterDay } from "@/modules/school/settings";
 import { applyDelta, assertCanSpend, parseWalletState } from "@/modules/wallet/model";
+import { settlementOf } from "@/modules/payments/topup-model";
 import { counterReason, counterSaleSchema, directSaleSchema, feeRecordOf, type CounterItem, type FeeRecord, type PaymentMethod } from "./model";
 
 /**
@@ -262,11 +264,15 @@ export async function recordDirectSale(db: Firestore, actor: Actor, raw: unknown
   return runIdempotentCommand(db, actor, { scope: "pos.direct_sale", key: input.key, payload: input, allow: allowPos }, async ({ tx, actor: current, auditId }) => {
     const today = localDateOf(clock());
     const { shiftId } = input;
-    const [day, menu] = await Promise.all([
+    if (input.sourceId && input.paymentMethod === "cash") throw conflict("invalid_source", "Dinheiro não usa maquininha.");
+    const refs = feeRefs(db, input.paymentMethod, input.sourceId);
+    const [day, menu, feeSnaps] = await Promise.all([
       checkCounterDay(db, { shiftId, date: today }, tx),
       readMenuForSale(db, tx, { date: today, shiftId, channel: "counter", productIds: input.lines.map((l) => l.productId) }),
+      refs ? tx.getAll(...refsToRead(refs)) : Promise.resolve([]),
     ]);
     if (!day.allowed) throw conflict(day.reason, undefined, { date: today });
+    if (refs) assertTerminalFor(refs, feeSnaps[1]);
     const prepared = resolveLines(today, input.lines, menu);
     const items: CounterItem[] = prepared.map((l, index) => ({
       lineNo: index + 1,
@@ -283,6 +289,7 @@ export async function recordDirectSale(db: Firestore, actor: Actor, raw: unknown
       deliveredQty: l.quantity,
     }));
     const totalCents = totalOf(items);
+    const rule = feeApplicationOf(refs, feeSnaps[0], { grossCents: totalCents, receivedOn: today });
     // Regras da taxa juntas e antes de qualquer valor derivado: dinheiro não tem taxa de meio (0 é aceito) e a taxa não passa do total.
     if (input.paymentMethod === "cash" && input.feeCents) throw conflict("invalid_fee", "Dinheiro não tem taxa de meio de pagamento.", { feeCents: input.feeCents });
     if (input.feeCents !== undefined && input.feeCents > totalCents) throw conflict("invalid_fee", "A taxa não pode superar o valor da venda.", { totalCents, feeCents: input.feeCents });
@@ -307,7 +314,8 @@ export async function recordDirectSale(db: Firestore, actor: Actor, raw: unknown
       items,
       itemCount,
       totalCents,
-      payment: { method: input.paymentMethod, receivedCents: totalCents, receivedConfirmed: true, fee, netCents },
+      // Recebimento EXTERNO (dinheiro/Pix/cartão): nunca passa pela carteira. Taxa efetiva em `fee`; estimativa congelada pela regra em vigor (F20).
+      payment: { method: input.paymentMethod, receivedCents: totalCents, receivedConfirmed: true, fee, netCents, feeEstimate: rule.estimate, sourceId: refs?.sourceId ?? null, settlement: settlementOf(input.paymentMethod, today, undefined, rule.expectedSettlementOn), financeVersion: 0 },
       buyerKind: input.buyerKind,
       buyerNote: input.buyerNote ?? null,
       movements,

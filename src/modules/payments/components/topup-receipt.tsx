@@ -20,7 +20,7 @@ import { settlementText, statusText } from "./topup-text";
 
 type Props = { user: User; role: Role; permissions: readonly string[]; topupId: string };
 
-const FEE_TEXT = { none: "Sem taxa (dinheiro)", informed: "Informada pelo operador", pending: "A conferir" } as const;
+const FEE_TEXT = { none: "Sem taxa (dinheiro)", informed: "Informada pelo operador", confirmed: "Conferida pela administração", pending: "A conferir" } as const;
 
 /**
  * Comprovante interno (imprimível) e estorno. O estorno exige a permissão SEPARADA `topup.reverse`, motivo e valor até o

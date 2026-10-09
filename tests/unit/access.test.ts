@@ -15,12 +15,12 @@ describe("matriz de papéis (A30)", () => {
 
   it("secretaria nunca recebe custos, lucro, auditoria ou gestão de usuários", () => {
     const secretaria = allowed("secretaria");
-    expect(secretaria).toEqual(["students.search", "topup.register"]);
+    expect(secretaria).toEqual(["students.search", "topup.register", "cash.operate"]); // F20: fecha o PRÓPRIO caixa; sem finance.manage (regras, relatórios, caixas alheios)
     for (const c of ["costs.read", "profit.read", "audit.read", "users.manage"] as Capability[]) expect(can({ role: "secretaria" }, c)).toBe(false);
   });
 
   it("cantina opera pedidos/PDV/fotos, mas não vê custos, lucro nem recarrega", () => {
-    expect(allowed("cantina")).toEqual(["students.search", "orders.operate", "orders.cancel", "orders.amend", "pos.operate", "catalog.photos.manage", "inventory.read", "inventory.loss"]);
+    expect(allowed("cantina")).toEqual(["students.search", "orders.operate", "orders.cancel", "orders.amend", "pos.operate", "catalog.photos.manage", "inventory.read", "inventory.loss", "cash.operate"]);
   });
 
   it("responsável, aluno e conta sem papel não têm capacidade administrativa", () => {
@@ -28,6 +28,14 @@ describe("matriz de papéis (A30)", () => {
     expect(allowed("student")).toEqual([]);
     for (const c of CAPABILITIES) expect(can({ role: null }, c)).toBe(false);
     for (const c of CAPABILITIES) expect(can({}, c)).toBe(false);
+  });
+
+  it("F20: o caixa é do PRÓPRIO operador; regras de taxa, conferência, revisão e relatório financeiro são só da administração, mesmo com a permissão extra de estorno", () => {
+    for (const role of ["secretaria", "cantina", "admin"] as Role[]) expect(can({ role }, "cash.operate"), role).toBe(true);
+    for (const role of ["guardian", "student"] as Role[]) expect(can({ role }, "cash.operate"), role).toBe(false);
+    for (const role of ["secretaria", "cantina", "guardian", "student"] as Role[]) expect(can({ role, permissions: ["topup.reverse"] }, "finance.manage"), role).toBe(false);
+    expect(can({ role: "admin" }, "finance.manage")).toBe(true);
+    expect(can({ role: "secretaria", permissions: ["topup.reverse"] }, "cash.operate")).toBe(true);
   });
 
   it("estorno manual é permissão separada: só a secretaria com a permissão extra explícita", () => {
