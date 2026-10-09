@@ -2,9 +2,13 @@ import { FieldValue, Timestamp, type Firestore } from "firebase-admin/firestore"
 import { unavailable } from "@/lib/domain-error";
 import { sha256Hex } from "@/lib/firebase/command";
 import { COMMAND_TRANSACTION } from "@/lib/firebase/transaction-options";
+import { localDateOf } from "@/lib/dates/school-time";
 import { auditInTransaction } from "@/modules/audit/log";
 import { applyDelta, MAX_BALANCE_CENTS, parseWalletState, pendingReversalOf } from "@/modules/wallet/model";
+import { ONLINE_SOURCE_ID } from "@/modules/fees/fee-model";
+import { feeApplicationOf, feeRefs, refsToRead } from "@/modules/fees/fee-store";
 import { PAYMENT_LABEL } from "../methods";
+import { pendingSettlement } from "../topup-model";
 import { decide, splitRecovery, type Decision, type DecisionContext, type IntentFacts, type ReviewReason } from "./confirmation-model";
 import type { IntentDoc } from "./intent-doc";
 import type { IntentStatus } from "./intent-model";
@@ -124,7 +128,9 @@ async function applyOrder(db: Firestore, a: ApplyArgs): Promise<ConfirmResult> {
     }
     const data = intentSnap.data() as IntentDoc;
     const walletRef = db.doc(`wallets/${data.studentId}`);
-    const [walletSnap, pendencySnap] = await tx.getAll(walletRef, pendencyRef);
+    // Regra de taxa em vigor (F20): lida junto, ANTES de qualquer escrita; só é usada se este gatilho creditar.
+    const onlineFeeRefs = feeRefs(db, data.channel === "pix" ? "pix" : "card_credit", ONLINE_SOURCE_ID);
+    const [walletSnap, pendencySnap, feeSeriesSnap] = await tx.getAll(walletRef, pendencyRef, ...refsToRead(onlineFeeRefs).slice(0, 1));
     const walletState = parseWalletState(walletSnap!.data());
 
     const facts: IntentFacts = {
@@ -161,6 +167,7 @@ async function applyOrder(db: Firestore, a: ApplyArgs): Promise<ConfirmResult> {
         const wallet = applyDelta(walletState, data.amountCents);
         const entryId = `${intentId}_credit`;
         const method = data.channel === "pix" ? "pix" : "card_credit";
+        const rule = feeApplicationOf(onlineFeeRefs, feeSeriesSnap, { grossCents: data.amountCents, receivedOn: localDateOf(a.now) });
         // Pagamento que chegou depois de a intenção já constar como encerrada, ou de o Pix vencer pela validade local.
         const afterExpiry = data.status === "expired" || data.status === "failed" || (data.pix !== null && Date.parse(data.pix.expiresAt) <= a.now.getTime());
         tx.create(db.doc(`wallets/${data.studentId}/entries/${entryId}`), {
@@ -187,8 +194,12 @@ async function applyOrder(db: Firestore, a: ApplyArgs): Promise<ConfirmResult> {
           "provider.accountId": ctx.accountId,
           confirmation: { orderId: order.orderId, paymentId: order.paymentId, source: a.source, paidCents: order.paidCents, confirmedAt: nowTs, afterExpiry, walletEntryId: entryId, walletSeq: wallet.version, balanceAfterCents: wallet.balanceCents },
           reversal: { accountedCents: 0, recoveredCents: 0, pendingCents: 0, cause: "refund", lastEntryId: null },
+          // Taxa e liquidação REAIS ainda não são consultadas ao provedor: ficam pendentes até a conferência da administração (F20). A regra
+          // em vigor só gera ESTIMATIVA congelada e a previsão de liquidação; nunca altera o crédito (bruto integral).
           fee: { status: "pending", cents: null, source: "provider" },
-          settlement: { status: "pending", expectedOn: null, settledOn: null },
+          feeEstimate: rule.estimate,
+          feeSourceId: ONLINE_SOURCE_ID,
+          settlement: pendingSettlement(rule.expectedSettlement),
           version,
           updatedAt: nowTs,
         });

@@ -11,7 +11,9 @@
       "topup-intents-api.test.ts",
       "online-confirmation-api.test.ts",
       "school-calendar.test.ts",
-      "probe-route.test.ts"
+      "probe-route.test.ts",
+      "cash-api.test.ts",
+      "finance-fees-api.test.ts"
     ],
     "g2": [
       "cancellation-api.test.ts",

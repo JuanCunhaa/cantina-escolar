@@ -1,4 +1,7 @@
 import type { Timestamp } from "firebase-admin/firestore";
+import type { FeeEstimate } from "@/modules/fees/fee-model";
+import type { FeeRecord } from "../methods";
+import type { Settlement } from "../topup-model";
 import type { DisputeStatus, ReviewReason } from "./confirmation-model";
 import type { Channel, IntentStatus } from "./intent-model";
 import type { PixData } from "./provider";
@@ -39,9 +42,16 @@ export type IntentDoc = {
   review?: { reason: ReviewReason; at: Timestamp };
   /** Contestação no provedor (F19): `open` não mexe na carteira; `lost` gerou a reversão; `won_after_reversal` pede decisão humana. */
   dispute?: { status: DisputeStatus; at: Timestamp };
-  /** Taxa do provedor e liquidação: a conta ainda não é consultada (F20); nunca altera o crédito (bruto integral). */
-  fee?: { status: "pending"; cents: null; source: "provider" };
-  settlement?: { status: "pending"; expectedOn: null; settledOn: null };
+  /**
+   * Taxa e liquidação (F20): `fee`/`settlement` EFETIVOS (pendentes até a conferência da administração); `feeEstimate` é a estimativa
+   * congelada com a regra aplicada no crédito. Nada disso altera o crédito (bruto integral).
+   */
+  fee?: FeeRecord;
+  feeEstimate?: FeeEstimate | null;
+  feeSourceId?: string;
+  settlement?: Settlement;
+  /** Versão da conferência financeira (F20), independente de `version` (ordem das notificações). */
+  financeVersion?: number;
   version: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;

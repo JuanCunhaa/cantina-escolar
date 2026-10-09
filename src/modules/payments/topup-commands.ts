@@ -6,6 +6,7 @@ import type { Actor } from "@/modules/access/actor";
 import { authorize } from "@/modules/access/authorize";
 import { can } from "@/modules/access/permissions";
 import { auditInTransaction } from "@/modules/audit/log";
+import { assertTerminalFor, feeApplicationOf, feeRefs, refsToRead } from "@/modules/fees/fee-store";
 import { applyDelta, parseWalletState } from "@/modules/wallet/model";
 import {
   amountsOf,
@@ -54,14 +55,19 @@ export async function registerManualTopup(db: Firestore, actor: Actor, raw: unkn
     checkSettlementDate(today, input.expectedSettlementOn);
 
     const walletRef = db.doc(`wallets/${input.studentId}`);
-    const [student, walletSnap, keySnap] = await tx.getAll(db.doc(`students/${input.studentId}`), walletRef, ...(keyRef ? [keyRef] : []));
+    const refs = feeRefs(db, input.method, input.sourceId);
+    const [student, walletSnap, ...rest] = await tx.getAll(db.doc(`students/${input.studentId}`), walletRef, ...(keyRef ? [keyRef] : []), ...refsToRead(refs));
+    const keySnap = keyRef ? rest[0] : undefined;
+    const feeSnaps = keyRef ? rest.slice(1) : rest;
     if (!student?.exists) throw notFound("student_not_found", "Aluno não encontrado.");
     if (student.get("status") !== "active") throw conflict("student_inactive", "Aluno inativo.");
     if (keySnap?.exists && keySnap.get("status") === "active") {
       throw conflict("duplicate_reference", "Este recebimento já foi lançado (mesma referência).", { topupId: String(keySnap.get("topupId") ?? "") });
     }
     const before = parseWalletState(walletSnap!.data());
+    if (refs) assertTerminalFor(refs, feeSnaps[1]);
     const amounts = amountsOf(input);
+    const rule = feeApplicationOf(refs, feeSnaps[0], { grossCents: amounts.grossCents, receivedOn: today });
     const wallet = applyDelta(before, amounts.creditedCents); // teto de saldo
 
     const stamp = FieldValue.serverTimestamp();
@@ -82,7 +88,11 @@ export async function registerManualTopup(db: Firestore, actor: Actor, raw: unkn
       method: input.method,
       fee: amounts.fee,
       netCents: amounts.netCents,
-      settlement: settlementOf(input.method, today, input.expectedSettlementOn),
+      // Estimativa pela regra em vigor, CONGELADA com a versão usada (F20); a taxa efetiva continua sendo `fee`.
+      feeEstimate: rule.estimate,
+      sourceId: refs?.sourceId ?? null,
+      financeVersion: 0,
+      settlement: settlementOf(input.method, today, input.expectedSettlementOn, rule.expectedSettlement),
       reference,
       verification: { receivedConfirmed: true as const, payerName: input.payerName || null, note: input.note || null },
       receivedOn: today,

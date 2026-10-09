@@ -82,3 +82,10 @@ Busca por nome: `students` por intervalo de prefixo em `nameNormalized` (custo =
 - Varredura/cron/manual (`sweepIntents`): `topupIntents where status in [creating, creation_uncertain, awaiting_payment, processing, in_review] and createdAt >= −30 d orderBy createdAt desc limit N`; `status in [failed, expired] and createdAt >= −7 d`; `status == confirmed and confirmation.confirmedAt >= −120 d orderBy confirmation.confirmedAt desc` — índices `(status, createdAt DESC)` e `(status, confirmation.confirmedAt DESC)`. Limite por execução (100; máx. 300).
 - Revisão (`GET /api/admin/payments`): `paymentPendencies where status == open limit 100` (ordenado em memória) e `topupIntents where status == in_review limit 100` — igualdade em campo único, sem índice composto.
 - Leitura da carteira (`GET /api/wallets?studentId=`) devolve também `pendingReversalCents`.
+
+## Taxas, caixa e relatório financeiro (F20)
+
+Todas pelo servidor, só `finance.manage` salvo o caixa do próprio operador (`cash.operate`). Sem índice composto novo.
+- Caixa do operador: `GET /api/cash?date=` (sessão por ponto permitido ao papel + recebimentos do dia por `operator.uid`/`createdByUid` + data, alertas filtrados pelo UID, últimos 15 caixas por `operator.uid`); `GET /api/cash/{id}` (dono ou administração).
+- Administração: `GET /api/admin/finance/cash?from&to` (sessões por `date` em intervalo, até 3 meses; alertas da janela de 14 dias: recebimentos por intervalo de `receivedOn`/`consumptionDate` agrupados por operador/ponto/data e cruzados com as sessões); `GET /api/admin/finance/fees` (fontes e séries); `GET /api/admin/finance/receipts` (taxa/liquidação `== "pending"` nas três origens, teto de 150 por consulta) e `?ref=tipo:id` (detalhe + `reconciliations` por `seq`); `GET /api/admin/finance/report?from&to` (até 93 dias; três origens por data do recebimento, a online por `confirmation.confirmedAt`) e `GET /api/admin/finance/export?month&view`.
+- Maquininhas para o operador: `GET /api/finance/terminals` (`kind == terminal` e `active == true`; só nome e meios).

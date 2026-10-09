@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { TerminalField } from "@/modules/fees/components/terminal-field";
+import type { TerminalOption } from "@/modules/fees/fee-queries";
 import Link from "next/link";
 import type { User } from "firebase/auth";
 import { errorText } from "@/lib/api-client";
@@ -19,8 +21,8 @@ import { MAX_TOPUP_CENTS, MIN_TOPUP_CENTS, normalizeReference, referenceRequired
 import type { TopupList, TopupStudent, TopupView } from "../topup-queries";
 import { settlementText, statusText } from "./topup-text";
 
-type Fields = { amountText: string; method: PaymentMethod; reference: string; feeText: string; expectedOn: string; payerName: string; note: string; confirmed: boolean };
-const EMPTY: Fields = { amountText: "", method: "pix", reference: "", feeText: "", expectedOn: "", payerName: "", note: "", confirmed: false };
+type Fields = { amountText: string; method: PaymentMethod; reference: string; feeText: string; expectedOn: string; payerName: string; note: string; confirmed: boolean; sourceId: string };
+const EMPTY: Fields = { amountText: "", method: "pix", reference: "", feeText: "", expectedOn: "", payerName: "", note: "", confirmed: false, sourceId: "" };
 
 const REFERENCE_LABEL: Record<PaymentMethod, string> = {
   cash: "Nº do recibo em dinheiro (opcional)",
@@ -58,6 +60,7 @@ function refusalText(code: string): string {
  */
 export function TopupDesk({ user }: { user: User }) {
   const roster = useServerQuery<PosRoster>(user, "/api/topups/students", "", true, false);
+  const terminals = useServerQuery<{ terminals: TerminalOption[] }>(user, "/api/finance/terminals", "", true, false);
   const [picked, setPicked] = useState<PosStudentRow | null>(null);
   const detail = useServerQuery<TopupStudent>(user, "/api/topups/students", `id=${picked?.id ?? ""}`, picked !== null);
   const [fields, setFields] = useState<Fields>(EMPTY);
@@ -100,6 +103,7 @@ export function TopupDesk({ user }: { user: User }) {
     if (fields.reference.trim()) body.reference = fields.reference.trim();
     if (typeof fee === "number") body.feeCents = fee;
     if (fields.expectedOn && fields.method.startsWith("card")) body.expectedSettlementOn = fields.expectedOn;
+    if (fields.sourceId && fields.method.startsWith("card")) body.sourceId = fields.sourceId;
     if (fields.payerName.trim()) body.payerName = fields.payerName.trim();
     if (fields.note.trim()) body.note = fields.note.trim();
     setMessage(null);
@@ -200,7 +204,7 @@ export function TopupDesk({ user }: { user: User }) {
                 <div className="choice-group" role="radiogroup" aria-label="Forma de recebimento">
                   {PAYMENT_METHODS.map((m) => (
                     <label key={m}>
-                      <input type="radio" name="topup-method" value={m} checked={fields.method === m} disabled={locked} onChange={() => setFields({ ...fields, method: m, feeText: m === "cash" ? "" : fields.feeText, expectedOn: m.startsWith("card") ? fields.expectedOn : "" })} data-testid={`topup-method-${m}`} />
+                      <input type="radio" name="topup-method" value={m} checked={fields.method === m} disabled={locked} onChange={() => setFields({ ...fields, method: m, feeText: m === "cash" ? "" : fields.feeText, expectedOn: m.startsWith("card") ? fields.expectedOn : "", sourceId: "" })} data-testid={`topup-method-${m}`} />
                       {PAYMENT_LABEL[m]}
                     </label>
                   ))}
@@ -210,6 +214,7 @@ export function TopupDesk({ user }: { user: User }) {
                 <label htmlFor="topup-reference">{REFERENCE_LABEL[fields.method]}</label>
                 <input id="topup-reference" type="text" autoComplete="off" maxLength={60} value={fields.reference} disabled={locked} onChange={(e) => setFields({ ...fields, reference: e.target.value })} data-testid="topup-reference" />
               </div>
+              <TerminalField id="topup-terminal" terminals={terminals.data?.terminals ?? []} method={fields.method} value={fields.sourceId} disabled={locked} onChange={(sourceId) => setFields({ ...fields, sourceId })} />
               <div className="form-grid">
                 {fields.method !== "cash" && (
                   <div className="field">
@@ -333,7 +338,7 @@ export function TopupDesk({ user }: { user: User }) {
               {day.data.totals.count} recebimento(s) · creditado {formatBRL(day.data.totals.creditedCents)}
               {PAYMENT_METHODS.filter((m) => day.data!.totals.byMethod[m] > 0).map((m) => ` · ${PAYMENT_LABEL[m]} ${formatBRL(day.data!.totals.byMethod[m])}`)}
               {day.data.totals.reversedCents > 0 && ` · estornado ${formatBRL(day.data.totals.reversedCents)}`}
-              {` · taxas informadas ${formatBRL(day.data.totals.feeInformedCents)}`}
+              {` · taxas informadas ou conferidas ${formatBRL(day.data.totals.feeInformedCents)}`}
               {day.data.totals.feePendingCount > 0 && ` · ${day.data.totals.feePendingCount} taxa(s) a conferir`}
             </p>
             <table className="data-table stock-table" data-testid="topup-day-table">
