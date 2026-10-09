@@ -243,8 +243,8 @@ describe("taxas e maquininhas", () => {
         blockedInProduction: false,
         current: null,
         versions: [
-          { n: 1, effectiveFrom: "2026-10-01", enabled: true, percentBp: 300, fixedCents: 0, settlementDays: 30, fictitious: true, reason: "Regra FICTÍCIA de homologação", createdByUid: "a", createdOn: "2026-10-01", createdAtIso: "2026-10-01T00:00:00.000Z", withdrawn: null, state: "in_effect" },
-          { n: 2, effectiveFrom: "2026-10-20", enabled: true, percentBp: 500, fixedCents: 39, settlementDays: 2, fictitious: true, reason: "Regra FICTÍCIA futura", createdByUid: "a", createdOn: "2026-10-05", createdAtIso: "2026-10-05T00:00:00.000Z", withdrawn: null, state: "future" },
+          { n: 1, effectiveFrom: "2026-10-01", enabled: true, percentBp: 300, fixedCents: 0, settlementDays: 30, settlementBasis: "calendar_days", fictitious: true, reason: "Regra FICTÍCIA de homologação", createdByUid: "a", createdOn: "2026-10-01", createdAtIso: "2026-10-01T00:00:00.000Z", withdrawn: null, state: "in_effect" },
+          { n: 2, effectiveFrom: "2026-10-20", enabled: true, percentBp: 500, fixedCents: 39, settlementDays: null, settlementBasis: null, fictitious: true, reason: "Regra FICTÍCIA futura", createdByUid: "a", createdOn: "2026-10-05", createdAtIso: "2026-10-05T00:00:00.000Z", withdrawn: null, state: "future" },
         ],
       },
     ],
@@ -262,7 +262,10 @@ describe("taxas e maquininhas", () => {
     expect(out).toContain("3,00%");
     expect(out).toContain("5,00%");
     expect(out).toMatch(/R\$\s0,39/);
-    expect(out).toContain("D+30");
+    expect(out).toContain("30 dias corridos"); // a BASE do prazo sempre à vista
+    expect(out).toContain("Sem prazo (previsão pendente)"); // versão sem prazo: previsão pendente, nada assumido
+    expect(out).toContain("Base do prazo de liquidação");
+    expect(out).toContain("Dias úteis (aguardando decisão da escola)");
     expect(out).toContain("FICTÍCIA");
     expect(out.match(/>Retirar</g)).toHaveLength(1);
     expect(out).toContain("Publicar nova versão de regra");
@@ -315,9 +318,9 @@ describe("conferência e relatório", () => {
     grossCents: 5000,
     reversedCents: 0,
     fee: { status: "pending", cents: null, source: "operator" },
-    estimate: { cents: 150, seriesId: "term_abc__card_credit", ruleVersion: 1, effectiveFrom: "2026-10-01", percentBp: 300, fixedCents: 0, settlementDays: 30, fictitious: true, computedOn: "2026-10-05" },
+    estimate: { cents: 150, seriesId: "term_abc__card_credit", ruleVersion: 1, effectiveFrom: "2026-10-01", percentBp: 300, fixedCents: 0, settlementDays: 30, settlementBasis: "calendar_days", fictitious: true, computedOn: "2026-10-05" },
     effective: { basis: "estimated", cents: 150, estimatedCents: 150, differenceCents: null },
-    settlement: { status: "pending", expectedOn: "2026-10-04", settledOn: null, expectedSource: "rule" },
+    settlement: { status: "pending", expectedOn: "2026-10-04", settledOn: null, expectedSource: "rule", expectedBasis: "calendar_days", expectedDays: 30, expectedRuleVersion: 1 },
     overdue: true,
     financeVersion: 0,
     reference: null,
@@ -334,11 +337,16 @@ describe("conferência e relatório", () => {
     expect(out).toContain("vencida");
     expect(out).toContain("regra FICTÍCIA");
     expect(out).toContain("Liquidada em 08/10/2026");
+    expect(out).toContain("Prevista 04/10/2026 · 30 dias corridos pela regra v1"); // a base da previsão à vista
+    const noForecast = html(createElement(ReconcileView, { list: list([item({ settlement: { status: "pending", expectedOn: null, settledOn: null, expectedSource: null }, overdue: false })]), message: null, locked: false, onSave: noop }));
+    expect(noForecast).toContain("Previsão pendente (sem prazo configurado)");
+    const byOperator = html(createElement(ReconcileView, { list: list([item({ settlement: { status: "pending", expectedOn: "2026-10-20", settledOn: null, expectedSource: "operator" }, overdue: false })]), message: null, locked: false, onSave: noop }));
+    expect(byOperator).toContain("data informada pelo operador");
     expect(out).toContain("O crédito do aluno não muda");
     expect(html(createElement(ReconcileView, { list: list([]), message: null, locked: false, onSave: noop }))).toContain("Nada pendente de conferência");
   });
 
-  const rcpt = (id: string, over: Partial<Receipt> = {}): Receipt => ({ kind: "topup", id, ref: `topup:${id}`, point: "secretaria", operatorUid: "u", operatorName: "M", method: "card_credit", sourceId: "term_abc", receivedOn: "2026-10-05", receivedAtIso: null, grossCents: 5000, reversedCents: 0, fee: { status: "pending", cents: null, source: "operator" }, feeEstimate: { cents: 150, seriesId: "s", ruleVersion: 1, effectiveFrom: "2026-10-01", percentBp: 300, fixedCents: 0, settlementDays: 30, fictitious: true, computedOn: "2026-10-05" }, settlement: { status: "pending", expectedOn: "2026-10-01", settledOn: null }, financeVersion: 0, label: "A", reference: null, status: "confirmed", ...over });
+  const rcpt = (id: string, over: Partial<Receipt> = {}): Receipt => ({ kind: "topup", id, ref: `topup:${id}`, point: "secretaria", operatorUid: "u", operatorName: "M", method: "card_credit", sourceId: "term_abc", receivedOn: "2026-10-05", receivedAtIso: null, grossCents: 5000, reversedCents: 0, fee: { status: "pending", cents: null, source: "operator" }, feeEstimate: { cents: 150, seriesId: "s", ruleVersion: 1, effectiveFrom: "2026-10-01", percentBp: 300, fixedCents: 0, settlementDays: 30, settlementBasis: "calendar_days", fictitious: true, computedOn: "2026-10-05" }, settlement: { status: "pending", expectedOn: "2026-10-01", settledOn: null }, financeVersion: 0, label: "A", reference: null, status: "confirmed", ...over });
 
   it("relatório: base de data explícita, totais, aviso de regra fictícia, exportação e o que NÃO entra", () => {
     const report = buildReport([rcpt("a"), rcpt("b", { method: "pix", fee: { status: "informed", cents: 20, source: "operator" }, feeEstimate: null, settlement: { status: "settled", expectedOn: null, settledOn: "2026-10-05" } })], { from: "2026-10-01", to: "2026-10-31" }, "2026-10-09", { truncated: false, production: false });

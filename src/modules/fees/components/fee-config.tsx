@@ -8,7 +8,7 @@ import { brDate } from "@/modules/cash/components/cash-text";
 import { useServerQuery } from "@/modules/orders/use-operations";
 import { usePosSubmit } from "@/modules/pos/use-pos";
 import { PAYMENT_LABEL } from "@/modules/payments/methods";
-import { FEE_METHODS, SOURCE_KIND_LABEL, type FeeMethod, type SourceKind } from "../fee-model";
+import { FEE_METHODS, SETTLEMENT_BASIS_LABEL, SOURCE_KIND_LABEL, type FeeMethod, type SettlementBasis, type SourceKind } from "../fee-model";
 import type { FeeConfig } from "../fee-queries";
 import { FEE_ERRORS, adminAction, type Message } from "../finance-actions";
 import { FinanceTabs } from "./finance-tabs";
@@ -23,6 +23,13 @@ export function parsePercentBp(text: string): number | null {
 }
 export const percentText = (bp: number): string => `${(bp / 100).toFixed(2).replace(".", ",")}%`;
 
+/** Prazo da versão com a BASE sempre à vista; sem prazo (ou versão antiga sem base gravada) a previsão fica pendente. */
+export function prazoText(v: { settlementDays?: number | null; settlementBasis?: SettlementBasis | null }): string {
+  if (v.settlementDays === null || v.settlementDays === undefined) return "Sem prazo (previsão pendente)";
+  if (!v.settlementBasis) return "Sem base gravada (previsão pendente)";
+  return `${v.settlementDays} ${SETTLEMENT_BASIS_LABEL[v.settlementBasis]}`;
+}
+
 const STATE_TEXT = { in_effect: "Em vigor", future: "Futura", superseded: "Substituída", withdrawn: "Retirada" } as const;
 
 export type FeeConfigViewProps = {
@@ -31,7 +38,7 @@ export type FeeConfigViewProps = {
   locked: boolean;
   onCreateSource: (b: { kind: SourceKind; code: string; name: string; methods: FeeMethod[]; fictitious: boolean }) => void;
   onToggleSource: (sourceId: string, active: boolean, reason: string) => void;
-  onPublish: (b: { sourceId: string; method: FeeMethod; effectiveFrom: string; enabled: boolean; percentBp: number; fixedCents: number; settlementDays: number; fictitious: boolean; reason: string }) => void;
+  onPublish: (b: { sourceId: string; method: FeeMethod; effectiveFrom: string; enabled: boolean; percentBp: number; fixedCents: number; settlementDays: number | null; settlementBasis: SettlementBasis | null; fictitious: boolean; reason: string }) => void;
   onWithdraw: (b: { sourceId: string; method: FeeMethod; version: number; reason: string }) => void;
 };
 
@@ -99,18 +106,20 @@ function RuleForm({ config, locked, onPublish }: { config: FeeConfig; locked: bo
   const [enabled, setEnabled] = useState(true);
   const [percent, setPercent] = useState("");
   const [fixed, setFixed] = useState("");
-  const [days, setDays] = useState("0");
+  // O prazo NÃO tem valor padrão: sem escolher a base e o prazo, a regra fica sem prazo e a previsão de liquidação fica pendente.
+  const [basis, setBasis] = useState<"" | SettlementBasis>("");
+  const [days, setDays] = useState("");
   const [fictitious, setFictitious] = useState(source?.fictitious ?? !config.production);
   const [reason, setReason] = useState("");
   const bp = percent.trim() === "" ? 0 : parsePercentBp(percent);
   const fixedCents = fixed.trim() === "" ? 0 : /^\d+(?:,\d{1,2})?$/.test(fixed.trim()) ? Math.round(Number(fixed.replace(",", ".")) * 100) : null;
-  const dayCount = /^\d{1,2}$/.test(days.trim()) ? Number(days) : null;
-  const valid = bp !== null && fixedCents !== null && fixedCents <= 10_000 && dayCount !== null && dayCount <= 90 && reason.trim().length >= 10 && effectiveFrom >= config.today && !(config.production && fictitious) && methods.includes(method);
+  const dayCount = basis === "" ? null : /^\d{1,2}$/.test(days.trim()) ? Number(days) : undefined;
+  const valid = bp !== null && fixedCents !== null && fixedCents <= 10_000 && dayCount !== undefined && (dayCount === null || dayCount <= 90) && reason.trim().length >= 10 && effectiveFrom >= config.today && !(config.production && fictitious) && methods.includes(method);
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (valid) onPublish({ sourceId, method, effectiveFrom, enabled, percentBp: bp, fixedCents: fixedCents!, settlementDays: dayCount!, fictitious, reason: reason.trim() });
+        if (valid) onPublish({ sourceId, method, effectiveFrom, enabled, percentBp: bp, fixedCents: fixedCents!, settlementDays: dayCount ?? null, settlementBasis: basis === "" ? null : basis, fictitious, reason: reason.trim() });
       }}
     >
       <h2>Publicar nova versão de regra</h2>
@@ -158,8 +167,18 @@ function RuleForm({ config, locked, onPublish }: { config: FeeConfig; locked: bo
           <input type="text" id="rule-fixed" inputMode="decimal" value={fixed} onChange={(e) => setFixed(e.target.value)} />
         </div>
         <div className="field">
-          <label htmlFor="rule-days">Prazo de liquidação (dias corridos)</label>
-          <input type="text" id="rule-days" inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value)} />
+          <label htmlFor="rule-basis">Base do prazo de liquidação</label>
+          <select id="rule-basis" value={basis} onChange={(e) => setBasis(e.target.value as "" | SettlementBasis)}>
+            <option value="">Sem prazo (a previsão fica pendente)</option>
+            <option value="calendar_days">Dias corridos</option>
+            <option value="business_days" disabled>
+              Dias úteis (aguardando decisão da escola)
+            </option>
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="rule-days">Prazo (em {basis === "" ? "dias, depois de escolher a base" : SETTLEMENT_BASIS_LABEL[basis]})</label>
+          <input type="text" id="rule-days" inputMode="numeric" value={days} disabled={basis === ""} onChange={(e) => setDays(e.target.value)} />
         </div>
         <div className="field field-wide">
           <label htmlFor="rule-reason">Motivo / origem dos valores (mínimo 10 caracteres)</label>
@@ -264,7 +283,7 @@ export function FeeConfigView({ config, message, locked, onCreateSource, onToggl
                     </td>
                     <td>{percentText(v.percentBp)}</td>
                     <td>{formatBRL(v.fixedCents)}</td>
-                    <td>D+{v.settlementDays}</td>
+                    <td>{prazoText(v)}</td>
                     <td>
                       {v.fictitious ? <span className="badge badge-warn">FICTÍCIA</span> : "Real"} <span className="muted">{v.reason}</span>
                     </td>

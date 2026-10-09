@@ -92,7 +92,7 @@ export async function registerManualTopup(db: Firestore, actor: Actor, raw: unkn
       feeEstimate: rule.estimate,
       sourceId: refs?.sourceId ?? null,
       financeVersion: 0,
-      settlement: settlementOf(input.method, today, input.expectedSettlementOn, rule.expectedSettlementOn),
+      settlement: settlementOf(input.method, today, input.expectedSettlementOn, rule.expectedSettlement),
       reference,
       verification: { receivedConfirmed: true as const, payerName: input.payerName || null, note: input.note || null },
       receivedOn: today,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addDays } from "@/lib/dates/school-time";
-import { applyRule, checkNewVersion, effectiveFee, estimateFee, percentFeeCents, resolveRule, ruleSchema, sourceSchema, type RuleVersion } from "@/modules/fees/fee-model";
+import { applyRule, expectedSettlementOf, checkNewVersion, effectiveFee, estimateFee, percentFeeCents, resolveRule, ruleSchema, sourceSchema, type RuleVersion } from "@/modules/fees/fee-model";
 
 const version = (n: number, effectiveFrom: string, over: Partial<RuleVersion> = {}): RuleVersion => ({
   n,
@@ -9,6 +9,7 @@ const version = (n: number, effectiveFrom: string, over: Partial<RuleVersion> = 
   percentBp: 300,
   fixedCents: 0,
   settlementDays: 30,
+  settlementBasis: "calendar_days",
   fictitious: true,
   reason: "Regra FICTÍCIA de teste",
   createdByUid: "admin",
@@ -67,15 +68,32 @@ describe("F20 — vigência e versões", () => {
     expect(resolveRule(v, "2026-10-10", { production: true })).toEqual({ rule: null, issue: "fictitious_in_production" });
     const real = [version(1, "2026-10-01", { fictitious: false })];
     expect(resolveRule(real, "2026-10-10", { production: true }).rule?.n).toBe(1);
-    expect(applyRule("s__pix", v, { grossCents: 5000, receivedOn: "2026-10-10" }, { production: true })).toEqual({ estimate: null, expectedSettlementOn: null, issue: "fictitious_in_production" });
+    expect(applyRule("s__pix", v, { grossCents: 5000, receivedOn: "2026-10-10" }, { production: true })).toEqual({ estimate: null, expectedSettlement: null, issue: "fictitious_in_production" });
   });
 
   it("aplicar congela a versão usada e a previsão de liquidação (dias corridos)", () => {
     const out = applyRule("term_x__card_credit", v, { grossCents: 10_000, receivedOn: "2026-10-09" }, { production: false });
     expect(out.estimate).toMatchObject({ cents: 100, ruleVersion: 1, percentBp: 100, fictitious: true, computedOn: "2026-10-09", seriesId: "term_x__card_credit" });
-    expect(out.expectedSettlementOn).toBe(addDays("2026-10-09", 30));
+    expect(out.expectedSettlement).toEqual({ on: addDays("2026-10-09", 30), days: 30, basis: "calendar_days", ruleVersion: 1 }); // a base usada é gravada junto da data
+    expect(out.estimate).toMatchObject({ settlementDays: 30, settlementBasis: "calendar_days" });
     // depois da virada, o MESMO valor usa a versão 2 — o lançamento antigo continua guardando a versão 1
     expect(applyRule("term_x__card_credit", v, { grossCents: 10_000, receivedOn: "2026-11-01" }, { production: false }).estimate).toMatchObject({ cents: 250, ruleVersion: 2 });
+  });
+
+  it("SEM prazo configurado a previsão fica PENDENTE (sem data); a estimativa da taxa segue valendo", () => {
+    const none = [version(1, "2026-10-01", { settlementDays: null, settlementBasis: null })];
+    const out = applyRule("s__card_credit", none, { grossCents: 10_000, receivedOn: "2026-10-09" }, { production: false });
+    expect(out.expectedSettlement).toBeNull();
+    expect(out.estimate).toMatchObject({ cents: 300, settlementDays: null, settlementBasis: null });
+    expect(expectedSettlementOf(none[0]!, "2026-10-09")).toBeNull();
+  });
+
+  it("versão ANTIGA sem a base gravada não assume dias corridos: previsão pendente", () => {
+    const legacy = { ...version(1, "2026-10-01"), settlementBasis: undefined } as RuleVersion;
+    expect(expectedSettlementOf(legacy, "2026-10-09")).toBeNull();
+    const withDaysOnly = { ...version(1, "2026-10-01"), settlementBasis: null };
+    expect(expectedSettlementOf(withDaysOnly, "2026-10-09")).toBeNull();
+    expect(applyRule("s__card_credit", [legacy], { grossCents: 1000, receivedOn: "2026-10-09" }, { production: false }).expectedSettlement).toBeNull();
   });
 
   it("publicar: nunca retroativa, estritamente depois das vigentes/futuras, limite de versões", () => {
@@ -90,12 +108,20 @@ describe("F20 — vigência e versões", () => {
   });
 
   it("validação de entrada: percentual, fixo e prazo dentro dos tetos; cartão de débito não é online", () => {
-    const ok = { key: "chave-1234", sourceId: "default", method: "pix", effectiveFrom: "2026-10-10", enabled: true, percentBp: 99, fixedCents: 0, settlementDays: 0, fictitious: true, reason: "regra fictícia de teste" };
+    const ok = { key: "chave-1234", sourceId: "default", method: "pix", effectiveFrom: "2026-10-10", enabled: true, percentBp: 99, fixedCents: 0, settlementDays: 0, settlementBasis: "calendar_days", fictitious: true, reason: "regra fictícia de teste" };
     expect(ruleSchema.safeParse(ok).success).toBe(true);
     expect(ruleSchema.safeParse({ ...ok, percentBp: 3001 }).success).toBe(false);
     expect(ruleSchema.safeParse({ ...ok, percentBp: 1.5 }).success).toBe(false);
     expect(ruleSchema.safeParse({ ...ok, fixedCents: 10_001 }).success).toBe(false);
     expect(ruleSchema.safeParse({ ...ok, settlementDays: 91 }).success).toBe(false);
+    // prazo e base andam juntos; dias úteis NÃO é aceito (depende de decisão da escola e de calendário bancário)
+    expect(ruleSchema.safeParse({ ...ok, settlementDays: null, settlementBasis: null }).success).toBe(true);
+    expect(ruleSchema.safeParse({ ...ok, settlementBasis: null }).success).toBe(false);
+    expect(ruleSchema.safeParse({ ...ok, settlementDays: null }).success).toBe(false);
+    expect(ruleSchema.safeParse({ ...ok, settlementBasis: "business_days" }).success).toBe(false);
+    const withoutBasis: Record<string, unknown> = { ...ok };
+    delete withoutBasis.settlementBasis;
+    expect(ruleSchema.safeParse(withoutBasis).success).toBe(false); // sem base explícita não há padrão silencioso
     expect(ruleSchema.safeParse({ ...ok, method: "cash" }).success).toBe(false);
     expect(ruleSchema.safeParse({ ...ok, reason: "curto" }).success).toBe(false);
     const src = { key: "chave-1234", kind: "provider", code: "mercadopago", name: "Provedor fictício", methods: ["pix", "card_credit"], fictitious: true };

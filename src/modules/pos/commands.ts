@@ -315,7 +315,7 @@ export async function recordDirectSale(db: Firestore, actor: Actor, raw: unknown
       itemCount,
       totalCents,
       // Recebimento EXTERNO (dinheiro/Pix/cartão): nunca passa pela carteira. Taxa efetiva em `fee`; estimativa congelada pela regra em vigor (F20).
-      payment: { method: input.paymentMethod, receivedCents: totalCents, receivedConfirmed: true, fee, netCents, feeEstimate: rule.estimate, sourceId: refs?.sourceId ?? null, settlement: settlementOf(input.paymentMethod, today, undefined, rule.expectedSettlementOn), financeVersion: 0 },
+      payment: { method: input.paymentMethod, receivedCents: totalCents, receivedConfirmed: true, fee, netCents, feeEstimate: rule.estimate, sourceId: refs?.sourceId ?? null, settlement: settlementOf(input.paymentMethod, today, undefined, rule.expectedSettlement), financeVersion: 0 },
       buyerKind: input.buyerKind,
       buyerNote: input.buyerNote ?? null,
       movements,

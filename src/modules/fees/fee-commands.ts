@@ -86,6 +86,7 @@ export async function publishFeeRule(db: Firestore, actor: Actor, raw: unknown, 
       percentBp: input.percentBp,
       fixedCents: input.fixedCents,
       settlementDays: input.settlementDays,
+      settlementBasis: input.settlementBasis,
       fictitious: input.fictitious,
       reason: input.reason,
       createdByUid: current.uid,
@@ -101,7 +102,7 @@ export async function publishFeeRule(db: Firestore, actor: Actor, raw: unknown, 
       target: { type: "feeSeries", id: seriesId },
       reason: input.reason,
       before: { versionCount: versions.length },
-      after: { version: version.n, effectiveFrom: version.effectiveFrom, enabled: version.enabled, percentBp: version.percentBp, fixedCents: version.fixedCents, settlementDays: version.settlementDays, fictitious: version.fictitious },
+      after: { version: version.n, effectiveFrom: version.effectiveFrom, enabled: version.enabled, percentBp: version.percentBp, fixedCents: version.fixedCents, settlementDays: version.settlementDays, settlementBasis: version.settlementBasis, fictitious: version.fictitious },
     });
     return { seriesId, sourceId: input.sourceId, method: input.method, version: version.n, effectiveFrom: version.effectiveFrom, withdrawn: false, versionCount: version.n };
   });

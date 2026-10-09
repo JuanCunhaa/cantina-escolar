@@ -4,7 +4,7 @@ import { addDays, isLocalDate, localDateOf, localInstant, type LocalDate } from 
 import { conflict } from "@/lib/domain-error";
 import type { Actor } from "@/modules/access/actor";
 import { authorize } from "@/modules/access/authorize";
-import { FICTITIOUS_PREFIX, effectiveFee } from "@/modules/fees/fee-model";
+import { FICTITIOUS_PREFIX, SETTLEMENT_BASIS_LABEL, effectiveFee } from "@/modules/fees/fee-model";
 import { POINT_LABEL, RECEIPT_KIND_LABEL, receiptOfDirectSale, receiptOfIntent, receiptOfTopup, type Receipt } from "@/modules/fees/receipts";
 import { PAYMENT_LABEL, type PaymentMethod } from "@/modules/payments/methods";
 import { csvCell } from "@/modules/orders/fulfillment-model";
@@ -162,9 +162,18 @@ const line = (cells: readonly Cell[]) => cells.map(encode).join(";");
 
 const BASIS_CSV = { none: "sem taxa", confirmed: "conferida", informed: "informada", estimated: "estimada", unknown: "sem valor" } as const;
 
-export const DETAIL_HEADER = ["Data do recebimento", "Referência interna", "Tipo", "Ponto", "Operador", "Forma", "Fonte (maquininha/provedor)", "Bruto (R$)", "Estornado (R$)", "Base da taxa", "Taxa efetiva (R$)", "Taxa estimada (R$)", "Regra aplicada", "Regra fictícia", "Líquido previsto (R$)", "Liquidação", "Liquidação prevista", "Liquidação real"];
+export const DETAIL_HEADER = ["Data do recebimento", "Referência interna", "Tipo", "Ponto", "Operador", "Forma", "Fonte (maquininha/provedor)", "Bruto (R$)", "Estornado (R$)", "Base da taxa", "Taxa efetiva (R$)", "Taxa estimada (R$)", "Regra aplicada", "Regra fictícia", "Líquido previsto (R$)", "Liquidação", "Liquidação prevista", "Base da previsão", "Liquidação real"];
 export const SUMMARY_HEADER = ["Tipo", "Ponto", "Forma", "Fonte", "Recebimentos", "Bruto (R$)", "Estornado (R$)", "Taxa conferida (R$)", "Taxa informada (R$)", "Taxa estimada (R$)", "Sem taxa conhecida", "Taxa efetiva (R$)", "Líquido previsto (R$)", "Líquido real (R$)", "Liquidado (R$)", "Pendente (R$)", "Vencido (R$)", "Com regra fictícia"];
 const SETTLEMENT_LABEL = { cash_on_hand: "dinheiro no caixa", settled: "liquidado", pending: "pendente" } as const;
+
+/** Base da previsão de liquidação (nada assumido): prazo e base da regra, data do operador, ou pendente por falta de prazo configurado. */
+export function forecastBasis(r: Receipt): string {
+  const s = r.settlement;
+  if (s.status !== "pending") return "";
+  if (!s.expectedOn) return "pendente: sem prazo configurado";
+  if (s.expectedSource === "rule" && s.expectedBasis && s.expectedDays !== null && s.expectedDays !== undefined) return `${s.expectedDays} ${SETTLEMENT_BASIS_LABEL[s.expectedBasis]} pela regra${s.expectedRuleVersion ? ` v${s.expectedRuleVersion}` : ""}`;
+  return s.expectedSource === "operator" ? "data informada pelo operador" : "origem não registrada";
+}
 
 export function detailCsv(receipts: readonly Receipt[]): string {
   const rows = receipts.map((r): Cell[] => {
@@ -173,7 +182,7 @@ export function detailCsv(receipts: readonly Receipt[]): string {
       date(r.receivedOn), r.ref, RECEIPT_KIND_LABEL[r.kind], POINT_LABEL[r.point], r.operatorName ?? "", PAYMENT_LABEL[r.method], r.sourceId,
       money(r.grossCents), money(r.reversedCents), BASIS_CSV[fee.basis], money(fee.cents), money(fee.estimatedCents),
       r.feeEstimate ? `${r.feeEstimate.seriesId} v${r.feeEstimate.ruleVersion}` : "", r.feeEstimate?.fictitious ? "Sim" : "Não",
-      money(fee.cents === null ? null : r.grossCents - fee.cents), SETTLEMENT_LABEL[r.settlement.status], r.settlement.expectedOn ? date(r.settlement.expectedOn) : "", r.settlement.settledOn ? date(r.settlement.settledOn) : "",
+      money(fee.cents === null ? null : r.grossCents - fee.cents), SETTLEMENT_LABEL[r.settlement.status], r.settlement.expectedOn ? date(r.settlement.expectedOn) : "", forecastBasis(r), r.settlement.settledOn ? date(r.settlement.settledOn) : "",
     ];
   });
   return `${[line(DETAIL_HEADER), ...rows.map(line)].join("\r\n")}\r\n`;

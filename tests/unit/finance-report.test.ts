@@ -18,7 +18,7 @@ function receipt(over: Partial<Receipt> & { id: string }): Receipt {
     reversedCents: 0,
     fee: { status: "pending", cents: null, source: "operator" },
     feeEstimate: null,
-    settlement: { status: "pending", expectedOn: "2026-11-04", settledOn: null, expectedSource: "rule" },
+    settlement: { status: "pending", expectedOn: "2026-11-04", settledOn: null, expectedSource: "rule", expectedBasis: "calendar_days", expectedDays: 30, expectedRuleVersion: 1 },
     financeVersion: 0,
     label: "Aluno",
     reference: null,
@@ -26,7 +26,7 @@ function receipt(over: Partial<Receipt> & { id: string }): Receipt {
     ...over,
   };
 }
-const estimate = (cents: number, fictitious = true) => ({ cents, seriesId: "term_x__card_credit", ruleVersion: 1, effectiveFrom: "2026-10-01", percentBp: 300, fixedCents: 0, settlementDays: 30, fictitious, computedOn: "2026-10-05" });
+const estimate = (cents: number, fictitious = true) => ({ cents, seriesId: "term_x__card_credit", ruleVersion: 1, effectiveFrom: "2026-10-01", percentBp: 300, fixedCents: 0, settlementDays: 30, settlementBasis: "calendar_days" as const, fictitious, computedOn: "2026-10-05" });
 
 describe("F20 — dinheiro em reais para a planilha (inteiro exato)", () => {
   it("formata centavos sem ponto flutuante e sem separador de milhar", () => {
@@ -107,6 +107,7 @@ describe("F20 — exportação CSV: detalhe e resumo conferem; texto livre neutr
     expect(first[DETAIL_HEADER.indexOf("Bruto (R$)")]).toBe("50,00");
     expect(first[DETAIL_HEADER.indexOf("Base da taxa")]).toBe("estimada");
     expect(first[DETAIL_HEADER.indexOf("Liquidação prevista")]).toBe("04/11/2026");
+    expect(first[DETAIL_HEADER.indexOf("Base da previsão")]).toBe("30 dias corridos pela regra v1"); // a base usada na previsão vai no arquivo
     const cash = csv.trim().split("\r\n")[3]!.split(";");
     expect(cash[DETAIL_HEADER.indexOf("Operador")]).toBe("");
     expect(cash[DETAIL_HEADER.indexOf("Liquidação")]).toBe("dinheiro no caixa");

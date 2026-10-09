@@ -213,7 +213,9 @@ test.describe("taxas, conferência e relatório (regras FICTÍCIAS)", () => {
     await page.getByLabel("Fonte").selectOption({ label: "[FICTÍCIA] Maquininha E2E" });
     await page.getByLabel("Meio").selectOption({ label: "Cartão de crédito (1x)" });
     await page.getByTestId("rule-percent").fill("3,00");
-    await page.getByLabel("Prazo de liquidação (dias corridos)").fill("30");
+    await expect(page.getByLabel(/^Prazo \(em/)).toBeDisabled(); // sem escolher a base, o prazo nem é digitável
+    await page.getByLabel("Base do prazo de liquidação").selectOption("calendar_days");
+    await page.getByLabel(/^Prazo \(em dias corridos\)/).fill("30");
     await expect(page.getByTestId("rule-publish")).toBeDisabled(); // falta o motivo
     await page.getByTestId("rule-reason").fill("Regra FICTÍCIA de homologação E2E");
     await page.getByTestId("rule-publish").click();
@@ -222,7 +224,7 @@ test.describe("taxas, conferência e relatório (regras FICTÍCIAS)", () => {
     await expect(series.first()).toContainText("v1");
     await expect(series.first()).toContainText("Em vigor");
     await expect(series.first()).toContainText("3,00%");
-    await expect(series.first()).toContainText("D+30");
+    await expect(series.first()).toContainText("30 dias corridos"); // a base do prazo sempre à vista
     await expect(series.first()).toContainText("FICTÍCIA");
     await page.screenshot({ path: "test-results/f20-taxas.png", fullPage: true });
   });

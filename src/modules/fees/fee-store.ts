@@ -56,6 +56,6 @@ export function assertTerminalFor(refs: FeeRefs, sourceSnap: DocumentSnapshot | 
 
 /** Estimativa e previsão de liquidação para o recebimento, pela versão em vigor na data (nenhuma = taxa fica pendente). */
 export function feeApplicationOf(refs: FeeRefs | null, seriesSnap: DocumentSnapshot | undefined, input: { grossCents: number; receivedOn: LocalDate }): RuleApplication {
-  if (!refs) return { estimate: null, expectedSettlementOn: null, issue: null };
+  if (!refs) return { estimate: null, expectedSettlement: null, issue: null };
   return applyRule(refs.series.id, parseVersions(seriesSnap), input, { production: isProductionEnv() });
 }

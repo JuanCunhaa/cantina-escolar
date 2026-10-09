@@ -4,6 +4,7 @@
 // carteira, regra FICTÍCIA recusada/ignorada em produção, autorização (secretaria/cantina não veem regras nem relatórios) e relatório
 // × exportação mensal conferindo com os detalhes (A28). Regras e valores são FICTÍCIOS; o provedor online é o roteirizado.
 import { randomUUID } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestUser, seedStudentAccess, targetFromEnv, writeDemoDoc, type TestUser } from "../helpers/auth-emulator";
 import { fakeMercadoPago } from "../helpers/fake-mercadopago";
@@ -52,6 +53,8 @@ const ADMIN_ROUTES: [string, string, string][] = [
   ["GET", "admin/finance/report/route", "/api/admin/finance/report?from=2026-10-01&to=2026-10-02"],
   ["GET", "admin/finance/export/route", "/api/admin/finance/export?month=2026-10"],
   ["GET", "admin/finance/cash/route", "/api/admin/finance/cash"],
+  ["POST", "admin/finance/cash/reopen/route", "/api/admin/finance/cash/reopen"],
+  ["POST", "admin/finance/cash/review/route", "/api/admin/finance/cash/review"],
 ];
 const LOADERS: Record<string, () => Promise<Record<string, unknown>>> = {
   "admin/finance/fees/route": () => import("@/app/api/admin/finance/fees/route"),
@@ -64,6 +67,8 @@ const LOADERS: Record<string, () => Promise<Record<string, unknown>>> = {
   "admin/finance/report/route": () => import("@/app/api/admin/finance/report/route"),
   "admin/finance/export/route": () => import("@/app/api/admin/finance/export/route"),
   "admin/finance/cash/route": () => import("@/app/api/admin/finance/cash/route"),
+  "admin/finance/cash/reopen/route": () => import("@/app/api/admin/finance/cash/reopen/route"),
+  "admin/finance/cash/review/route": () => import("@/app/api/admin/finance/cash/review/route"),
 };
 
 beforeAll(async () => {
@@ -167,7 +172,7 @@ async function newProduct(price: number, stock = 300) {
 const directSale = (productId: string, quantity: number, over: Record<string, unknown> = {}, when?: () => Date) =>
   posCommands.recordDirectSale(db(), actorOf(cantina, "cantina"), { key: randomUUID(), shiftId: ST, lines: [{ productId, quantity, expectedPriceCents: prices.get(productId)! }], paymentMethod: "card_credit", receivedConfirmed: true, ...over }, when);
 
-const ruleBody = (over: Record<string, unknown> = {}) => ({ key: randomUUID(), sourceId: TERMINAL, method: "card_credit", effectiveFrom: BASE, enabled: true, percentBp: 300, fixedCents: 0, settlementDays: 30, fictitious: true, reason: "Regra FICTÍCIA de homologação", ...over });
+const ruleBody = (over: Record<string, unknown> = {}) => ({ key: randomUUID(), sourceId: TERMINAL, method: "card_credit", effectiveFrom: BASE, enabled: true, percentBp: 300, fixedCents: 0, settlementDays: 30, settlementBasis: "calendar_days", fictitious: true, reason: "Regra FICTÍCIA de homologação", ...over });
 const seriesDoc = async (sourceId: string, method: string) => (await doc(`feeSeries/${sourceId}__${method}`)) as { versions: Record<string, unknown>[]; versionCount: number } | undefined;
 const noRuleLeak = (value: unknown) => expect(JSON.stringify(value)).not.toMatch(/percentBp|feeEstimate|fixedCents|settlementDays|ruleVersion|seriesId|\bcost|profit|lucro/i);
 
@@ -199,6 +204,19 @@ describe("autorização: só a administração vê regras, conferência, relató
   it("GET admin/finance/report/route: anônimo 401; secretaria, cantina, responsável e aluno 403", () => denied("GET", "admin/finance/report/route"));
   it("GET admin/finance/export/route: anônimo 401; secretaria, cantina, responsável e aluno 403", () => denied("GET", "admin/finance/export/route"));
   it("GET admin/finance/cash/route: anônimo 401; secretaria, cantina, responsável e aluno 403", () => denied("GET", "admin/finance/cash/route"));
+  it("POST admin/finance/cash/reopen/route: anônimo 401; secretaria, cantina, responsável e aluno 403", () => denied("POST", "admin/finance/cash/reopen/route"));
+  it("POST admin/finance/cash/review/route: anônimo 401; secretaria, cantina, responsável e aluno 403", () => denied("POST", "admin/finance/cash/review/route"));
+
+  it("NENHUMA rota administrativa financeira fica sem teste de autorização (a lista dos it literais acompanha as rotas existentes)", () => {
+    const found = (readdirSync("src/app/api/admin/finance", { recursive: true }) as string[])
+      .map((f) => f.replace(/\\/g, "/"))
+      .filter((f) => f.endsWith("route.ts"))
+      .map((f) => `admin/finance/${f.replace(/\.ts$/, "")}`)
+      .sort();
+    expect(ADMIN_ROUTES.map(([, file]) => file).sort()).toEqual(found);
+    const literal = readFileSync("tests/integration/finance-fees-api.test.ts", "utf8");
+    for (const [method, file] of ADMIN_ROUTES) expect(literal, `${method} ${file}`).toContain(`denied("${method}", "${file}")`);
+  });
 
   it("a secretaria e a cantina listam só NOME e meios das maquininhas (nunca percentuais, prazos ou regras); família não lista", async () => {
     const created = await adminPost("admin/finance/sources/route", { key: randomUUID(), kind: "terminal", code, name: "Maquininha fictícia balcão", methods: ["card_debit", "card_credit"], fictitious: true });
@@ -243,7 +261,7 @@ describe("cadastro e versões imutáveis das regras (A29)", () => {
     expect((await seriesDoc(TERMINAL, "card_credit"))!.versionCount).toBe(1);
 
     const stored1 = (await seriesDoc(TERMINAL, "card_credit"))!.versions[0]!;
-    expect(stored1).toMatchObject({ n: 1, effectiveFrom: BASE, percentBp: 300, fixedCents: 0, settlementDays: 30, fictitious: true, enabled: true, createdByUid: admin.uid, withdrawn: null });
+    expect(stored1).toMatchObject({ n: 1, effectiveFrom: BASE, percentBp: 300, fixedCents: 0, settlementDays: 30, settlementBasis: "calendar_days", fictitious: true, enabled: true, createdByUid: admin.uid, withdrawn: null });
 
     expect((await adminPost("admin/finance/rules/route", ruleBody({ effectiveFrom: school.addDays(BASE, -1) }))).body.error).toBe("effective_in_past");
     expect((await adminPost("admin/finance/rules/route", ruleBody({ effectiveFrom: BASE, percentBp: 999 }))).body.error).toBe("effective_not_after_last");
@@ -297,10 +315,12 @@ describe("estimativa pela regra em vigor, congelada no lançamento; taxa efetiva
   it("R$ 50,00 no cartão a 3,00%: estima R$ 1,50 com a versão 1; crédito segue R$ 50,00; nada de regra vaza para a secretaria", async () => {
     const student = await newStudent();
     const r = await topup(student, { method: "card_credit", sourceId: TERMINAL, amountCents: 5000 });
-    expect(r).toMatchObject({ creditedCents: 5000, fee: { status: "pending", cents: null }, netCents: null, settlement: { status: "pending", expectedOn: school.addDays(BASE, 30), expectedSource: "rule" } });
+    expect(r).toMatchObject({ creditedCents: 5000, fee: { status: "pending", cents: null }, netCents: null, settlement: { status: "pending", expectedOn: school.addDays(BASE, 30), expectedSource: "rule", expectedBasis: "calendar_days", expectedDays: 30 } });
+    expect(r.settlement).not.toHaveProperty("expectedRuleVersion"); // o operador vê a base e o prazo, não a versão da regra
+    expect((await doc(`topups/${r.topupId}`))!.settlement).toMatchObject({ expectedBasis: "calendar_days", expectedDays: 30, expectedRuleVersion: 1 }); // gravado no lançamento
     noRuleLeak(r);
     const stored = (await doc(`topups/${r.topupId}`))!;
-    expect(stored.feeEstimate).toMatchObject({ cents: 150, seriesId: `${TERMINAL}__card_credit`, ruleVersion: 1, percentBp: 300, fixedCents: 0, settlementDays: 30, fictitious: true, computedOn: BASE, effectiveFrom: BASE });
+    expect(stored.feeEstimate).toMatchObject({ cents: 150, seriesId: `${TERMINAL}__card_credit`, ruleVersion: 1, percentBp: 300, fixedCents: 0, settlementDays: 30, settlementBasis: "calendar_days", fictitious: true, computedOn: BASE, effectiveFrom: BASE });
     expect(stored).toMatchObject({ sourceId: TERMINAL, financeVersion: 0, creditedCents: 5000 });
     expect(await walletOf(student)).toMatchObject({ balanceCents: 5000, version: 1 });
   });
@@ -321,8 +341,9 @@ describe("estimativa pela regra em vigor, congelada no lançamento; taxa efetiva
     const stored0 = (await doc(`topups/${before.topupId}`))!;
     const afterChange = school.addDays(BASE, 10);
     const later = await topup(student, { method: "card_credit", sourceId: TERMINAL, amountCents: 10_000 }, at(afterChange));
-    expect((await doc(`topups/${later.topupId}`))!.feeEstimate).toMatchObject({ cents: 500, ruleVersion: 2, percentBp: 500, settlementDays: 2, effectiveFrom: afterChange });
-    expect(later.settlement.expectedOn).toBe(school.addDays(afterChange, 2));
+    expect((await doc(`topups/${later.topupId}`))!.feeEstimate).toMatchObject({ cents: 500, ruleVersion: 2, percentBp: 500, settlementDays: 2, settlementBasis: "calendar_days", effectiveFrom: afterChange });
+    expect(later.settlement).toMatchObject({ expectedOn: school.addDays(afterChange, 2), expectedBasis: "calendar_days", expectedDays: 2 });
+    expect((await doc(`topups/${later.topupId}`))!.settlement).toMatchObject({ expectedRuleVersion: 2 });
     const stored1 = (await doc(`topups/${before.topupId}`))!;
     expect(stored1.feeEstimate).toEqual(stored0.feeEstimate); // o antigo segue exatamente com a v1 (R$ 3,00)
     expect((stored1.feeEstimate as { cents: number }).cents).toBe(300);
@@ -375,10 +396,53 @@ describe("estimativa pela regra em vigor, congelada no lançamento; taxa efetiva
     const sale = await directSale(product, 2, { sourceId: TERMINAL }, at(BASE));
     expect(sale).toMatchObject({ totalCents: 1400, fee: { status: "pending", cents: null }, netCents: null });
     const stored = (await doc(`directSales/${sale.saleId}`))!;
-    expect(stored.payment).toMatchObject({ sourceId: TERMINAL, financeVersion: 0, feeEstimate: { cents: 42, ruleVersion: 1, fictitious: true }, settlement: { status: "pending", expectedOn: school.addDays(BASE, 30), expectedSource: "rule" } });
+    expect(stored.payment).toMatchObject({ sourceId: TERMINAL, financeVersion: 0, feeEstimate: { cents: 42, ruleVersion: 1, fictitious: true }, settlement: { status: "pending", expectedOn: school.addDays(BASE, 30), expectedSource: "rule", expectedBasis: "calendar_days", expectedDays: 30, expectedRuleVersion: 1 } });
     const cash = await directSale(product, 1, { paymentMethod: "cash" }, at(BASE));
     expect((await doc(`directSales/${cash.saleId}`))!.payment).toMatchObject({ feeEstimate: null, settlement: { status: "cash_on_hand" } });
     await expect(directSale(product, 1, { paymentMethod: "cash", sourceId: TERMINAL })).rejects.toThrow();
+  });
+
+  it("a BASE do prazo é obrigatória e explícita: prazo sem base, base sem prazo e dias úteis são recusados; sem prazo a regra é aceita", async () => {
+    const other = `b${tag}`;
+    cleanup.push(`paymentSources/term_${other}`, `feeSeries/term_${other}__card_credit`);
+    expect((await adminPost("admin/finance/sources/route", { key: randomUUID(), kind: "terminal", code: other, name: "Maquininha sem prazo", methods: ["card_credit"], fictitious: true })).status).toBe(200);
+    const body = (over: Record<string, unknown>) => ruleBody({ sourceId: `term_${other}`, effectiveFrom: BASE, ...over });
+    expect((await adminPost("admin/finance/rules/route", body({ settlementBasis: null }))).status).toBe(400); // prazo sem base
+    expect((await adminPost("admin/finance/rules/route", body({ settlementDays: null }))).status).toBe(400); // base sem prazo
+    expect((await adminPost("admin/finance/rules/route", body({ settlementBasis: "business_days" }))).status).toBe(400); // dias úteis: aguardando decisão
+    const withoutBasis: Record<string, unknown> = body({});
+    delete withoutBasis.settlementBasis;
+    expect((await adminPost("admin/finance/rules/route", withoutBasis)).status).toBe(400); // sem base não há padrão silencioso
+    expect(await seriesDoc(`term_${other}`, "card_credit")).toBeUndefined();
+
+    const noTerm = await adminPost("admin/finance/rules/route", body({ settlementDays: null, settlementBasis: null }));
+    expect(noTerm, JSON.stringify(noTerm.body)).toMatchObject({ status: 200, body: { version: 1 } });
+    expect((await seriesDoc(`term_${other}`, "card_credit"))!.versions[0]).toMatchObject({ settlementDays: null, settlementBasis: null });
+    const student = await newStudent();
+    const r = await topup(student, { method: "card_credit", sourceId: `term_${other}`, amountCents: 5000 }, at(BASE));
+    // a taxa é estimada (R$ 1,50), mas a previsão de liquidação fica PENDENTE: nenhuma data presumida
+    expect(r.settlement).toEqual({ status: "pending", expectedOn: null, settledOn: null, expectedSource: null });
+    expect((await doc(`topups/${r.topupId}`))!.feeEstimate).toMatchObject({ cents: 150, settlementDays: null, settlementBasis: null });
+    const detail = await call("GET admin/finance/receipts/route", admin, "GET", `/api/admin/finance/receipts?ref=topup:${r.topupId}`);
+    expect(detail.body.receipt).toMatchObject({ settlement: { expectedOn: null }, overdue: false });
+  });
+
+  it("versão ANTIGA de uma série (sem base gravada) não assume dias corridos: a previsão fica pendente", async () => {
+    const legacy = `l${tag}`;
+    cleanup.push(`feeSeries/default__card_debit`);
+    // fixture: série como as gravadas antes da base explícita (prazo numérico, sem `settlementBasis`)
+    await db().doc("feeSeries/default__card_debit").set({
+      seriesId: "default__card_debit",
+      sourceId: "default",
+      method: "card_debit",
+      versionCount: 1,
+      versions: [{ n: 1, effectiveFrom: BASE, enabled: true, percentBp: 200, fixedCents: 0, settlementDays: 10, fictitious: true, reason: `Série anterior à base explícita ${legacy}`, createdByUid: admin.uid, createdOn: BASE, createdAtIso: new Date().toISOString(), withdrawn: null }],
+    });
+    const student = await newStudent();
+    const r = await topup(student, { method: "card_debit", amountCents: 5000 }, at(BASE));
+    expect(r.settlement).toEqual({ status: "pending", expectedOn: null, settledOn: null, expectedSource: null });
+    expect((await doc(`topups/${r.topupId}`))!.feeEstimate).toMatchObject({ cents: 100, settlementBasis: null });
+    await db().doc("feeSeries/default__card_debit").delete();
   });
 
   it("em PRODUÇÃO a regra fictícia é ignorada: sem estimativa e sem previsão de liquidação", async () => {
@@ -406,7 +470,7 @@ describe("recarga online confirmada: estimativa pela regra do provedor, crédito
     const result = await confirmation.refreshIntent(db(), { providers: p.providers, production: false }, created.intentId, "admin");
     expect(result.outcome).toBe("credited");
     const stored = (await doc(`topupIntents/${created.intentId}`))!;
-    expect(stored).toMatchObject({ status: "confirmed", fee: { status: "pending", cents: null, source: "provider" }, feeSourceId: PROVIDER, settlement: { status: "pending", expectedOn: school.addDays(BASE, 1), expectedSource: "rule" } });
+    expect(stored).toMatchObject({ status: "confirmed", fee: { status: "pending", cents: null, source: "provider" }, feeSourceId: PROVIDER, settlement: { status: "pending", expectedOn: school.addDays(BASE, 1), expectedSource: "rule", expectedBasis: "calendar_days", expectedDays: 1, expectedRuleVersion: 1 } });
     expect(stored.feeEstimate).toMatchObject({ cents: 50, ruleVersion: 1, percentBp: 99 }); // 49,5 centavos → 50 (meio para cima)
     expect(await walletOf(student)).toMatchObject({ balanceCents: 5000, version: 1 });
 
@@ -631,6 +695,7 @@ describe("relatório financeiro e exportação mensal (A28/A29): cada recebiment
     expect(a[col(d, "Regra aplicada")]).toBe(`${TERMINAL}__card_credit v2`);
     expect(a[col(d, "Regra fictícia")]).toBe("Sim");
     expect(a[col(d, "Base da taxa")]).toBe("estimada");
+    expect(a[col(d, "Base da previsão")]).toBe("2 dias corridos pela regra v2"); // a base usada na previsão vai no arquivo
     expect(a[col(d, "Taxa efetiva (R$)")]).toBe("2,50");
     expect(a[col(d, "Líquido previsto (R$)")]).toBe("47,50");
     // fórmula em nome de operador: neutralizada com apóstrofo (texto livre), nunca interpretada

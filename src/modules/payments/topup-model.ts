@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { addDays, isLocalDate, type LocalDate } from "@/lib/dates/school-time";
 import { conflict } from "@/lib/domain-error";
+import type { ExpectedSettlement, SettlementBasis } from "@/modules/fees/fee-model";
 import { isSafeLabel } from "@/modules/students/normalize";
 import { PAYMENT_LABEL, PAYMENT_METHODS, feeRecordOf, type FeeRecord, type PaymentMethod } from "./methods";
 
@@ -83,17 +84,28 @@ export type Settlement = {
   settledOn: LocalDate | null;
   /** De onde veio a data prevista (F20): digitada pelo operador ou calculada pela regra de taxa/prazo em vigor. */
   expectedSource?: "operator" | "rule" | null;
+  /** Base e prazo da previsão pela regra (F20): mostram de onde veio a data; nunca presumidos. Data digitada pelo operador não tem base. */
+  expectedBasis?: SettlementBasis | null;
+  expectedDays?: number | null;
+  expectedRuleVersion?: number | null;
 };
+
+/** Liquidação pendente com a previsão pela regra (base, prazo e versão gravados) ou SEM data quando a regra não tem prazo configurado. */
+export function pendingSettlement(rule: ExpectedSettlement | null): Settlement {
+  return rule
+    ? { status: "pending", expectedOn: rule.on, settledOn: null, expectedSource: "rule", expectedBasis: rule.basis, expectedDays: rule.days, expectedRuleVersion: rule.ruleVersion }
+    : { status: "pending", expectedOn: null, settledOn: null, expectedSource: null };
+}
 
 /**
  * Liquidação ao registrar: dinheiro no caixa; Pix MANUAL conferido na conta = liquidado; cartão = pendente. A previsão digitada pelo
- * operador vale; sem ela, a da regra em vigor (`ruleExpectedOn`, F20); sem nenhuma, fica sem previsão (nunca inventada).
+ * operador vale; sem ela, a da regra em vigor COM a base e o prazo usados (F20); sem prazo configurado, fica PENDENTE sem data (nunca inventada).
  */
-export function settlementOf(method: PaymentMethod, receivedOn: LocalDate, expectedOn: LocalDate | undefined, ruleExpectedOn: LocalDate | null = null): Settlement {
+export function settlementOf(method: PaymentMethod, receivedOn: LocalDate, expectedOn: LocalDate | undefined, rule: ExpectedSettlement | null = null): Settlement {
   if (method === "cash") return { status: "cash_on_hand", expectedOn: null, settledOn: null, expectedSource: null };
   if (method === "pix") return { status: "settled", expectedOn: null, settledOn: receivedOn, expectedSource: null };
-  const expected = expectedOn ?? ruleExpectedOn;
-  return { status: "pending", expectedOn: expected, settledOn: null, expectedSource: expectedOn ? "operator" : ruleExpectedOn ? "rule" : null };
+  if (expectedOn) return { status: "pending", expectedOn, settledOn: null, expectedSource: "operator" };
+  return pendingSettlement(rule);
 }
 
 /** Data prevista de liquidação: de hoje até +90 dias. */

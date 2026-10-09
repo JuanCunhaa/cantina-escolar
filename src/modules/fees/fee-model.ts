@@ -27,6 +27,14 @@ export const SOURCE_KIND_LABEL: Record<SourceKind, string> = { provider: "Proved
 export const MAX_PERCENT_BP = 3000; // 30,00% (teto de sanidade contra erro de digitação)
 export const MAX_FIXED_CENTS = 10_000; // R$ 100,00
 export const MAX_SETTLEMENT_DAYS = 90;
+/**
+ * Base do prazo de liquidação. NUNCA assumida: toda regra que tem prazo grava a base escolhida pela administração, e a previsão mostra
+ * qual foi. Hoje só `calendar_days` (dias corridos) tem cálculo; `business_days` (dias úteis) depende de decisão do dono e de um
+ * calendário bancário que não existe — não é aceito até lá. Sem prazo configurado, a previsão fica PENDENTE (sem data).
+ */
+export const SETTLEMENT_BASES = ["calendar_days"] as const;
+export type SettlementBasis = (typeof SETTLEMENT_BASES)[number];
+export const SETTLEMENT_BASIS_LABEL: Record<SettlementBasis, string> = { calendar_days: "dias corridos" };
 export const MAX_VERSIONS_PER_SERIES = 100;
 export const FICTITIOUS_PREFIX = "[FICTÍCIA] ";
 
@@ -78,11 +86,16 @@ export const ruleSchema = z
     enabled: z.boolean(),
     percentBp: z.number().int().min(0).max(MAX_PERCENT_BP),
     fixedCents: z.number().int().min(0).max(MAX_FIXED_CENTS),
-    settlementDays: z.number().int().min(0).max(MAX_SETTLEMENT_DAYS),
+    /** Prazo e base andam JUNTOS: os dois ausentes (null) = sem prazo configurado, a previsão de liquidação fica pendente. */
+    settlementDays: z.number().int().min(0).max(MAX_SETTLEMENT_DAYS).nullable(),
+    settlementBasis: z.enum(SETTLEMENT_BASES).nullable(),
     fictitious: z.boolean(),
     reason: label(10, 200),
   })
-  .strict();
+  .strict()
+  .superRefine((v, ctx) => {
+    if ((v.settlementDays === null) !== (v.settlementBasis === null)) ctx.addIssue({ code: "custom", path: ["settlementBasis"], message: "Prazo e base do prazo andam juntos: informe os dois ou nenhum." });
+  });
 export type RuleInput = z.infer<typeof ruleSchema>;
 
 export const withdrawSchema = z
@@ -96,7 +109,9 @@ export type RuleVersion = {
   enabled: boolean;
   percentBp: number;
   fixedCents: number;
-  settlementDays: number;
+  /** Versões antigas (sem base gravada) não têm prazo válido: a previsão fica pendente em vez de assumir dias corridos. */
+  settlementDays?: number | null;
+  settlementBasis?: SettlementBasis | null;
   fictitious: boolean;
   reason: string;
   createdByUid: string;
@@ -112,7 +127,8 @@ export type FeeEstimate = {
   effectiveFrom: LocalDate;
   percentBp: number;
   fixedCents: number;
-  settlementDays: number;
+  settlementDays: number | null;
+  settlementBasis: SettlementBasis | null;
   fictitious: boolean;
   computedOn: LocalDate;
 };
@@ -153,19 +169,29 @@ export function resolveRule(versions: readonly RuleVersion[], on: LocalDate, env
   return { rule: best, issue: null };
 }
 
-export type RuleApplication = { estimate: FeeEstimate | null; expectedSettlementOn: LocalDate | null; issue: ResolveIssue | "exceeds_amount" | null };
+/** Previsão de liquidação pela regra: a data E a base/prazo/versão usados (para mostrar de onde veio). */
+export type ExpectedSettlement = { on: LocalDate; days: number; basis: SettlementBasis; ruleVersion: number };
+export type RuleApplication = { estimate: FeeEstimate | null; expectedSettlement: ExpectedSettlement | null; issue: ResolveIssue | "exceeds_amount" | null };
 
-/** Aplica a regra em vigor ao recebimento: estimativa congelada com a versão usada e previsão de liquidação (dias corridos). */
+/** Previsão pela regra: só com prazo E base gravados; dias corridos somam ao calendário. Sem prazo ou base = sem previsão (nada assumido). */
+export function expectedSettlementOf(rule: RuleVersion, receivedOn: LocalDate): ExpectedSettlement | null {
+  const days = rule.settlementDays ?? null;
+  const basis = rule.settlementBasis ?? null;
+  if (days === null || basis === null) return null;
+  return { on: addDays(receivedOn, days), days, basis, ruleVersion: rule.n };
+}
+
+/** Aplica a regra em vigor ao recebimento: estimativa congelada com a versão usada e, se houver prazo configurado, a previsão de liquidação. */
 export function applyRule(seriesId: string, versions: readonly RuleVersion[], input: { grossCents: number; receivedOn: LocalDate }, env: { production: boolean }): RuleApplication {
   const resolved = resolveRule(versions, input.receivedOn, env);
-  if (!resolved.rule) return { estimate: null, expectedSettlementOn: null, issue: resolved.issue };
+  if (!resolved.rule) return { estimate: null, expectedSettlement: null, issue: resolved.issue };
   const rule = resolved.rule;
-  const expectedSettlementOn = addDays(input.receivedOn, rule.settlementDays);
+  const expectedSettlement = expectedSettlementOf(rule, input.receivedOn);
   const out = estimateFee(input.grossCents, rule);
-  if (!out.ok) return { estimate: null, expectedSettlementOn, issue: out.issue };
+  if (!out.ok) return { estimate: null, expectedSettlement, issue: out.issue };
   return {
-    estimate: { cents: out.cents, seriesId, ruleVersion: rule.n, effectiveFrom: rule.effectiveFrom, percentBp: rule.percentBp, fixedCents: rule.fixedCents, settlementDays: rule.settlementDays, fictitious: rule.fictitious, computedOn: input.receivedOn },
-    expectedSettlementOn,
+    estimate: { cents: out.cents, seriesId, ruleVersion: rule.n, effectiveFrom: rule.effectiveFrom, percentBp: rule.percentBp, fixedCents: rule.fixedCents, settlementDays: rule.settlementDays ?? null, settlementBasis: rule.settlementBasis ?? null, fictitious: rule.fictitious, computedOn: input.receivedOn },
+    expectedSettlement,
     issue: null,
   };
 }

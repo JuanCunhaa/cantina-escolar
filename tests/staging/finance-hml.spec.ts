@@ -69,13 +69,16 @@ test("cadastro FICTÍCIO: maquininha e regra versionada, sem retroatividade; só
   expect(created.status, JSON.stringify(created.body)).toBe(200);
   expect((await call(request, fam.admin, "POST", "/api/admin/finance/sources", { ...source, key: newKey("hml-f20") })).body.error).toBe("source_exists");
 
-  const rule = { key: newKey("hml-f20"), sourceId: TERMINAL, method: "card_credit", effectiveFrom: TODAY, enabled: true, percentBp: 300, fixedCents: 0, settlementDays: 30, fictitious: true, reason: `${MARK}: regra FICTÍCIA` };
+  const rule = { key: newKey("hml-f20"), sourceId: TERMINAL, method: "card_credit", effectiveFrom: TODAY, enabled: true, percentBp: 300, fixedCents: 0, settlementDays: 30, settlementBasis: "calendar_days", fictitious: true, reason: `${MARK}: regra FICTÍCIA` };
   const v1 = await call(request, fam.admin, "POST", "/api/admin/finance/rules", rule);
   expect(v1, JSON.stringify(v1.body)).toMatchObject({ status: 200, body: { version: 1, effectiveFrom: TODAY, replayed: false } });
   expect((await call(request, fam.admin, "POST", "/api/admin/finance/rules", rule)).body).toMatchObject({ replayed: true, version: 1 });
   expect((await call(request, fam.admin, "POST", "/api/admin/finance/rules", { ...rule, key: newKey("hml-f20"), effectiveFrom: addDays(TODAY, -1) })).body.error).toBe("effective_in_past");
+  // a base do prazo é explícita: prazo sem base, base sem prazo e dias úteis são recusados
+  for (const bad of [{ settlementBasis: null }, { settlementDays: null }, { settlementBasis: "business_days" }]) expect((await call(request, fam.admin, "POST", "/api/admin/finance/rules", { ...rule, key: newKey("hml-f20"), effectiveFrom: addDays(TODAY, 20), ...bad })).status).toBe(400);
   expect((await call(request, fam.admin, "POST", "/api/admin/finance/rules", { ...rule, key: newKey("hml-f20"), percentBp: 999 })).body.error).toBe("effective_not_after_last");
-  const v2 = await call(request, fam.admin, "POST", "/api/admin/finance/rules", { ...rule, key: newKey("hml-f20"), effectiveFrom: addDays(TODAY, 10), percentBp: 500 });
+  // a v2 (futura) não tem prazo configurado: a previsão de liquidação ficará pendente quando ela valer
+  const v2 = await call(request, fam.admin, "POST", "/api/admin/finance/rules", { ...rule, key: newKey("hml-f20"), effectiveFrom: addDays(TODAY, 10), percentBp: 500, settlementDays: null, settlementBasis: null });
   expect(v2.body).toMatchObject({ version: 2 });
 
   const cfg = await call(request, fam.admin, "GET", "/api/admin/finance/fees");
@@ -93,7 +96,7 @@ test("cadastro FICTÍCIO: maquininha e regra versionada, sem retroatividade; só
 test("recebimento no cartão (simulado): crédito integral, estimativa congelada pela regra, nada vaza para a secretaria", async ({ request }) => {
   const r = await topup(request, secretaria, { amountCents: 5000, method: "card_credit", reference: `HML-F20-${tag}-NSU1`, sourceId: TERMINAL });
   expect(r.status, JSON.stringify(r.body)).toBe(200);
-  expect(r.body).toMatchObject({ creditedCents: 5000, fee: { status: "pending", cents: null }, netCents: null, settlement: { status: "pending", expectedOn: addDays(TODAY, 30), expectedSource: "rule" } });
+  expect(r.body).toMatchObject({ creditedCents: 5000, fee: { status: "pending", cents: null }, netCents: null, settlement: { status: "pending", expectedOn: addDays(TODAY, 30), expectedSource: "rule", expectedBasis: "calendar_days", expectedDays: 30, expectedRuleVersion: 1 } });
   expect(JSON.stringify(r.body)).not.toMatch(/feeEstimate|percentBp|ruleVersion|seriesId/);
   cardTopupId = String(r.body.topupId);
   ref = `topup:${cardTopupId}`;

@@ -25,8 +25,10 @@ describe("recarga manual — regras puras (F17)", () => {
     expect(settlementOf("card_credit", "2026-10-05", undefined)).toEqual({ status: "pending", expectedOn: null, settledOn: null, expectedSource: null });
     expect(settlementOf("pix", "2026-10-05", undefined)).toEqual({ status: "settled", expectedOn: null, settledOn: "2026-10-05", expectedSource: null });
     // F20: sem data do operador, a previsão vem da regra em vigor
-    expect(settlementOf("card_credit", "2026-10-05", undefined, "2026-11-04")).toEqual({ status: "pending", expectedOn: "2026-11-04", settledOn: null, expectedSource: "rule" });
-    expect(settlementOf("card_credit", "2026-10-05", "2026-10-20", "2026-11-04").expectedOn).toBe("2026-10-20");
+    const rule = { on: "2026-11-04", days: 30, basis: "calendar_days" as const, ruleVersion: 1 };
+    expect(settlementOf("card_credit", "2026-10-05", undefined, rule)).toEqual({ status: "pending", expectedOn: "2026-11-04", settledOn: null, expectedSource: "rule", expectedBasis: "calendar_days", expectedDays: 30, expectedRuleVersion: 1 });
+    expect(settlementOf("card_credit", "2026-10-05", "2026-10-20", rule)).toEqual({ status: "pending", expectedOn: "2026-10-20", settledOn: null, expectedSource: "operator" }); // a data digitada vale e não carrega base
+    expect(settlementOf("card_credit", "2026-10-05", undefined, null)).toEqual({ status: "pending", expectedOn: null, settledOn: null, expectedSource: null }); // sem prazo configurado: pendente
     expect(settlementOf("cash", "2026-10-05", undefined).status).toBe("cash_on_hand");
   });
 

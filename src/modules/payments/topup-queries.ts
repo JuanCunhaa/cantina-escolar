@@ -109,6 +109,13 @@ export type TopupView = {
   reversals: ReversalView[];
 };
 
+/** O operador vê a previsão com a base e o prazo (para entender a data), mas não a VERSÃO da regra nem a regra em si (F20). */
+function forOperator(s: Settlement): Settlement {
+  const visible: Settlement = { ...s };
+  delete visible.expectedRuleVersion;
+  return visible;
+}
+
 export function topupView(t: TopupRecord, reversals: ReversalView[]): TopupView {
   return {
     topupId: t.topupId,
@@ -119,7 +126,7 @@ export function topupView(t: TopupRecord, reversals: ReversalView[]): TopupView 
     method: t.method,
     fee: t.fee,
     netCents: t.netCents,
-    settlement: t.settlement,
+    settlement: forOperator(t.settlement),
     reference: t.reference?.raw ?? null,
     payerName: t.verification?.payerName ?? null,
     note: t.verification?.note ?? null,

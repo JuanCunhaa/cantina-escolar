@@ -8,6 +8,7 @@ import { applyDelta, MAX_BALANCE_CENTS, parseWalletState, pendingReversalOf } fr
 import { ONLINE_SOURCE_ID } from "@/modules/fees/fee-model";
 import { feeApplicationOf, feeRefs, refsToRead } from "@/modules/fees/fee-store";
 import { PAYMENT_LABEL } from "../methods";
+import { pendingSettlement } from "../topup-model";
 import { decide, splitRecovery, type Decision, type DecisionContext, type IntentFacts, type ReviewReason } from "./confirmation-model";
 import type { IntentDoc } from "./intent-doc";
 import type { IntentStatus } from "./intent-model";
@@ -198,7 +199,7 @@ async function applyOrder(db: Firestore, a: ApplyArgs): Promise<ConfirmResult> {
           fee: { status: "pending", cents: null, source: "provider" },
           feeEstimate: rule.estimate,
           feeSourceId: ONLINE_SOURCE_ID,
-          settlement: { status: "pending", expectedOn: rule.expectedSettlementOn, settledOn: null, expectedSource: rule.expectedSettlementOn ? "rule" : null },
+          settlement: pendingSettlement(rule.expectedSettlement),
           version,
           updatedAt: nowTs,
         });

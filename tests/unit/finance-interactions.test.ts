@@ -210,7 +210,7 @@ describe("taxas e maquininhas: formulários e comandos", () => {
       { sourceId: "default", kind: "default", name: "Padrão", methods: ["pix", "card_debit", "card_credit"], active: true, fictitious: false },
       { sourceId: "term_abc", kind: "terminal", name: "[FICTÍCIA] Maquininha", methods: ["card_debit", "card_credit"], active: true, fictitious: true },
     ],
-    series: [{ seriesId: "term_abc__card_credit", sourceId: "term_abc", method: "card_credit", blockedInProduction: false, current: null, versions: [{ n: 2, effectiveFrom: "2026-10-20", enabled: true, percentBp: 500, fixedCents: 0, settlementDays: 2, fictitious: true, reason: "r", createdByUid: "a", createdOn: "2026-10-05", createdAtIso: "x", withdrawn: null, state: "future" }] }],
+    series: [{ seriesId: "term_abc__card_credit", sourceId: "term_abc", method: "card_credit", blockedInProduction: false, current: null, versions: [{ n: 2, effectiveFrom: "2026-10-20", enabled: true, percentBp: 500, fixedCents: 0, settlementDays: 2, settlementBasis: "calendar_days", fictitious: true, reason: "r", createdByUid: "a", createdOn: "2026-10-05", createdAtIso: "x", withdrawn: null, state: "future" }] }],
   };
 
   it("cadastrar maquininha: valida código e meios; envia o corpo certo", async () => {
@@ -236,6 +236,9 @@ describe("taxas e maquininhas: formulários e comandos", () => {
     await h.change(input(h, "rule-from"), "2026-10-30");
     await h.change(input(h, "rule-percent"), "3,00");
     await h.change(input(h, "rule-fixed"), "0,39");
+    expect(input(h, "rule-days").props.disabled).toBe(true); // sem escolher a base, o prazo nem é digitável
+    await h.change(input(h, "rule-basis"), "calendar_days");
+    expect(input(h, "rule-days").props.disabled).toBe(false);
     await h.change(input(h, "rule-days"), "30");
     await h.change(input(h, "rule-reason"), "curto");
     await h.submit(h.findAll((n) => n.type === "form")[0]!);
@@ -244,10 +247,32 @@ describe("taxas e maquininhas: formulários e comandos", () => {
     const boxes = h.findAll((n) => n.type === "input" && n.props.type === "checkbox");
     await h.change(boxes.find((b) => b.props.checked === true && b.props.disabled === undefined)!, false); // desativa "Regra ativa" (a única marcada sem estar travada)
     await h.submit(h.findAll((n) => n.type === "form")[0]!);
-    expect(published).toEqual([{ sourceId: "term_abc", method: "card_credit", effectiveFrom: "2026-10-30", enabled: false, percentBp: 300, fixedCents: 39, settlementDays: 30, fictitious: true, reason: "Regra FICTÍCIA de homologação" }]);
+    expect(published).toEqual([{ sourceId: "term_abc", method: "card_credit", effectiveFrom: "2026-10-30", enabled: false, percentBp: 300, fixedCents: 39, settlementDays: 30, settlementBasis: "calendar_days", fictitious: true, reason: "Regra FICTÍCIA de homologação" }]);
     await h.change(input(h, "rule-percent"), "31");
     await h.submit(h.findAll((n) => n.type === "form")[0]!);
     expect(published).toHaveLength(1);
+  });
+
+  it("sem escolher a base do prazo a regra é publicada SEM prazo (previsão pendente), nunca com dias corridos presumidos", async () => {
+    const published: unknown[] = [];
+    const h = mount(FeeConfigView as never, { config, message: null, locked: false, onCreateSource: () => undefined, onToggleSource: () => undefined, onPublish: (b: unknown) => published.push(b), onWithdraw: () => undefined });
+    await h.change(input(h, "rule-source"), "term_abc");
+    await h.change(input(h, "rule-method"), "card_credit");
+    await h.change(input(h, "rule-percent"), "2,5");
+    await h.change(input(h, "rule-reason"), "Regra FICTÍCIA de homologação");
+    await h.submit(h.findAll((n) => n.type === "form")[0]!);
+    expect(published).toEqual([{ sourceId: "term_abc", method: "card_credit", effectiveFrom: "2026-10-09", enabled: true, percentBp: 250, fixedCents: 0, settlementDays: null, settlementBasis: null, fictitious: true, reason: "Regra FICTÍCIA de homologação" }]);
+    // voltar a "sem prazo" depois de digitar dias descarta o prazo
+    await h.change(input(h, "rule-basis"), "calendar_days");
+    await h.change(input(h, "rule-days"), "7");
+    await h.change(input(h, "rule-basis"), "");
+    await h.submit(h.findAll((n) => n.type === "form")[0]!);
+    expect(published[1]).toMatchObject({ settlementDays: null, settlementBasis: null });
+    // prazo acima do teto é recusado
+    await h.change(input(h, "rule-basis"), "calendar_days");
+    await h.change(input(h, "rule-days"), "91");
+    await h.submit(h.findAll((n) => n.type === "form")[0]!);
+    expect(published).toHaveLength(2);
   });
 
   it("arquivar maquininha e retirar versão futura pedem motivo de 10+ caracteres", async () => {
@@ -304,7 +329,7 @@ describe("taxas e maquininhas: formulários e comandos", () => {
 });
 
 describe("conferência e relatório: interações", () => {
-  const item = { ref: "topup:tpm_1", kind: "topup", point: "secretaria", label: "Aluno", operatorName: "M", method: "card_credit", sourceId: "term_abc", receivedOn: "2026-10-05", grossCents: 5000, reversedCents: 0, fee: { status: "pending", cents: null, source: "operator" }, estimate: { cents: 150, seriesId: "s", ruleVersion: 1, effectiveFrom: "2026-10-01", percentBp: 300, fixedCents: 0, settlementDays: 30, fictitious: true, computedOn: "2026-10-05" }, effective: { basis: "estimated", cents: 150, estimatedCents: 150, differenceCents: null }, settlement: { status: "pending", expectedOn: "2026-10-04", settledOn: null }, overdue: true, financeVersion: 0, reference: null };
+  const item = { ref: "topup:tpm_1", kind: "topup", point: "secretaria", label: "Aluno", operatorName: "M", method: "card_credit", sourceId: "term_abc", receivedOn: "2026-10-05", grossCents: 5000, reversedCents: 0, fee: { status: "pending", cents: null, source: "operator" }, estimate: { cents: 150, seriesId: "s", ruleVersion: 1, effectiveFrom: "2026-10-01", percentBp: 300, fixedCents: 0, settlementDays: 30, fictitious: true, computedOn: "2026-10-05" }, effective: { basis: "estimated", cents: 150, estimatedCents: 150, differenceCents: null }, settlement: { status: "pending", expectedOn: "2026-10-04", settledOn: null, expectedSource: "rule", expectedBasis: "calendar_days", expectedDays: 30, expectedRuleVersion: 1 }, overdue: true, financeVersion: 0, reference: null };
 
   it("conferir: taxa acima do valor é recusada; salvar envia a versão vista; correção exige motivo", async () => {
     const saved: unknown[] = [];
