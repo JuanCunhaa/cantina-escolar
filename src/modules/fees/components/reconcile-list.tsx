@@ -8,20 +8,12 @@ import { brDate, parseCents } from "@/modules/cash/components/cash-text";
 import { useServerQuery } from "@/modules/orders/use-operations";
 import { usePosSubmit } from "@/modules/pos/use-pos";
 import { PAYMENT_LABEL } from "@/modules/payments/methods";
-import { FEE_BASIS_LABEL, SETTLEMENT_BASIS_LABEL, type FeeBasis } from "../fee-model";
-import type { Settlement } from "@/modules/payments/topup-model";
+import { FEE_BASIS_LABEL, type FeeBasis } from "../fee-model";
+import { forecastOriginText } from "@/modules/payments/topup-model";
 import type { ReceiptAdminView, ReconcileList } from "../fee-queries";
 import { POINT_LABEL, RECEIPT_KIND_LABEL } from "../receipt-labels";
 import { RECONCILE_ERRORS, adminAction, type Message } from "../finance-actions";
 import { FinanceTabs } from "./finance-tabs";
-
-/** Origem/base da previsão à vista: pela regra (prazo, base e versão), informada pelo operador ou sem registro. */
-export function basisText(s: Settlement): string {
-  if (s.expectedSource === "rule" && s.expectedBasis && s.expectedDays !== null && s.expectedDays !== undefined) {
-    return `${s.expectedDays} ${SETTLEMENT_BASIS_LABEL[s.expectedBasis]} pela regra${s.expectedRuleVersion ? ` v${s.expectedRuleVersion}` : ""}`;
-  }
-  return s.expectedSource === "operator" ? "data informada pelo operador" : "origem não registrada";
-}
 
 export type ReconcileDraft = { ref: string; expectedVersion: number; actualFeeCents?: number; settledOn?: string; reason?: string };
 
@@ -54,7 +46,7 @@ function Row({ item, today, locked, onSave }: { item: ReceiptAdminView; today: s
           {item.estimate?.fictitious && <span className="badge badge-warn"> regra FICTÍCIA</span>}
         </td>
         <td>
-          {item.settlement.status === "settled" ? `Liquidada em ${item.settlement.settledOn ? brDate(item.settlement.settledOn) : "—"}` : item.settlement.expectedOn ? `Prevista ${brDate(item.settlement.expectedOn)} · ${basisText(item.settlement)}` : "Previsão pendente (sem prazo configurado)"}
+          {item.settlement.status === "settled" ? `Liquidada em ${item.settlement.settledOn ? brDate(item.settlement.settledOn) : "—"}` : item.settlement.expectedOn ? `Prevista ${brDate(item.settlement.expectedOn)} · ${forecastOriginText(item.settlement)}` : "Previsão pendente (sem prazo configurado)"}
           {item.overdue && <span className="badge badge-cancelled"> vencida</span>}
         </td>
         <td>

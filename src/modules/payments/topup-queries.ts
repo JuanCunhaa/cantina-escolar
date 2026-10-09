@@ -217,7 +217,7 @@ export async function listTopups(db: Firestore, actor: Actor, raw: unknown, cloc
       count: topups.length,
       creditedCents: topups.reduce((n, t) => n + t.creditedCents, 0),
       reversedCents: topups.reduce((n, t) => n + t.reversedCents, 0),
-      feeInformedCents: topups.reduce((n, t) => n + (t.fee.status === "informed" ? (t.fee.cents ?? 0) : 0), 0),
+      feeInformedCents: topups.reduce((n, t) => n + ((t.fee.status === "informed" || t.fee.status === "confirmed") ? (t.fee.cents ?? 0) : 0), 0),
       feePendingCount: topups.filter((t) => t.fee.status === "pending").length,
       byMethod,
     },

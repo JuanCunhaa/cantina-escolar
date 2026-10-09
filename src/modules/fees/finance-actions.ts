@@ -55,7 +55,7 @@ export async function adminAction(submit: Submit, url: string, body: Record<stri
 
 /* ------------------------------------------------------------------------------------- caixa do operador */
 
-export type CloseDraft = { countedCashCents: number; declared: { pixCents?: number; cardDebitCents?: number; cardCreditCents?: number }; note: string; expectedReceiptCount: number };
+export type CloseDraft = { countedCashCents: number; declared: { pixCents?: number; cardDebitCents?: number; cardCreditCents?: number }; note: string; expectedReceiptCount: number; expectedNetCents: number };
 
 export async function openCashAction(submit: Submit, input: { point: string; date: string; openingCents: number }): Promise<Message | null> {
   const r = await submit<{ sessionId: string }>("/api/cash/open", { point: input.point, date: input.date, openingCents: input.openingCents, openingConfirmed: true });
@@ -73,6 +73,7 @@ export async function closeCashAction(submit: Submit, sessionId: string, draft: 
     declared: draft.declared,
     ...(draft.note ? { note: draft.note } : {}),
     expectedReceiptCount: draft.expectedReceiptCount,
+    expectedNetCents: draft.expectedNetCents,
   });
   if (!r) return null;
   if (r.ok) {
@@ -80,7 +81,7 @@ export async function closeCashAction(submit: Submit, sessionId: string, draft: 
       ? { kind: "error", text: `Caixa fechado com divergência (${differenceText(r.data.cashDifferenceCents)}). Ela fica pendente de revisão da administração.` }
       : { kind: "ok", text: "Caixa fechado sem diferença." };
   }
-  if (r.error === "stale_summary") return { kind: "error", text: "Entraram novos recebimentos desde que você viu o resumo. Confira de novo antes de fechar." };
+  if (r.error === "stale_summary") return { kind: "error", text: "Entraram novos recebimentos ou estornos desde que você viu o resumo. Confira de novo antes de fechar." };
   if (r.error === "already_closed") return { kind: "error", text: "Este caixa já está fechado. A tela foi atualizada." };
   return definitive(r) ? { kind: "error", text: errorText(r.error) } : null;
 }

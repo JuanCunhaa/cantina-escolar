@@ -1,4 +1,5 @@
 import type { Firestore, Query, QuerySnapshot, Transaction } from "firebase-admin/firestore";
+import { addDays } from "@/lib/dates/school-time";
 import { conflict } from "@/lib/domain-error";
 import type { LocalDate } from "@/lib/dates/school-time";
 import { receiptOfDirectSale, receiptOfTopup, type Receipt } from "@/modules/fees/receipts";
@@ -44,10 +45,26 @@ export async function readWalletConsumption(db: Firestore, tx: Transaction | nul
 export type ScopeKey = `${string}__${CashPoint}__${string}`;
 export const scopeKeyOf = (date: LocalDate, point: CashPoint, uid: string): ScopeKey => `${date}__${point}__${uid}`;
 
+/**
+ * Visão PRÓPRIA do operador: uma consulta por dia da janela com igualdades (operador + data), então só os documentos DELE são lidos
+ * (nenhum recebimento de outro operador sai do banco) e não precisa de índice composto.
+ */
+async function readOwnDocs(db: Firestore, range: { from: LocalDate; to: LocalDate }, uid: string): Promise<[QuerySnapshotLike, QuerySnapshotLike]> {
+  const days: LocalDate[] = [];
+  for (let d = range.from; d <= range.to; d = addDays(d, 1)) days.push(d);
+  const [topupSnaps, saleSnaps] = await Promise.all([
+    Promise.all(days.map((d) => db.collection("topups").where("operator.uid", "==", uid).where("receivedOn", "==", d).limit(MAX_RECEIPTS_PER_SESSION + 1).get())),
+    Promise.all(days.map((d) => db.collection("directSales").where("createdByUid", "==", uid).where("consumptionDate", "==", d).limit(MAX_RECEIPTS_PER_SESSION + 1).get())),
+  ]);
+  const join = (snaps: QuerySnapshot[]): QuerySnapshotLike => ({ docs: snaps.flatMap((x) => x.docs), size: snaps.reduce((n, x) => n + x.size, 0) });
+  return [join(topupSnaps), join(saleSnaps)];
+}
+type QuerySnapshotLike = { docs: QuerySnapshot["docs"]; size: number };
+
 /** Todos os recebimentos de caixa físico no intervalo (secretaria + balcão), agrupados por operador/ponto/data. Filtro por UID em memória. */
 export async function readReceiptsByScope(db: Firestore, range: { from: LocalDate; to: LocalDate }, uid?: string): Promise<{ groups: Map<ScopeKey, Receipt[]>; truncated: boolean }> {
   const CAP = 3000;
-  const [topups, sales] = await Promise.all([
+  const [topups, sales] = uid ? await readOwnDocs(db, range, uid) : await Promise.all([
     db.collection("topups").where("receivedOn", ">=", range.from).where("receivedOn", "<=", range.to).limit(CAP + 1).get(),
     db.collection("directSales").where("consumptionDate", ">=", range.from).where("consumptionDate", "<=", range.to).limit(CAP + 1).get(),
   ]);

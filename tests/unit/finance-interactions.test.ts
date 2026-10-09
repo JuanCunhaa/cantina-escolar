@@ -84,7 +84,7 @@ describe("caixa do operador: abrir e fechar", () => {
     await h.submit(h.find((n) => n.type === "form"));
     expect(h.text()).toContain("Sem diferença");
     await h.submit(h.find((n) => n.type === "form"));
-    expect(closed).toEqual([{ countedCashCents: 15_000, declared: { pixCents: 3000 }, note: "gaveta conferida", expectedReceiptCount: 3 }]);
+    expect(closed).toEqual([{ countedCashCents: 15_000, declared: { pixCents: 3000 }, note: "gaveta conferida", expectedReceiptCount: 3, expectedNetCents: 8000 }]);
   });
 
   it("conferência inválida de Pix/cartão impede revisar", async () => {
@@ -140,7 +140,7 @@ describe("CashDesk (contêiner): resposta do servidor decide a mensagem", () => 
     await again.submit(again.find((n) => n.type === "form"));
     state.submit = async () => ({ ok: false, status: 409, error: "stale_summary" });
     await again.submit(again.find((n) => n.type === "form"));
-    expect(again.byTestId("cash-message").children[0]!.text).toContain("novos recebimentos");
+    expect(again.byTestId("cash-message").children[0]!.text).toContain("novos recebimentos ou estornos");
   });
 });
 
@@ -383,9 +383,12 @@ describe("conferência e relatório: interações", () => {
     const report = buildReport([], { from: "2026-10-01", to: today }, today, { truncated: false, production: false });
     const ranges: string[][] = [];
     const exported: string[] = [];
-    const view = mount(ReportView as never, { report, from: "2026-10-01", to: today, onRange: (f: string, t: string) => ranges.push([f, t]), onExport: (v: string) => exported.push(v), exporting: false, message: null });
+    const months: string[] = [];
+    const view = mount(ReportView as never, { report, month: "2026-10", onMonth: (m: string) => months.push(m), from: "2026-10-01", to: today, onRange: (f: string, t: string) => ranges.push([f, t]), onExport: (v: string) => exported.push(v), exporting: false, message: null });
     await view.change(input(view, "rep-from"), "2026-09-01");
     await view.change(input(view, "rep-to"), "2026-10-05");
+    await view.change(input(view, "rep-month"), "2026-09");
+    expect(months).toEqual(["2026-09"]);
     await view.click(view.byTestId("rep-export-detail"));
     await view.click(view.byTestId("rep-export-summary"));
     expect(ranges).toEqual([["2026-09-01", today], ["2026-10-01", "2026-10-05"]]);
@@ -406,6 +409,10 @@ describe("conferência e relatório: interações", () => {
       expect(clicks).toEqual(expect.arrayContaining(["click", "href:blob:teste"]));
       expect(clicks.find((c) => c.startsWith("file:"))).toMatch(/^file:financeiro-resumo-\d{4}-\d{2}\.csv$/);
       await h.change(input(h, "rep-from"), "2026-10-02");
+      await h.change(input(h, "rep-month"), "2026-09");
+      await h.click(h.byTestId("rep-export-detail"));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(clicks.find((c) => c.startsWith("file:financeiro-detalhe-2026-09"))).toBeTruthy(); // exporta o mês ESCOLHIDO, não o do período exibido
     } finally {
       URL.createObjectURL = originalCreate;
       URL.revokeObjectURL = originalRevoke;

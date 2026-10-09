@@ -69,6 +69,8 @@ export const closeSchema = z
     note: note.optional(),
     /** Revisão da tela: se algo foi lançado depois que o operador viu o resumo, o fechamento é recusado (`stale_summary`). */
     expectedReceiptCount: z.number().int().min(0).max(MAX_RECEIPTS_PER_SESSION).optional(),
+    /** Soma do líquido de TODOS os meios que a tela viu: um estorno muda o valor sem mudar a contagem, e também recusa o fechamento. */
+    expectedNetCents: z.number().int().min(-MAX_CASH_CENTS * 10).max(MAX_CASH_CENTS * 10).optional(),
   })
   .strict();
 export type CloseInput = z.infer<typeof closeSchema>;

@@ -127,6 +127,8 @@ export async function cashAlerts(db: Firestore, now: Date, uid?: string): Promis
 
 export type MyCash = { date: LocalDate; points: { point: CashPoint; sessionId: string; session: SessionView | null; live: LiveSummary | null }[]; alerts: CashAlert[]; recent: { sessionId: string; date: LocalDate; point: CashPoint; status: SessionDoc["status"]; cashDifferenceCents: number | null; reviewStatus: string | null }[] };
 
+/** Janela dos últimos caixas do operador (consulta por data, campo único e já ordenada; o filtro por UID é em memória). */
+const RECENT_DAYS = 45;
 const dateQuery = z.object({ date: z.string().refine(isLocalDate).optional() }).strict();
 
 /** Caixa do PRÓPRIO operador: a sessão do dia em cada ponto permitido ao papel, o que já foi recebido, alertas próprios e os últimos fechamentos. */
@@ -149,10 +151,10 @@ export async function getMyCash(db: Firestore, actor: Actor, raw: unknown, clock
       return { point, sessionId, session: null, live: liveOf(0, receipts.map(lineOf), walletConsumption) };
     }),
   );
-  const [alerts, recentSnap] = await Promise.all([cashAlerts(db, now, actor.uid), db.collection("cashSessions").where("operator.uid", "==", actor.uid).limit(120).get()]);
+  const [alerts, recentSnap] = await Promise.all([cashAlerts(db, now, actor.uid), db.collection("cashSessions").where("date", ">=", addDays(today, -RECENT_DAYS)).orderBy("date", "desc").limit(400).get()]);
   const recent = recentSnap.docs
     .map((d) => parseSession(d.id, d.data()))
-    .sort((a, b) => b.date.localeCompare(a.date))
+    .filter((s) => s.operator.uid === actor.uid)
     .slice(0, 15)
     .map((s) => ({ sessionId: s.sessionId, date: s.date, point: s.point, status: s.status, cashDifferenceCents: s.closure?.cashDifferenceCents ?? null, reviewStatus: s.review?.status ?? null }));
   return { date, points, alerts, recent };

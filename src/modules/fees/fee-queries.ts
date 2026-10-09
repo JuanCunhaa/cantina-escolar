@@ -90,18 +90,23 @@ export function adminViewOf(r: Receipt, today: LocalDate): ReceiptAdminView {
   };
 }
 
-const CAP = 150;
+const CAP = 400;
 const COLLECTION: Record<ReceiptKind, string> = { topup: "topups", online_topup: "topupIntents", direct_sale: "directSales" };
 const PREFIX: Record<ReceiptKind, string> = { topup: "", online_topup: "", direct_sale: "payment." };
 
 export type ReconcileList = { today: LocalDate; items: ReceiptAdminView[]; truncated: boolean };
 
-/** Recebimentos com taxa sem valor real/informado OU liquidação pendente, do mais antigo ao mais novo; vencidas sinalizadas. */
+/**
+ * Recebimentos com taxa ainda NÃO conferida (pendente ou só informada pelo operador) OU liquidação pendente, do mais antigo ao mais novo;
+ * vencidas sinalizadas. Sem `orderBy` (evita índice composto): acima do teto por consulta a lista avisa que é PARCIAL.
+ */
 export async function listPendingReconciliation(db: Firestore, actor: Actor, clock: () => Date = () => new Date()): Promise<ReconcileList> {
   authorize(actor, "finance.manage");
   const today = localDateOf(clock());
   const queries: { kind: ReceiptKind; query: Query }[] = RECEIPT_KINDS.flatMap((kind) => [
     { kind, query: db.collection(COLLECTION[kind]).where(`${PREFIX[kind]}fee.status`, "==", "pending").limit(CAP + 1) },
+    // taxa digitada ao registrar ainda não foi CONFERIDA pela administração (inclusive Pix manual, que nasce liquidado)
+    { kind, query: db.collection(COLLECTION[kind]).where(`${PREFIX[kind]}fee.status`, "==", "informed").limit(CAP + 1) },
     { kind, query: db.collection(COLLECTION[kind]).where(`${PREFIX[kind]}settlement.status`, "==", "pending").limit(CAP + 1) },
   ]);
   const snaps = await Promise.all(queries.map((q) => q.query.get()));

@@ -407,6 +407,28 @@ describe("fechamento concorrente", () => {
     expect(inside !== flagged).toBe(true); // exatamente um dos dois
   });
 
+  it("um ESTORNO depois de ver o resumo também invalida o fechamento (a contagem não muda, o dinheiro esperado sim)", async () => {
+    const op = await createTestUser("cstale2", "secretaria", { displayName: "Secretaria Estorno" });
+    const student = await newStudent();
+    const o = await open(op, { openingCents: 0 });
+    const id = o.body.sessionId as string;
+    const t = await topup(op, student, { method: "cash", amountCents: 2000 });
+    const seen = { expectedReceiptCount: 1, expectedNetCents: 2000 }; // o que a tela mostrava
+    await topupCommands.reverseManualTopup(db(), asActor(admin, "admin"), { key: randomUUID(), topupId: t.topupId, amountCents: 500, reasonCode: "payment_returned", reason: "Valor devolvido ao pagador", expectedReversedCents: 0 });
+    const stale = await close(op, id, { countedCashCents: 2000, ...seen });
+    expect(stale).toMatchObject({ status: 409, body: { error: "stale_summary", details: { receiptCount: 1, netCents: 1500 } } });
+    expect((await doc(`cashSessions/${id}`))!.status).toBe("open");
+    expect((await close(op, id, { countedCashCents: 1500, expectedReceiptCount: 1, expectedNetCents: 1500 })).body).toMatchObject({ status: "closed", hasDivergence: false });
+  });
+
+  it("os últimos caixas do operador são SÓ os dele, do mais novo ao mais antigo", async () => {
+    const mine = await call("GET cash", secA, "GET", "/api/cash");
+    const recent = mine.body.recent as { sessionId: string; date: string }[];
+    expect(recent.length).toBeGreaterThan(0);
+    expect(recent.every((r) => r.sessionId.endsWith(`__${secA.uid}`))).toBe(true);
+    expect(recent.map((r) => r.date)).toEqual([...recent.map((r) => r.date)].sort().reverse());
+  });
+
   it("`expectedReceiptCount` evita fechar com um resumo velho: lançou algo depois de ver a tela = 409 com a contagem atual", async () => {
     const op = await createTestUser("cstale", "secretaria", { displayName: "Secretaria Resumo" });
     const student = await newStudent();

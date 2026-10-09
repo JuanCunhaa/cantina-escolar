@@ -1,7 +1,6 @@
 import { formatBRL } from "@/lib/money/format";
 import { dayMonth } from "@/modules/menu/format";
-import { SETTLEMENT_BASIS_LABEL } from "@/modules/fees/fee-model";
-import type { Settlement } from "../topup-model";
+import { forecastOriginText, type Settlement } from "../topup-model";
 import type { TopupView } from "../topup-queries";
 
 export function statusText(t: Pick<TopupView, "status" | "reversedCents">): string {
@@ -12,9 +11,7 @@ export function statusText(t: Pick<TopupView, "status" | "reversedCents">): stri
 
 /** Previsão com a ORIGEM/base à vista: digitada pelo operador, pela regra (prazo e base) ou pendente por falta de prazo configurado. */
 export function forecastText(s: Settlement): string {
-  if (!s.expectedOn) return " (previsão pendente: sem prazo configurado)";
-  if (s.expectedSource === "rule" && s.expectedDays !== null && s.expectedDays !== undefined && s.expectedBasis) return ` (prevista ${dayMonth(s.expectedOn)} · ${s.expectedDays} ${SETTLEMENT_BASIS_LABEL[s.expectedBasis]} pela regra)`;
-  return ` (prevista ${dayMonth(s.expectedOn)}${s.expectedSource === "operator" ? " · data informada pelo operador" : ""})`;
+  return s.expectedOn ? ` (prevista ${dayMonth(s.expectedOn)} · ${forecastOriginText(s)})` : " (previsão pendente: sem prazo configurado)";
 }
 
 /** Aprovação de cartão não é dinheiro no banco: a liquidação aparece separada. */

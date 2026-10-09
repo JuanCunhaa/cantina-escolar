@@ -338,7 +338,7 @@ export function TopupDesk({ user }: { user: User }) {
               {day.data.totals.count} recebimento(s) · creditado {formatBRL(day.data.totals.creditedCents)}
               {PAYMENT_METHODS.filter((m) => day.data!.totals.byMethod[m] > 0).map((m) => ` · ${PAYMENT_LABEL[m]} ${formatBRL(day.data!.totals.byMethod[m])}`)}
               {day.data.totals.reversedCents > 0 && ` · estornado ${formatBRL(day.data.totals.reversedCents)}`}
-              {` · taxas informadas ${formatBRL(day.data.totals.feeInformedCents)}`}
+              {` · taxas informadas ou conferidas ${formatBRL(day.data.totals.feeInformedCents)}`}
               {day.data.totals.feePendingCount > 0 && ` · ${day.data.totals.feePendingCount} taxa(s) a conferir`}
             </p>
             <table className="data-table stock-table" data-testid="topup-day-table">

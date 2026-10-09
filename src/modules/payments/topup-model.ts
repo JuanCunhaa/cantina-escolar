@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { addDays, isLocalDate, type LocalDate } from "@/lib/dates/school-time";
 import { conflict } from "@/lib/domain-error";
-import type { ExpectedSettlement, SettlementBasis } from "@/modules/fees/fee-model";
+import { SETTLEMENT_BASIS_LABEL, type ExpectedSettlement, type SettlementBasis } from "@/modules/fees/fee-model";
 import { isSafeLabel } from "@/modules/students/normalize";
 import { PAYMENT_LABEL, PAYMENT_METHODS, feeRecordOf, type FeeRecord, type PaymentMethod } from "./methods";
 
@@ -89,6 +89,14 @@ export type Settlement = {
   expectedDays?: number | null;
   expectedRuleVersion?: number | null;
 };
+
+/** Origem da data prevista (UM texto para telas e CSV): prazo e base da regra (com a versão, quando gravada), data do operador ou sem registro. */
+export function forecastOriginText(s: Settlement): string {
+  if (s.expectedSource === "rule" && s.expectedBasis && s.expectedDays !== null && s.expectedDays !== undefined) {
+    return `${s.expectedDays} ${SETTLEMENT_BASIS_LABEL[s.expectedBasis]} pela regra${s.expectedRuleVersion ? ` v${s.expectedRuleVersion}` : ""}`;
+  }
+  return s.expectedSource === "operator" ? "data informada pelo operador" : "origem não registrada";
+}
 
 /** Liquidação pendente com a previsão pela regra (base, prazo e versão gravados) ou SEM data quando a regra não tem prazo configurado. */
 export function pendingSettlement(rule: ExpectedSettlement | null): Settlement {

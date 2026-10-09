@@ -350,7 +350,7 @@ describe("conferência e relatório", () => {
 
   it("relatório: base de data explícita, totais, aviso de regra fictícia, exportação e o que NÃO entra", () => {
     const report = buildReport([rcpt("a"), rcpt("b", { method: "pix", fee: { status: "informed", cents: 20, source: "operator" }, feeEstimate: null, settlement: { status: "settled", expectedOn: null, settledOn: "2026-10-05" } })], { from: "2026-10-01", to: "2026-10-31" }, "2026-10-09", { truncated: false, production: false });
-    const out = html(createElement(ReportView, { report, from: "2026-10-01", to: "2026-10-31", onRange: noop, onExport: noop, exporting: false, message: null }));
+    const out = html(createElement(ReportView, { report, month: "2026-10", onMonth: noop, from: "2026-10-01", to: "2026-10-31", onRange: noop, onExport: noop, exporting: false, message: null }));
     expect(out).toContain("data do recebimento");
     expect(out).toContain("compra com saldo da carteira, transferência e reserva não aparecem aqui");
     expect(out).toContain("1 recebimento(s) com estimativa de regra FICTÍCIA");
@@ -358,11 +358,19 @@ describe("conferência e relatório", () => {
     expect(out).toMatch(/Taxa efetiva \(soma, sem repetir\)<\/dt><dd>R\$\s1,70/);
     expect(out).toContain("Exportar detalhe (CSV)");
     expect(out).toContain("1 vencida(s)");
-    const prod = html(createElement(ReportView, { report: { ...report, production: true }, from: "2026-10-01", to: "2026-10-31", onRange: noop, onExport: noop, exporting: true, message: "Falhou" }));
+    const prod = html(createElement(ReportView, { report: { ...report, production: true }, month: "2026-10", onMonth: noop, from: "2026-10-01", to: "2026-10-31", onRange: noop, onExport: noop, exporting: true, message: "Falhou" }));
     expect(prod).not.toContain("estimativa de regra FICTÍCIA");
     expect(prod).toContain("Falhou");
-    const truncated = html(createElement(ReportView, { report: { ...report, truncated: true, rows: [] }, from: "2026-10-01", to: "2026-10-31", onRange: noop, onExport: noop, exporting: false, message: null }));
+    const truncated = html(createElement(ReportView, { report: { ...report, truncated: true, rows: [] }, month: "2026-10", onMonth: noop, from: "2026-10-01", to: "2026-10-31", onRange: noop, onExport: noop, exporting: false, message: null }));
     expect(truncated).toContain("Relatório parcial");
+    // sem dados (carregando ou erro) os campos de período e o mês da exportação continuam na tela
+    const waiting = html(createElement(ReportView, { report: null, month: "2026-10", onMonth: noop, from: "2026-10-01", to: "2026-10-31", onRange: noop, onExport: noop, exporting: false, message: null }));
+    expect(waiting).toContain("Carregando…");
+    expect(waiting).toContain("rep-from");
+    const failedView = html(createElement(ReportView, { report: null, error: "Período máximo de ~3 meses.", month: "2026-10", onMonth: noop, from: "2026-01-01", to: "2026-10-31", onRange: noop, onExport: noop, exporting: false, message: null }));
+    expect(failedView).toContain("Período máximo");
+    expect(failedView).toContain("rep-to");
+    expect(failedView).toContain("Mês a exportar");
     expect(truncated).toContain("Nenhum recebimento no período");
   });
 });

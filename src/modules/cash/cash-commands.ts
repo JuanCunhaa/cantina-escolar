@@ -92,10 +92,11 @@ export async function closeCashSession(db: Firestore, actor: Actor, raw: unknown
     const scope = { uid: current.uid, point: session.point, date: session.date };
     const receipts = await readOperatorReceipts(db, tx, scope);
     const walletConsumption = await readWalletConsumption(db, tx, scope);
-    if (input.expectedReceiptCount !== undefined && input.expectedReceiptCount !== receipts.length) {
-      throw conflict("stale_summary", "Houve novos recebimentos desde que você viu o resumo: confira de novo.", { receiptCount: receipts.length });
-    }
     const lines = receipts.map(lineOf);
+    const netCents = lines.reduce((n, l) => n + l.grossCents - l.reversedCents, 0);
+    if ((input.expectedReceiptCount !== undefined && input.expectedReceiptCount !== receipts.length) || (input.expectedNetCents !== undefined && input.expectedNetCents !== netCents)) {
+      throw conflict("stale_summary", "Houve novos recebimentos ou estornos desde que você viu o resumo: confira de novo.", { receiptCount: receipts.length, netCents });
+    }
     const closing = computeClosing({ openingCents: session.openingCents, receipts: lines, countedCashCents: input.countedCashCents, declared: input.declared });
     const no = session.closureNo + 1;
     const stamp = FieldValue.serverTimestamp();

@@ -102,11 +102,16 @@ describe("Taxas, conferência e relatório (contêineres)", () => {
   });
 
   it("relatório: carregando, erro e dados", () => {
-    expect(html(createElement(FinanceReportPage, { user }))).toContain("Carregando…");
+    const loading = html(createElement(FinanceReportPage, { user }));
+    expect(loading).toContain("Carregando…");
+    expect(loading).toContain("rep-from"); // os campos De/Até NÃO somem enquanto carrega
+    expect(loading).toContain("rep-month");
     const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo" }).format(new Date());
     const path = `/api/admin/finance/report`;
-    state.byPath[path] = failed("forbidden");
-    expect(html(createElement(FinanceReportPage, { user }))).toContain("notice-error");
+    state.byPath[path] = failed("range_too_long");
+    const errorView = html(createElement(FinanceReportPage, { user }));
+    expect(errorView).toContain("notice-error");
+    expect(errorView).toContain("rep-from"); // período inválido: dá para corrigir sem recarregar a página
     state.byPath[path] = ready(buildReport([], { from: `${today.slice(0, 7)}-01`, to: today }, today, { truncated: false, production: false }));
     expect(html(createElement(FinanceReportPage, { user }))).toContain("Base de datas");
   });
@@ -146,7 +151,7 @@ describe("páginas: só quem tem a capacidade vê a tela", () => {
 describe("ações do caixa (resultado só pela resposta do servidor)", () => {
   const ok = <T>(data: T) => ({ ok: true as const, data });
   const bad = (status: number, error: string) => ({ ok: false as const, status, error });
-  const draft: CloseDraft = { countedCashCents: 15_000, declared: { pixCents: 3000 }, note: "Gaveta conferida", expectedReceiptCount: 3 };
+  const draft: CloseDraft = { countedCashCents: 15_000, declared: { pixCents: 3000 }, note: "Gaveta conferida", expectedReceiptCount: 3, expectedNetCents: 8000 };
   const submitting = (result: unknown): Submit & { calls: { url: string; body: Record<string, unknown> }[] } => {
     const calls: { url: string; body: Record<string, unknown> }[] = [];
     const fn = (async (url: string, body: Record<string, unknown>) => {
@@ -172,14 +177,14 @@ describe("ações do caixa (resultado só pela resposta do servidor)", () => {
   it("fechar: corpo com a contagem pelo total, conferências e contagem de recebimentos; divergência vira aviso de erro", async () => {
     const submit = submitting(ok({ hasDivergence: false, cashDifferenceCents: 0, closureNo: 1 }));
     expect(await closeCashAction(submit, "s", draft)).toEqual({ kind: "ok", text: "Caixa fechado sem diferença." });
-    expect(submit.calls[0]!.body).toEqual({ sessionId: "s", countedCashCents: 15_000, declared: { pixCents: 3000 }, note: "Gaveta conferida", expectedReceiptCount: 3 });
+    expect(submit.calls[0]!.body).toEqual({ sessionId: "s", countedCashCents: 15_000, declared: { pixCents: 3000 }, note: "Gaveta conferida", expectedReceiptCount: 3, expectedNetCents: 8000 });
     const noNote = submitting(ok({ hasDivergence: false, cashDifferenceCents: 0, closureNo: 1 }));
     await closeCashAction(noNote, "s", { ...draft, note: "" });
     expect(noNote.calls[0]!.body).not.toHaveProperty("note");
     expect(await closeCashAction(submitting(ok({ hasDivergence: true, cashDifferenceCents: -1, closureNo: 1 })), "s", draft)).toMatchObject({ kind: "error", text: expect.stringMatching(/divergência \(Falta R\$\s0,01\).*pendente de revisão/) });
     expect(await closeCashAction(submitting(null), "s", draft)).toBeNull();
     expect(await closeCashAction(submitting(bad(0, "network")), "s", draft)).toBeNull();
-    expect(await closeCashAction(submitting(bad(409, "stale_summary")), "s", draft)).toMatchObject({ text: expect.stringContaining("novos recebimentos") });
+    expect(await closeCashAction(submitting(bad(409, "stale_summary")), "s", draft)).toMatchObject({ text: expect.stringContaining("novos recebimentos ou estornos") });
     expect(await closeCashAction(submitting(bad(409, "already_closed")), "s", draft)).toMatchObject({ text: expect.stringContaining("já está fechado") });
     expect(await closeCashAction(submitting(bad(403, "forbidden")), "s", draft)).toMatchObject({ kind: "error" });
     expect(await closeCashAction(submitting(bad(500, "internal")), "s", draft)).toBeNull();
@@ -190,9 +195,9 @@ describe("ações do caixa (resultado só pela resposta do servidor)", () => {
     expect(openingOf("0", true)).toBe(0);
     expect(openingOf("100", false)).toBeNull();
     expect(openingOf("abc", true)).toBeNull();
-    expect(closeDraftOf({ counted: "150", pix: "30", debit: "", credit: "", note: " ok ", receiptCount: 4 })).toEqual({ countedCashCents: 15_000, declared: { pixCents: 3000 }, note: "ok", expectedReceiptCount: 4 });
-    expect(closeDraftOf({ counted: "", pix: "", debit: "", credit: "", note: "", receiptCount: 0 })).toBeNull();
-    expect(closeDraftOf({ counted: "10", pix: "xx", debit: "", credit: "", note: "", receiptCount: 0 })).toBeNull();
+    expect(closeDraftOf({ counted: "150", pix: "30", debit: "", credit: "", note: " ok ", receiptCount: 4, netCents: 8000 })).toEqual({ countedCashCents: 15_000, declared: { pixCents: 3000 }, note: "ok", expectedReceiptCount: 4, expectedNetCents: 8000 });
+    expect(closeDraftOf({ counted: "", pix: "", debit: "", credit: "", note: "", receiptCount: 0, netCents: 0 })).toBeNull();
+    expect(closeDraftOf({ counted: "10", pix: "xx", debit: "", credit: "", note: "", receiptCount: 0, netCents: 0 })).toBeNull();
   });
 });
 

@@ -4,7 +4,8 @@ import { addDays, isLocalDate, localDateOf, localInstant, type LocalDate } from 
 import { conflict } from "@/lib/domain-error";
 import type { Actor } from "@/modules/access/actor";
 import { authorize } from "@/modules/access/authorize";
-import { FICTITIOUS_PREFIX, SETTLEMENT_BASIS_LABEL, effectiveFee } from "@/modules/fees/fee-model";
+import { FICTITIOUS_PREFIX, effectiveFee } from "@/modules/fees/fee-model";
+import { forecastOriginText } from "@/modules/payments/topup-model";
 import { POINT_LABEL, RECEIPT_KIND_LABEL, receiptOfDirectSale, receiptOfIntent, receiptOfTopup, type Receipt } from "@/modules/fees/receipts";
 import { PAYMENT_LABEL, type PaymentMethod } from "@/modules/payments/methods";
 import { csvCell } from "@/modules/orders/fulfillment-model";
@@ -166,13 +167,11 @@ export const DETAIL_HEADER = ["Data do recebimento", "Referência interna", "Tip
 export const SUMMARY_HEADER = ["Tipo", "Ponto", "Forma", "Fonte", "Recebimentos", "Bruto (R$)", "Estornado (R$)", "Taxa conferida (R$)", "Taxa informada (R$)", "Taxa estimada (R$)", "Sem taxa conhecida", "Taxa efetiva (R$)", "Líquido previsto (R$)", "Líquido real (R$)", "Liquidado (R$)", "Pendente (R$)", "Vencido (R$)", "Com regra fictícia"];
 const SETTLEMENT_LABEL = { cash_on_hand: "dinheiro no caixa", settled: "liquidado", pending: "pendente" } as const;
 
-/** Base da previsão de liquidação (nada assumido): prazo e base da regra, data do operador, ou pendente por falta de prazo configurado. */
+/** Base da previsão de liquidação (nada assumido): a MESMA origem das telas, ou pendente por falta de prazo configurado. */
 export function forecastBasis(r: Receipt): string {
   const s = r.settlement;
   if (s.status !== "pending") return "";
-  if (!s.expectedOn) return "pendente: sem prazo configurado";
-  if (s.expectedSource === "rule" && s.expectedBasis && s.expectedDays !== null && s.expectedDays !== undefined) return `${s.expectedDays} ${SETTLEMENT_BASIS_LABEL[s.expectedBasis]} pela regra${s.expectedRuleVersion ? ` v${s.expectedRuleVersion}` : ""}`;
-  return s.expectedSource === "operator" ? "data informada pelo operador" : "origem não registrada";
+  return s.expectedOn ? forecastOriginText(s) : "pendente: sem prazo configurado";
 }
 
 export function detailCsv(receipts: readonly Receipt[]): string {

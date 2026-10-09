@@ -94,7 +94,7 @@ export async function publishFeeRule(db: Firestore, actor: Actor, raw: unknown, 
       createdAtIso: now.toISOString(),
       withdrawn: null,
     };
-    tx.set(seriesRef, { seriesId, sourceId: input.sourceId, method: input.method, versions: [...versions, version], versionCount: version.n, updatedAt: FieldValue.serverTimestamp(), ...(seriesSnap!.exists ? {} : { createdAt: FieldValue.serverTimestamp() }) });
+    tx.set(seriesRef, { seriesId, sourceId: input.sourceId, method: input.method, versions: [...versions, version], versionCount: version.n, updatedAt: FieldValue.serverTimestamp(), ...(seriesSnap!.exists ? {} : { createdAt: FieldValue.serverTimestamp() }) }, { merge: true });
     auditInTransaction(db, tx, auditId, {
       action: "finance.rule.publish",
       actorUid: current.uid,

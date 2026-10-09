@@ -17,15 +17,19 @@ import { SESSION_ERRORS, adminAction, type Message } from "../finance-actions";
 import { FinanceTabs } from "./finance-tabs";
 
 
-export type CashAdminViewProps = { list: CashAdminList; from: string; to: string; onRange: (from: string, to: string) => void };
+export type CashAdminViewProps = { list: CashAdminList | null; error?: string | null; from: string; to: string; onRange: (from: string, to: string) => void };
 
 /** Lista de caixas do período e alertas (parte visual, sem rede). */
-export function CashAdminView({ list, from, to, onRange }: CashAdminViewProps) {
-  const alerts: CashAlert[] = list.alerts;
+export function CashAdminView({ list, error = null, from, to, onRange }: CashAdminViewProps) {
+  const alerts: CashAlert[] = list?.alerts ?? [];
   return (
     <section aria-labelledby="fin-cash-title">
       <h1 id="fin-cash-title">Financeiro</h1>
       <FinanceTabs current="/operacao/financeiro" />
+      {!list && !error && <p role="status" className="muted">Carregando…</p>}
+      {error && <p role="alert" className="notice notice-error">{error}</p>}
+      {list && (
+        <>
       <h2>Alertas ({alerts.length})</h2>
       {alerts.length === 0 && <p className="muted">Nenhuma pendência de caixa nos últimos 14 dias.</p>}
       <ul className="plain-list" data-testid="fin-alerts">
@@ -37,6 +41,8 @@ export function CashAdminView({ list, from, to, onRange }: CashAdminViewProps) {
           </li>
         ))}
       </ul>
+        </>
+      )}
 
       <h2>Caixas do período</h2>
       <div className="toolbar">
@@ -49,8 +55,8 @@ export function CashAdminView({ list, from, to, onRange }: CashAdminViewProps) {
           <input id="fin-to" type="date" value={to} onChange={(e) => e.target.value && onRange(from, e.target.value)} />
         </div>
       </div>
-      {list.sessions.length === 0 && <p className="muted">Nenhum caixa no período.</p>}
-      {list.sessions.length > 0 && (
+      {list && list.sessions.length === 0 && <p className="muted">Nenhum caixa no período.</p>}
+      {list && list.sessions.length > 0 && (
         <div className="table-scroll">
           <table className="data-table" data-testid="fin-sessions">
             <caption className="visually-hidden">Caixas por operador, ponto e data</caption>
@@ -88,7 +94,7 @@ export function CashAdminView({ list, from, to, onRange }: CashAdminViewProps) {
           </table>
         </div>
       )}
-      {list.truncated && <p className="muted">Lista parcial: reduza o período.</p>}
+      {list?.truncated && <p className="muted">Lista parcial: reduza o período.</p>}
     </section>
   );
 }
@@ -97,9 +103,8 @@ export function CashAdmin({ user }: { user: User }) {
   const today = localDateOf(new Date());
   const [range, setRange] = useState({ from: addDays(today, -6), to: today });
   const list = useServerQuery<CashAdminList>(user, "/api/admin/finance/cash", `from=${range.from}&to=${range.to}`);
-  if (list.status === "loading") return <p role="status" className="muted">Carregando…</p>;
-  if (!list.data) return <p role="alert" className="notice notice-error">{errorText(list.errorCode ?? "internal")}</p>;
-  return <CashAdminView list={list.data} from={range.from} to={range.to} onRange={(from, to) => setRange({ from, to })} />;
+  const error = list.status === "error" && !list.data ? errorText(list.errorCode ?? "internal") : null;
+  return <CashAdminView list={list.data} error={error} from={range.from} to={range.to} onRange={(from, to) => setRange({ from, to })} />;
 }
 
 /* ---------------------------------------------------------------------------------------- detalhe */

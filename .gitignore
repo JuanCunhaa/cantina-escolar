@@ -33,3 +33,6 @@ build-artifact/
 veracode/
 ci-metrics/
 .scannerwork/
+
+# Artefatos locais do Vitest (relatório JSON da listagem)
+.vitest/

@@ -16,12 +16,12 @@ export function openingOf(text: string, confirmed: boolean): number | null {
 }
 
 /** Rascunho do fechamento: exige a contagem; conferências vazias ficam de fora; devolve null se algo digitado for inválido. */
-export function closeDraftOf(f: { counted: string; pix: string; debit: string; credit: string; note: string; receiptCount: number }): CloseDraft | null {
+export function closeDraftOf(f: { counted: string; pix: string; debit: string; credit: string; note: string; receiptCount: number; netCents: number }): CloseDraft | null {
   const counted = parseCents(f.counted);
   const declared = { pixCents: parseCents(f.pix) ?? undefined, cardDebitCents: parseCents(f.debit) ?? undefined, cardCreditCents: parseCents(f.credit) ?? undefined };
   const invalid = [f.pix, f.debit, f.credit].some((t) => t.trim() !== "" && parseCents(t) === null);
   if (counted === null || invalid) return null;
-  return { countedCashCents: counted, declared: Object.fromEntries(Object.entries(declared).filter(([, v]) => v !== undefined)), note: f.note.trim(), expectedReceiptCount: f.receiptCount };
+  return { countedCashCents: counted, declared: Object.fromEntries(Object.entries(declared).filter(([, v]) => v !== undefined)), note: f.note.trim(), expectedReceiptCount: f.receiptCount, expectedNetCents: f.netCents };
 }
 
 type Props = {
@@ -128,7 +128,7 @@ function CloseForm({ session, live, locked, onClose }: { session: SessionView; l
           if (countedCents !== null && !invalidDeclared) setReviewing(true);
           return;
         }
-        const draft = closeDraftOf({ counted, pix, debit, credit, note, receiptCount: live.receiptCount });
+        const draft = closeDraftOf({ counted, pix, debit, credit, note, receiptCount: live.receiptCount, netCents: live.byMethod.reduce((n, m) => n + m.netCents, 0) });
         if (draft) onClose(draft);
       }}
     >

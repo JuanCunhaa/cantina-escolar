@@ -87,6 +87,7 @@ beforeAll(async () => {
   for (const [method, file] of ADMIN_ROUTES) routes[`${method} ${file}`] = (await LOADERS[file]!())[method] as unknown as Handler;
   routes["GET finance/terminals"] = (await import("@/app/api/finance/terminals/route")).GET as unknown as Handler;
   routes["POST inventory"] = (await import("@/app/api/inventory/receipts/route")).POST as unknown as Handler;
+  routes["GET topups"] = (await import("@/app/api/topups/route")).GET as unknown as Handler;
   routes["POST pos sales"] = (await import("@/app/api/pos/sales/route")).POST as unknown as Handler;
   BASE = school.localDateOf(new Date());
   D = school.addDays(BASE, 40);
@@ -425,6 +426,33 @@ describe("estimativa pela regra em vigor, congelada no lançamento; taxa efetiva
     expect((await doc(`topups/${r.topupId}`))!.feeEstimate).toMatchObject({ cents: 150, settlementDays: null, settlementBasis: null });
     const detail = await call("GET admin/finance/receipts/route", admin, "GET", `/api/admin/finance/receipts?ref=topup:${r.topupId}`);
     expect(detail.body.receipt).toMatchObject({ settlement: { expectedOn: null }, overdue: false });
+  });
+
+  it("a taxa só INFORMADA aparece na conferência (Pix manual nasce liquidado) e some quando conferida; o total do dia da secretaria segue contando a taxa", async () => {
+    const student = await newStudent();
+    const r = await topup(student, { method: "pix", amountCents: 4000, feeCents: 40 }, at(BASE));
+    const ref = `topup:${r.topupId}`;
+    const listed = async () => ((await call("GET admin/finance/receipts/route", admin, "GET", "/api/admin/finance/receipts")).body.items as { ref: string }[]).some((i) => i.ref === ref);
+    expect(await listed()).toBe(true); // informada, ainda não conferida
+    const day = async () => ((await call("GET topups", secretaria, "GET", `/api/topups?date=${BASE}`)).body.totals as { feeInformedCents: number }).feeInformedCents;
+    const before = await day();
+    const rec = await adminPost("admin/finance/reconcile/route", { key: randomUUID(), ref, expectedVersion: 0, actualFeeCents: 38 });
+    expect(rec.status, JSON.stringify(rec.body)).toBe(200);
+    expect(await listed()).toBe(false); // conferida e Pix já liquidado: sai da lista
+    expect(await day()).toBe(before - 2); // continua contando: agora com o valor conferido (R$ 0,38), não some do resumo
+  });
+
+  it("publicar uma 2ª versão mantém `createdAt` da série (o documento não é substituído)", async () => {
+    const other = `c${tag}`;
+    cleanup.push(`paymentSources/term_${other}`, `feeSeries/term_${other}__pix`);
+    expect((await adminPost("admin/finance/sources/route", { key: randomUUID(), kind: "terminal", code: other, name: "Maquininha createdAt", methods: ["pix"], fictitious: true })).status).toBe(200);
+    const id = `term_${other}`;
+    expect((await adminPost("admin/finance/rules/route", ruleBody({ sourceId: id, method: "pix" }))).status).toBe(200);
+    const first = (await doc(`feeSeries/${id}__pix`))!.createdAt;
+    expect(first).toBeTruthy();
+    expect((await adminPost("admin/finance/rules/route", ruleBody({ sourceId: id, method: "pix", effectiveFrom: school.addDays(BASE, 5) }))).status).toBe(200);
+    expect((await doc(`feeSeries/${id}__pix`))!.createdAt).toEqual(first);
+    expect((await doc(`feeSeries/${id}__pix`))!.versionCount).toBe(2);
   });
 
   it("versão ANTIGA de uma série (sem base gravada) não assume dias corridos: a previsão fica pendente", async () => {
