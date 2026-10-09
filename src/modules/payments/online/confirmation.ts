@@ -70,9 +70,15 @@ async function recordEventOnly(db: Firestore, id: string, doc: Record<string, un
  * pertença àquela intenção. Erros do provedor (`ProviderError`) sobem: o chamador decide (webhook → 503 para o provedor
  * reenviar; conciliação → "consulta falhou").
  */
-export async function confirmFromProvider(db: Firestore, deps: ConfirmDeps, orderId: string, trigger: { source: ConfirmSource; event?: NotificationEvent; expectIntentId?: string }): Promise<ConfirmResult> {
+export async function confirmFromProvider(
+  db: Firestore,
+  deps: ConfirmDeps,
+  orderId: string,
+  trigger: { source: ConfirmSource; event?: NotificationEvent; expectIntentId?: string; provider?: NonNullable<ReturnType<typeof pickProvider>> },
+): Promise<ConfirmResult> {
   const clock = deps.clock ?? (() => new Date());
-  const provider = pickProvider(deps.providers);
+  // Conciliação por intenção usa o provedor do CANAL da intenção; o webhook (só traz a order) usa o primeiro provedor real configurado.
+  const provider = trigger.provider ?? pickProvider(deps.providers);
   if (!provider) throw unavailable("payment_unavailable", "Pagamento online indisponível.");
   const accountId = await provider.accountId();
   const eventId = trigger.event ? eventIdOf(provider.id, accountId, orderId, trigger.event.requestId, trigger.event.tsMs) : null;
@@ -82,7 +88,8 @@ export async function confirmFromProvider(db: Firestore, deps: ConfirmDeps, orde
   // conta e o ambiente do dono da aplicação). Conta e ambiente valem para a ORDER consultada com a nossa credencial: uma order de
   // outra conta nem é encontrada (404 → `unknown_order`) e `decide` confere a conta recebedora da order. Ficam só registrados.
   const order = await provider.getOrder(orderId);
-  if (!order || order.orderId !== orderId) {
+  // O ID da order pode chegar em outra caixa que a devolvida pelo provedor (a assinatura aceita as duas formas): compara sem caixa.
+  if (!order || order.orderId.toLowerCase() !== orderId.toLowerCase()) {
     if (eventId && eventBase) await recordEventOnly(db, eventId, { ...eventBase, intentId: null, outcome: "unknown_order" });
     return noResult("unknown_order", "order_not_found");
   }
@@ -279,7 +286,7 @@ export async function refreshIntent(db: Firestore, deps: ConfirmDeps, intentId: 
   if (!provider || provider.id !== data.provider.id) return noResult("no_charge", "provider_unavailable", intentId, data.status);
   const chargeId = data.charge?.id ?? (await provider.findCharge(intentId, data.createdAt.toDate()))?.chargeId ?? null;
   if (!chargeId) return noResult("no_charge", "charge_not_found", intentId, data.status);
-  return confirmFromProvider(db, deps, chargeId, { source, expectIntentId: intentId });
+  return confirmFromProvider(db, deps, chargeId, { source, expectIntentId: intentId, provider });
 }
 
 /* ------------------------------------------------------------------------------------------------ varredura */
@@ -288,14 +295,20 @@ export const SWEEP_WINDOWS = { openDays: 30, closedDays: 7, confirmedDays: 120, 
 const OPEN_FOR_SWEEP: IntentStatus[] = ["creating", "creation_uncertain", "awaiting_payment", "processing", "in_review"];
 const CLOSED_FOR_SWEEP: IntentStatus[] = ["failed", "expired"];
 
-export type SweepSummary = { checked: number; credited: number; reversals: number; reviews: number; closed: number; unchanged: number; lookupFailed: number; noCharge: number };
+export type SweepSummary = { checked: number; credited: number; reversals: number; reviews: number; closed: number; unchanged: number; lookupFailed: number; noCharge: number; total: number; partial: boolean };
+
+/** Prazo padrão de uma varredura: abaixo do limite da função serverless (`maxDuration` das rotas = 60 s). */
+export const SWEEP_DEADLINE_MS = 45_000;
 
 /**
  * Conciliação agendada/manual: recupera notificações perdidas. Reconsulta (a) intenções abertas dos últimos 30 dias,
  * (b) falhas/expiradas dos últimos 7 dias (um pagamento tardio é creditado) e (c) recargas confirmadas dos últimos 120 dias
- * (reembolso/chargeback). Limitada por execução; falha de uma intenção não interrompe as demais.
+ * (reembolso/chargeback). Cada grupo tem o SEU limite (as abertas não tiram a vez das confirmadas) e os grupos são percorridos
+ * intercalados; há um PRAZO por execução (`partial: true` quando acaba antes de percorrer tudo — rodar de novo continua). Falha de uma
+ * intenção não interrompe as demais.
  */
-export async function sweepIntents(db: Firestore, deps: ConfirmDeps, options: { limit?: number } = {}): Promise<SweepSummary> {
+export async function sweepIntents(db: Firestore, deps: ConfirmDeps, options: { limit?: number; deadlineMs?: number } = {}): Promise<SweepSummary> {
+  const startedAt = Date.now();
   const clock = deps.clock ?? (() => new Date());
   const now = clock();
   const limit = Math.min(Math.max(options.limit ?? SWEEP_WINDOWS.defaultLimit, 1), 300);
@@ -306,9 +319,17 @@ export async function sweepIntents(db: Firestore, deps: ConfirmDeps, options: { 
     col.where("status", "in", CLOSED_FOR_SWEEP).where("createdAt", ">=", since(SWEEP_WINDOWS.closedDays)).orderBy("createdAt", "desc").limit(limit).get(),
     col.where("status", "==", "confirmed").where("confirmation.confirmedAt", ">=", since(SWEEP_WINDOWS.confirmedDays)).orderBy("confirmation.confirmedAt", "desc").limit(limit).get(),
   ]);
-  const ids = [...new Set([...open.docs, ...closed.docs, ...confirmed.docs].map((d) => d.id))].slice(0, limit);
-  const summary: SweepSummary = { checked: 0, credited: 0, reversals: 0, reviews: 0, closed: 0, unchanged: 0, lookupFailed: 0, noCharge: 0 };
-  for (const id of ids) {
+  const groups = [open.docs, confirmed.docs, closed.docs].map((docs) => docs.map((d) => d.id));
+  const ids: string[] = [];
+  for (let i = 0; i < Math.max(...groups.map((g) => g.length)); i += 1) for (const g of groups) if (g[i] !== undefined) ids.push(g[i]!);
+  const unique = [...new Set(ids)];
+  const summary: SweepSummary = { checked: 0, credited: 0, reversals: 0, reviews: 0, closed: 0, unchanged: 0, lookupFailed: 0, noCharge: 0, total: unique.length, partial: false };
+  const deadlineMs = options.deadlineMs ?? SWEEP_DEADLINE_MS;
+  for (const id of unique) {
+    if (Date.now() - startedAt >= deadlineMs) {
+      summary.partial = true;
+      break;
+    }
     summary.checked += 1;
     try {
       const result = await refreshIntent(db, deps, id, "sweep");

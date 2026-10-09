@@ -266,23 +266,3 @@ describe("contestação ganha depois de a recarga ser totalmente revertida", () 
     expect(decide(f, { ...won, state: "paid" }, c).kind).toBe("noop");
   });
 });
-
-describe("diagnóstico de assinatura recusada (só log; nunca aceita)", () => {
-  it("indica qual variante do manifesto bateria, sem aceitar a requisição", async () => {
-    const { diagnoseSignature, computeSignature: sign } = await import("@/modules/payments/online/mercadopago-webhook");
-    const ts = "1700000000000";
-    const header = (manifest: string) => `ts=${ts},v1=${sign(SECRET, manifest)}`;
-    const common = { secret: SECRET, requestId: "req-1", dataId: "ORD01ABC" };
-    expect(diagnoseSignature({ ...common, signature: header(`id:ord01abc;request-id:req-1;ts:${ts};`) })).toEqual(["default"]);
-    expect(diagnoseSignature({ ...common, signature: header(`id:ORD01ABC;request-id:req-1;ts:${ts};`) })).toEqual(["id_original"]);
-    expect(diagnoseSignature({ ...common, signature: header(`request-id:req-1;ts:${ts};`) })).toEqual(["sem_id"]);
-    expect(diagnoseSignature({ ...common, signature: header(`id:ord01abc;ts:${ts};`) })).toEqual(["sem_request_id"]);
-    expect(diagnoseSignature({ ...common, signature: header(`id:ord01abc;request-id:req-1;`) })).toEqual(["sem_ts"]);
-    expect(diagnoseSignature({ ...common, signature: `ts=${ts},v1=${"0".repeat(64)}` })).toEqual([]);
-    expect(diagnoseSignature({ ...common, signature: "lixo" })).toEqual(["cabecalho_malformado"]);
-    // a verificação oficial aceita o ID como recebido, mas continua recusando as demais variantes (sem id, sem request-id, sem ts)
-    const verify = (manifest: string) => verifyWebhookSignature({ secret: SECRET, signature: header(manifest), requestId: "req-1", dataId: "ORD01ABC", nowMs: Number(ts) });
-    expect(verify(`id:ORD01ABC;request-id:req-1;ts:${ts};`).ok).toBe(true);
-    for (const manifest of [`request-id:req-1;ts:${ts};`, `id:ord01abc;ts:${ts};`, `id:ord01abc;request-id:req-1;`]) expect(verify(manifest)).toEqual({ ok: false, reason: "bad_signature" });
-  });
-});

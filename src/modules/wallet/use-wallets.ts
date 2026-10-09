@@ -150,6 +150,21 @@ export function useWallets(user: User, studentIds: readonly string[]) {
     };
   }, [uid, idsKey, refresh, feed, update]);
 
+  // Pendência de reembolso/chargeback visível: a regularização pela administração NÃO altera saldo nem versão (nada para o listener
+  // anunciar), então o aviso só some por leitura do servidor. Relê as carteiras bloqueadas a cada 30 s e só enquanto houver aviso.
+  const blockedKey = Object.entries(slots)
+    .filter(([, slot]) => slot.pendingCents > 0)
+    .map(([id]) => id)
+    .sort()
+    .join(",");
+  useEffect(() => {
+    if (!blockedKey) return;
+    const timer = setInterval(() => {
+      for (const id of blockedKey.split(",")) void refresh(id);
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, [blockedKey, refresh]);
+
   const result = useMemo(() => {
     const out: Record<string, WalletSlot> = {};
     for (const id of idsKey ? idsKey.split(",") : []) {

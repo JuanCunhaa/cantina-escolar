@@ -63,7 +63,7 @@ export function fakeMercadoPago(options: { accountId?: string } = {}) {
         script.failGet -= 1;
         throw new ProviderError("uncertain", "http_503");
       }
-      const found = orders.get(orderId);
+      const found = orders.get(orderId) ?? orders.get(orderId.toUpperCase());
       return found ? { ...found } : null;
     },
     async accountId() {

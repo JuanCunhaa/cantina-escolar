@@ -11,7 +11,7 @@ import type { DisputeItemView, OrphanItemView, PendencyView, ResolveResult, Revi
 export type Message = { kind: "ok" | "error"; text: string };
 export type OpenResolve = { id: string; action: "recover" | "write_off" };
 type Review = { pendencies: PendencyView[]; reviews: ReviewItemView[]; disputes: DisputeItemView[]; orphans: OrphanItemView[] };
-type Sweep = { checked: number; credited: number; reversals: number; reviews: number; closed: number; unchanged: number; lookupFailed: number; noCharge: number };
+type Sweep = { checked: number; credited: number; reversals: number; reviews: number; closed: number; unchanged: number; lookupFailed: number; noCharge: number; total: number; partial: boolean };
 
 const timeFmt = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 const CAUSE: Record<PendencyView["cause"], string> = { refund: "Reembolso", chargeback: "Contestação (chargeback)" };
@@ -51,7 +51,7 @@ export function PaymentsReview({ user }: { user: User }) {
     setSweeping(false);
     if (r.ok) {
       const s = r.data.sweep;
-      setMessage({ kind: "ok", text: s ? `Conciliação concluída: ${s.checked} consultadas, ${s.credited} creditadas, ${s.reversals} reversões, ${s.reviews} em revisão, ${s.lookupFailed} sem resposta do provedor.` : "Consulta concluída." });
+      setMessage({ kind: "ok", text: s ? `Conciliação concluída: ${s.checked} consultadas, ${s.credited} creditadas, ${s.reversals} reversões, ${s.reviews} em revisão, ${s.lookupFailed} sem resposta do provedor.${s.partial ? ` Parcial: ${s.checked} de ${s.total}; rode de novo para continuar.` : ""}` : "Consulta concluída." });
     } else {
       setMessage({ kind: "error", text: errorText(r.error) });
     }

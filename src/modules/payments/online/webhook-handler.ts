@@ -1,7 +1,7 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { DomainError } from "@/lib/domain-error";
 import { confirmFromProvider } from "./confirmation";
-import { diagnoseSignature, parseNotification, parseSignatureHeader, verifyWebhookSignature, WEBHOOK_BODY_MAX_BYTES } from "./mercadopago-webhook";
+import { parseNotification, verifyWebhookSignature, WEBHOOK_BODY_MAX_BYTES } from "./mercadopago-webhook";
 import { ProviderError, type OnlineProviders } from "./provider";
 
 /**
@@ -28,22 +28,9 @@ export async function handleMercadoPagoWebhook(request: Request, deps: WebhookDe
     if (Number(request.headers.get("content-length") ?? 0) > WEBHOOK_BODY_MAX_BYTES) return json(413, { error: "payload_too_large" });
     const signature = verifyWebhookSignature({ secret: deps.secret, signature: request.headers.get("x-signature"), requestId: request.headers.get("x-request-id"), dataId: queryId, nowMs: clock().getTime() });
     if (!signature.ok) {
-      // Só dados NÃO secretos (ID da order, request-id, ts, 10 primeiros hex do v1 e quais variantes do manifesto bateriam).
-      const header = request.headers.get("x-signature");
-      const parsed = parseSignatureHeader(header);
-      // Corpo (NÃO assinado, só diagnóstico): de qual aplicação/conta/ambiente vem a entrega recusada. Nada além destes 4 campos curtos.
-      let origin: Record<string, unknown> = {};
-      try {
-        const raw = JSON.parse((await request.text()).slice(0, WEBHOOK_BODY_MAX_BYTES)) as Record<string, unknown>;
-        origin = { application_id: String(raw.application_id ?? "").slice(0, 24), user_id: String(raw.user_id ?? "").slice(0, 24), live_mode: raw.live_mode ?? null, action: String(raw.action ?? "").slice(0, 40) };
-      } catch {
-        origin = { corpo: "ilegível" };
-      }
-      console.warn(
-        "mercadopago webhook rejected: %s %s",
-        signature.reason,
-        JSON.stringify({ origin, shape: { sigKeys: (header ?? "").split(",").map((part) => part.split("=")[0]?.trim()).slice(0, 6), ua: (request.headers.get("user-agent") ?? "").slice(0, 60), headers: [...request.headers.keys()].filter((name) => !/^(authorization|cookie|x-vercel-(protection|oidc|sc|forwarded|ip|proxy))/.test(name)).slice(0, 30), query: [...url.searchParams.keys()].filter((k) => k !== "x-vercel-protection-bypass") }, dataId: queryId.slice(0, 40), requestId: (request.headers.get("x-request-id") ?? "").slice(0, 60), ts: parsed?.ts ?? null, v1: parsed?.v1.slice(0, 10) ?? null, matches: signature.reason === "bad_signature" ? diagnoseSignature({ secret: deps.secret, signature: header, requestId: request.headers.get("x-request-id"), dataId: queryId }) : [] }),
-      );
+      // Log mínimo e sem corpo: só o motivo e identificadores públicos (ID da order e request-id). O corpo de um chamador não
+      // autenticado nunca é lido nem registrado.
+      console.warn("mercadopago webhook rejected: %s %s", signature.reason, JSON.stringify({ dataId: queryId.slice(0, 40), requestId: (request.headers.get("x-request-id") ?? "").slice(0, 60) }));
       return json(401, { error: "invalid_signature" });
     }
     const text = await request.text();

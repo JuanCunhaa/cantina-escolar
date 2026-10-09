@@ -4,6 +4,8 @@ import { sweepIntents } from "@/modules/payments/online/confirmation";
 import { onlineProviders } from "@/modules/payments/online/config";
 
 export const dynamic = "force-dynamic";
+/** A varredura tem prazo próprio (45 s); a função serverless precisa de folga para terminar e responder. */
+export const maxDuration = 60;
 
 function authorized(request: Request): boolean | null {
   const secret = process.env.CRON_SECRET;

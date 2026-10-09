@@ -5,6 +5,8 @@ import { sweepIntents, refreshIntent } from "@/modules/payments/online/confirmat
 import { onlineProviders } from "@/modules/payments/online/config";
 
 export const dynamic = "force-dynamic";
+/** A varredura tem prazo próprio (45 s); a função serverless precisa de folga para terminar e responder. */
+export const maxDuration = 60;
 
 const bodySchema = z.object({ intentId: z.string().regex(/^tpi_[a-f0-9]{20}$/).optional(), limit: z.number().int().min(1).max(300).optional() }).strict();
 

@@ -50,7 +50,7 @@ export async function listPaymentReview(db: Firestore, actor: Actor): Promise<{ 
     db.collection("paymentPendencies").where("status", "==", "open").limit(100).get(),
     db.collection("topupIntents").where("status", "==", "in_review").limit(100).get(),
     db.collection("topupIntents").where("dispute.status", "in", ["open", "won_after_reversal"]).limit(100).get(),
-    db.collection("paymentEvents").where("outcome", "==", "orphan_payment").limit(50).get(),
+    db.collection("paymentEvents").where("outcome", "==", "orphan_payment").limit(300).get(),
   ]);
   const wallets = pendencySnap.docs.length ? await db.getAll(...pendencySnap.docs.map((d) => db.doc(`wallets/${d.get("studentId")}`))) : [];
   const pendencies = pendencySnap.docs
@@ -86,9 +86,14 @@ export async function listPaymentReview(db: Firestore, actor: Actor): Promise<{ 
       return { intentId: x.intentId, studentId: x.studentId, studentName: x.studentName, amountCents: x.amountCents, dispute: status, label: DISPUTE_LABEL[status], since: iso(x.dispute!.at) };
     })
     .sort((a, b) => (b.since ?? "").localeCompare(a.since ?? ""));
-  const orphans = orphanSnap.docs
-    .map((d): OrphanItemView => ({ eventId: d.id, orderId: String(d.get("orderId") ?? ""), reference: String(d.get("reference") ?? ""), amountCents: Number(d.get("amountCents") ?? 0), receivedAt: iso(d.get("receivedAt")) }))
-    .sort((a, b) => (b.receivedAt ?? "").localeCompare(a.receivedAt ?? ""));
+  // Uma linha por ORDER (cada entrega distinta gera um evento) e as mais recentes primeiro: o Firestore não ordena esta consulta.
+  const latest = new Map<string, OrphanItemView>();
+  for (const d of orphanSnap.docs) {
+    const item: OrphanItemView = { eventId: d.id, orderId: String(d.get("orderId") ?? ""), reference: String(d.get("reference") ?? ""), amountCents: Number(d.get("amountCents") ?? 0), receivedAt: iso(d.get("receivedAt")) };
+    const known = latest.get(item.orderId);
+    if (!known || (item.receivedAt ?? "") > (known.receivedAt ?? "")) latest.set(item.orderId, item);
+  }
+  const orphans = [...latest.values()].sort((a, b) => (b.receivedAt ?? "").localeCompare(a.receivedAt ?? "")).slice(0, 50);
   return { pendencies, reviews, disputes, orphans };
 }
 

@@ -152,7 +152,8 @@ const PENDING = new Set(["created", "action_required", "processing", "pending", 
 /**
  * Estado da order para a confirmação (F19). Conservador: PAGO exige order E pagamento `processed/accredited`; tudo que
  * mencione reembolso/contestação é tratado antes; combinação não reconhecida = `unknown` (não credita, não altera).
- * `partially_refunded` fica `unknown` até o valor devolvido ser confirmado na documentação/sandbox (pendência registrada).
+ * Reembolso PARCIAL (`processed/partially_refunded`, comprovado no sandbox em 08/10/2026) vira `partially_refunded` com o valor devolvido ACUMULADO e
+ * DEBITA a carteira até o saldo (pendência do restante); sem valor devolvido confiável (`refunded_amount`/`refunds[]`) fica `unknown` e não debita.
  */
 export function classifyOrder(order: Json, totalCents: number): { state: ProviderOrderState; reversedCents: number } {
   const transactions = order.transactions as Json | undefined;

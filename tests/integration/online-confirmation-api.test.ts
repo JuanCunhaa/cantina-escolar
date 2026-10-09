@@ -1084,3 +1084,73 @@ describe("contestação (chargeback): em andamento ≠ perdida; pagamento sem re
     await untouched(student);
   });
 });
+
+/* ------------------------------------------------------------------------------------------------- achados da revisão de código */
+
+describe("revisão de código do PR: varredura justa e com prazo, provedor do canal, ID sem caixa, órfãos por order", () => {
+  it("as intenções ABERTAS não tiram a vez das CONFIRMADAS: com limite pequeno a varredura ainda detecta o reembolso de uma recarga confirmada", async () => {
+    const p = fakeMercadoPago();
+    // várias abertas (de outras fakes ou desta) ocupam o grupo "abertas"; a confirmada tem o grupo próprio
+    for (let i = 0; i < 4; i += 1) await newIntent(p, await newStudent());
+    const student = await newStudent();
+    const intent = await credited(p, student);
+    p.refund(intent);
+    const summary = await confirmation.sweepIntents(db(), deps(p), { limit: 2 });
+    expect(summary.reversals).toBeGreaterThanOrEqual(1);
+    expect((await intentDoc(intent)).status).toBe("reversed");
+    expect(summary.total).toBeGreaterThanOrEqual(summary.checked);
+    await ledgerOk(student);
+  });
+
+  it("prazo da varredura: estourado, ela PARA, informa 'parcial' e a execução seguinte continua (idempotente)", async () => {
+    const p = fakeMercadoPago();
+    const student = await newStudent();
+    const intent = await newIntent(p, student);
+    p.pay(intent);
+    const stopped = await confirmation.sweepIntents(db(), deps(p), { limit: 300, deadlineMs: 0 });
+    expect(stopped).toMatchObject({ checked: 0, partial: true });
+    expect(stopped.total).toBeGreaterThan(0);
+    await untouched(student);
+    const resumed = await confirmation.sweepIntents(db(), deps(p), { limit: 300 });
+    expect(resumed.partial).toBe(false);
+    expect(await entriesOf(student)).toHaveLength(1);
+  });
+
+  it("conciliação de uma recarga por CARTÃO usa o provedor do canal, mesmo quando o provedor do Pix é outro", async () => {
+    const student = await newStudent();
+    const p = fakeMercadoPago();
+    const v = await intents.createTopupIntent(
+      db(),
+      actor(guardianA),
+      { key: randomUUID(), studentId: student, amountCents: 5000, channel: "card", installments: 1, cardToken: `tok_${randomUUID().slice(0, 12)}`, paymentMethodId: "visa", payer: { email: "pagador@example.test", identification: { type: "CPF", number: "12345678909" } } },
+      { providers: p.providers },
+    );
+    p.pay(v.intentId);
+    const otherPix = { ...p.pix, getOrder: async () => null }; // o Pix aponta para um provedor que não conhece essa order
+    const result = await confirmation.refreshIntent(db(), { providers: { pix: otherPix, card: p.card } }, v.intentId, "admin");
+    expect(result.outcome).toBe("credited");
+    expect(await entriesOf(student)).toHaveLength(1);
+  });
+
+  it("ID da order em outra caixa que a devolvida pelo provedor (assinatura aceita as duas formas) ainda é a MESMA order e credita uma vez", async () => {
+    const student = await newStudent();
+    const p = fakeMercadoPago();
+    const intent = await newIntent(p, student);
+    p.pay(intent);
+    const lower = p.orderIdOf(intent).toLowerCase();
+    expect(await notify(p, lower, { documentedCase: true })).toMatchObject({ status: 200, body: { outcome: "credited" } });
+    expect(await entriesOf(student)).toHaveLength(1);
+  });
+
+  it("pagamentos sem recarga: uma linha por ORDER (várias entregas não somem a lista) e as mais recentes aparecem", async () => {
+    const p = fakeMercadoPago();
+    const student = await newStudent();
+    const intent = await newIntent(p, student);
+    const base = p.orders.get(p.orderIdOf(intent))!;
+    const id = `ORDORFB${randomUUID().slice(0, 8).toUpperCase()}`;
+    p.orders.set(id, { ...base, orderId: id, externalReference: "venda-externa-dedupe", state: "paid", paidCents: 321, totalCents: 321 });
+    for (let i = 0; i < 4; i += 1) await notify(p, id, { requestId: `rq-orfa-${i}-${tag}`, ts: Date.now() + i });
+    const list = ((await call(listRoute, admin, "GET", "/api/admin/payments")).body as unknown as { orphans: { orderId: string }[] }).orphans;
+    expect(list.filter((o) => o.orderId === id)).toHaveLength(1);
+  });
+});
