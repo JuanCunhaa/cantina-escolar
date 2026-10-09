@@ -4,16 +4,14 @@ import { useState } from "react";
 import type { User } from "firebase/auth";
 import { errorText } from "@/lib/api-client";
 import { addDays, localDateOf } from "@/lib/dates/school-time";
-import { formatBRL } from "@/lib/money/format";
 import { useServerQuery } from "@/modules/orders/use-operations";
 import { usePosSubmit } from "@/modules/pos/use-pos";
 import { POINT_LABEL } from "@/modules/fees/receipt-labels";
 import { ALERT_LABEL, SESSION_STATUS_LABEL, type CashAlert, type CashPoint } from "../cash-model";
 import type { MyCash } from "../cash-queries";
-import { CashPointView, type CloseDraft } from "./cash-point";
+import { closeCashAction, openCashAction, type CloseDraft, type Message } from "@/modules/fees/finance-actions";
+import { CashPointView } from "./cash-point";
 import { brDate, differenceText } from "./cash-text";
-
-type Message = { kind: "ok" | "error"; text: string };
 
 /** Alertas do próprio operador: nunca bloqueiam o dia; cada um leva a abrir/fechar a data pendente. */
 export function CashAlerts({ alerts, onPick }: { alerts: CashAlert[]; onPick: (date: string) => void }) {
@@ -71,28 +69,15 @@ export function CashDesk({ user }: { user: User }) {
 
   async function open(point: CashPoint, openingCents: number) {
     setMessage(null);
-    const r = await submit.submit<{ sessionId: string }>("/api/cash/open", { point, date, openingCents, openingConfirmed: true });
-    if (!r) return;
-    if (r.ok) setMessage({ kind: "ok", text: `Caixa aberto com saldo inicial de ${formatBRL(openingCents)}.` });
-    else if (r.error === "session_exists") setMessage({ kind: "error", text: "Este caixa já foi aberto. A tela foi atualizada." });
-    else if (r.error === "invalid_date") setMessage({ kind: "error", text: "Só é possível abrir o caixa de hoje até 7 dias para trás." });
-    else if (r.status !== 0 && r.status < 500) setMessage({ kind: "error", text: errorText(r.error) });
+    const result = await openCashAction(submit.submit, { point, date, openingCents });
+    if (result) setMessage(result);
     cash.reload();
   }
 
   async function close(sessionId: string, draft: CloseDraft) {
     setMessage(null);
-    const r = await submit.submit<{ hasDivergence: boolean; cashDifferenceCents: number; closureNo: number }>("/api/cash/close", { sessionId, countedCashCents: draft.countedCashCents, declared: draft.declared, ...(draft.note ? { note: draft.note } : {}), expectedReceiptCount: draft.expectedReceiptCount });
-    if (!r) return;
-    if (r.ok) {
-      setMessage({ kind: r.data.hasDivergence ? "error" : "ok", text: r.data.hasDivergence ? `Caixa fechado com divergência (${differenceText(r.data.cashDifferenceCents)}). Ela fica pendente de revisão da administração.` : "Caixa fechado sem diferença." });
-    } else if (r.error === "stale_summary") {
-      setMessage({ kind: "error", text: "Entraram novos recebimentos desde que você viu o resumo. Confira de novo antes de fechar." });
-    } else if (r.error === "already_closed") {
-      setMessage({ kind: "error", text: "Este caixa já está fechado. A tela foi atualizada." });
-    } else if (r.status !== 0 && r.status < 500) {
-      setMessage({ kind: "error", text: errorText(r.error) });
-    }
+    const result = await closeCashAction(submit.submit, sessionId, draft);
+    if (result) setMessage(result);
     cash.reload();
   }
 

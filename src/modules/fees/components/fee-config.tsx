@@ -10,9 +10,9 @@ import { usePosSubmit } from "@/modules/pos/use-pos";
 import { PAYMENT_LABEL } from "@/modules/payments/methods";
 import { FEE_METHODS, SOURCE_KIND_LABEL, type FeeMethod, type SourceKind } from "../fee-model";
 import type { FeeConfig } from "../fee-queries";
+import { FEE_ERRORS, adminAction, type Message } from "../finance-actions";
 import { FinanceTabs } from "./finance-tabs";
 
-type Message = { kind: "ok" | "error"; text: string };
 
 /** "3,00" → 300 pontos-base (0,01% cada); no máximo 2 casas; inválido = null. */
 export function parsePercentBp(text: string): number | null {
@@ -304,9 +304,8 @@ export function FeeConfigPage({ user }: { user: User }) {
 
   async function run(url: string, body: Record<string, unknown>, ok: string) {
     setMessage(null);
-    const r = await submit.submit(url, body);
-    if (!r) return;
-    setMessage(r.ok ? { kind: "ok", text: ok } : { kind: "error", text: FEE_ERRORS[r.error] ?? errorText(r.error) });
+    const result = await adminAction(submit.submit, url, body, ok, FEE_ERRORS);
+    if (result) setMessage(result);
     q.reload();
   }
   if (q.status === "loading") return <p role="status" className="muted">Carregando…</p>;
@@ -324,18 +323,3 @@ export function FeeConfigPage({ user }: { user: User }) {
   );
 }
 
-const FEE_ERRORS: Record<string, string> = {
-  source_exists: "Já existe um cadastro com este código.",
-  source_not_found: "Cadastro não encontrado.",
-  source_inactive: "Cadastro arquivado: reative-o antes de publicar regra.",
-  method_not_in_source: "O cadastro não aceita este meio.",
-  fictitious_mismatch: "Regra e cadastro precisam ser ambos fictícios ou ambos reais.",
-  fictitious_in_production: "Dados fictícios não são aceitos em produção.",
-  effective_in_past: "A vigência não pode ser anterior a hoje: regras não são retroativas.",
-  effective_not_after_last: "A vigência precisa ser posterior à da última versão.",
-  too_many_versions: "Limite de versões desta regra atingido.",
-  version_in_effect: "A versão já está em vigor: publique uma nova em vez de retirá-la.",
-  already_withdrawn: "Versão já retirada.",
-  version_not_found: "Versão não encontrada.",
-  source_reserved: "A fonte padrão não pode ser arquivada.",
-};

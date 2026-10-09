@@ -2,12 +2,27 @@
 
 import { useState } from "react";
 import { formatBRL } from "@/lib/money/format";
+import type { CloseDraft } from "@/modules/fees/finance-actions";
 import { POINT_LABEL } from "@/modules/fees/receipt-labels";
 import { SESSION_STATUS_LABEL, type CashPoint } from "../cash-model";
 import type { LiveSummary, SessionView } from "../cash-queries";
 import { REVIEW_TEXT, brDate, differenceText, methodLabel, parseCents, when } from "./cash-text";
 
-export type CloseDraft = { countedCashCents: number; declared: { pixCents?: number; cardDebitCents?: number; cardCreditCents?: number }; note: string; expectedReceiptCount: number };
+export type { CloseDraft };
+
+/** Saldo inicial só com a confirmação da contagem; ZERO é válido (gaveta vazia). */
+export function openingOf(text: string, confirmed: boolean): number | null {
+  return confirmed ? parseCents(text) : null;
+}
+
+/** Rascunho do fechamento: exige a contagem; conferências vazias ficam de fora; devolve null se algo digitado for inválido. */
+export function closeDraftOf(f: { counted: string; pix: string; debit: string; credit: string; note: string; receiptCount: number }): CloseDraft | null {
+  const counted = parseCents(f.counted);
+  const declared = { pixCents: parseCents(f.pix) ?? undefined, cardDebitCents: parseCents(f.debit) ?? undefined, cardCreditCents: parseCents(f.credit) ?? undefined };
+  const invalid = [f.pix, f.debit, f.credit].some((t) => t.trim() !== "" && parseCents(t) === null);
+  if (counted === null || invalid) return null;
+  return { countedCashCents: counted, declared: Object.fromEntries(Object.entries(declared).filter(([, v]) => v !== undefined)), note: f.note.trim(), expectedReceiptCount: f.receiptCount };
+}
 
 type Props = {
   point: CashPoint;
@@ -59,11 +74,12 @@ function OpenForm({ locked, onOpen }: Pick<Props, "locked" | "onOpen">) {
   const [text, setText] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const cents = parseCents(text);
+  const opening = openingOf(text, confirmed);
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (cents !== null && confirmed) onOpen(cents);
+        if (opening !== null) onOpen(opening);
       }}
     >
       <p className="muted">Conte o dinheiro que já está na gaveta, pelo total, e confirme. Esse é o saldo inicial do seu caixa.</p>
@@ -112,7 +128,8 @@ function CloseForm({ session, live, locked, onClose }: { session: SessionView; l
           if (countedCents !== null && !invalidDeclared) setReviewing(true);
           return;
         }
-        if (countedCents !== null) onClose({ countedCashCents: countedCents, declared: Object.fromEntries(Object.entries(declared).filter(([, v]) => v !== undefined)), note: note.trim(), expectedReceiptCount: live.receiptCount });
+        const draft = closeDraftOf({ counted, pix, debit, credit, note, receiptCount: live.receiptCount });
+        if (draft) onClose(draft);
       }}
     >
       <h3>Fechar o caixa</h3>

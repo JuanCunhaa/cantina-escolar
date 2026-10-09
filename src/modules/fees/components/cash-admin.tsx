@@ -13,9 +13,9 @@ import { REVIEW_TEXT, brDate, differenceText, when } from "@/modules/cash/compon
 import { useServerQuery } from "@/modules/orders/use-operations";
 import { usePosSubmit } from "@/modules/pos/use-pos";
 import { POINT_LABEL } from "@/modules/fees/receipt-labels";
+import { SESSION_ERRORS, adminAction, type Message } from "../finance-actions";
 import { FinanceTabs } from "./finance-tabs";
 
-type Message = { kind: "ok" | "error"; text: string };
 
 export type CashAdminViewProps = { list: CashAdminList; from: string; to: string; onRange: (from: string, to: string) => void };
 
@@ -205,7 +205,7 @@ export function SessionDetailView({ session, message, locked, onReview, onReopen
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            onReview(decision, note.trim());
+            if (note.trim().length >= 10) onReview(decision, note.trim()); // o botão já fica desabilitado; Enter no campo também não envia sem nota
           }}
         >
           <h2>Revisar a divergência</h2>
@@ -232,7 +232,7 @@ export function SessionDetailView({ session, message, locked, onReview, onReopen
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            onReopen(reason.trim());
+            if (reason.trim().length >= 10) onReopen(reason.trim());
           }}
         >
           <h2>Reabrir o caixa</h2>
@@ -280,9 +280,8 @@ export function CashSessionDetail({ user, sessionId }: { user: User; sessionId: 
 
   async function run(url: string, body: Record<string, unknown>, ok: string) {
     setMessage(null);
-    const r = await submit.submit(url, { sessionId, ...body });
-    if (!r) return;
-    setMessage(r.ok ? { kind: "ok", text: ok } : { kind: "error", text: errorText(r.error) });
+    const result = await adminAction(submit.submit, url, { sessionId, ...body }, ok, SESSION_ERRORS);
+    if (result) setMessage(result);
     q.reload();
   }
 

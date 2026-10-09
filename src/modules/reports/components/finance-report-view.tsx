@@ -10,7 +10,24 @@ import { FinanceTabs } from "@/modules/fees/components/finance-tabs";
 import { POINT_LABEL, RECEIPT_KIND_LABEL } from "@/modules/fees/receipt-labels";
 import { PAYMENT_LABEL } from "@/modules/payments/methods";
 import { useServerQuery } from "@/modules/orders/use-operations";
+import { exportAction, type ExportDeps } from "@/modules/fees/finance-actions";
 import type { FinanceReport } from "../finance-report";
+
+/** Dependências reais do navegador para o download (token do usuário, `fetch`, link temporário). */
+function browserExport(user: User): ExportDeps {
+  return {
+    token: () => user.getIdToken(),
+    fetchFn: (url, init) => fetch(url, init),
+    save: (blob, filename) => {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    },
+  };
+}
 
 export type ReportViewProps = {
   report: FinanceReport;
@@ -158,25 +175,8 @@ export function FinanceReportPage({ user }: { user: User }) {
   async function download(view: "detail" | "summary") {
     setExporting(true);
     setMessage(null);
-    try {
-      const month = range.to.slice(0, 7);
-      const response = await fetch(`/api/admin/finance/export?month=${month}&view=${view}`, { headers: { authorization: `Bearer ${await user.getIdToken()}` } });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { error?: string };
-        setMessage(body.error === "export_truncated" ? "Há recebimentos demais no mês para uma exportação completa." : errorText(body.error ?? "internal"));
-        return;
-      }
-      const url = URL.createObjectURL(await response.blob());
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `financeiro-${view === "detail" ? "detalhe" : "resumo"}-${month}.csv`;
-      link.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      setMessage(errorText("network"));
-    } finally {
-      setExporting(false);
-    }
+    setMessage(await exportAction(browserExport(user), range.to.slice(0, 7), view));
+    setExporting(false);
   }
 
   if (q.status === "loading") return <p role="status" className="muted">Carregando…</p>;

@@ -11,9 +11,9 @@ import { PAYMENT_LABEL } from "@/modules/payments/methods";
 import { FEE_BASIS_LABEL, type FeeBasis } from "../fee-model";
 import type { ReceiptAdminView, ReconcileList } from "../fee-queries";
 import { POINT_LABEL, RECEIPT_KIND_LABEL } from "../receipt-labels";
+import { RECONCILE_ERRORS, adminAction, type Message } from "../finance-actions";
 import { FinanceTabs } from "./finance-tabs";
 
-type Message = { kind: "ok" | "error"; text: string };
 export type ReconcileDraft = { ref: string; expectedVersion: number; actualFeeCents?: number; settledOn?: string; reason?: string };
 
 function Row({ item, today, locked, onSave }: { item: ReceiptAdminView; today: string; locked: boolean; onSave: (d: ReconcileDraft) => void }) {
@@ -146,25 +146,14 @@ export function ReconcileView({ list, message, locked, onSave }: ReconcileViewPr
   );
 }
 
-const REC_ERRORS: Record<string, string> = {
-  stale_receipt: "Este recebimento foi conferido por outra operação. A lista foi atualizada: confira os valores atuais.",
-  correction_requires_reason: "Corrigir um valor já conferido exige motivo.",
-  nothing_to_change: "Nada mudou em relação ao que já está registrado.",
-  invalid_fee: "A taxa precisa estar entre zero e o valor recebido.",
-  invalid_settlement_date: "A liquidação real fica entre a data do recebimento e hoje.",
-  not_applicable: "Dinheiro não tem taxa nem liquidação bancária a conferir.",
-  receipt_not_found: "Recebimento não encontrado.",
-};
-
 export function ReconcilePage({ user }: { user: User }) {
   const q = useServerQuery<ReconcileList>(user, "/api/admin/finance/receipts", "");
   const submit = usePosSubmit(user);
   const [message, setMessage] = useState<Message | null>(null);
   async function save(d: ReconcileDraft) {
     setMessage(null);
-    const r = await submit.submit("/api/admin/finance/reconcile", d);
-    if (!r) return;
-    setMessage(r.ok ? { kind: "ok", text: "Conferência registrada. Carteira e livro não foram alterados." } : { kind: "error", text: REC_ERRORS[r.error] ?? errorText(r.error) });
+    const result = await adminAction(submit.submit, "/api/admin/finance/reconcile", d, "Conferência registrada. Carteira e livro não foram alterados.", RECONCILE_ERRORS);
+    if (result) setMessage(result);
     q.reload();
   }
   if (q.status === "loading") return <p role="status" className="muted">Carregando…</p>;
