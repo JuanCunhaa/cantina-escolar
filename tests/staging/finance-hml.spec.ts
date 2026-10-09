@@ -96,8 +96,10 @@ test("cadastro FICTÍCIO: maquininha e regra versionada, sem retroatividade; só
 test("recebimento no cartão (simulado): crédito integral, estimativa congelada pela regra, nada vaza para a secretaria", async ({ request }) => {
   const r = await topup(request, secretaria, { amountCents: 5000, method: "card_credit", reference: `HML-F20-${tag}-NSU1`, sourceId: TERMINAL });
   expect(r.status, JSON.stringify(r.body)).toBe(200);
-  expect(r.body).toMatchObject({ creditedCents: 5000, fee: { status: "pending", cents: null }, netCents: null, settlement: { status: "pending", expectedOn: addDays(TODAY, 30), expectedSource: "rule", expectedBasis: "calendar_days", expectedDays: 30, expectedRuleVersion: 1 } });
-  expect(JSON.stringify(r.body)).not.toMatch(/feeEstimate|percentBp|ruleVersion|seriesId/);
+  expect(r.body).toMatchObject({ creditedCents: 5000, fee: { status: "pending", cents: null }, netCents: null, settlement: { status: "pending", expectedOn: addDays(TODAY, 30), expectedSource: "rule", expectedBasis: "calendar_days", expectedDays: 30 } });
+  // o operador vê a base e o prazo da previsão, nunca a versão da regra nem a estimativa
+  expect(r.body.settlement).not.toHaveProperty("expectedRuleVersion");
+  expect(JSON.stringify(r.body)).not.toMatch(/feeEstimate|percentBp|ruleVersion|seriesId/i);
   cardTopupId = String(r.body.topupId);
   ref = `topup:${cardTopupId}`;
   expect(await wallet(request)).toMatchObject({ balanceCents: 5000, version: 1 });
