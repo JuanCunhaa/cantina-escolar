@@ -25,7 +25,8 @@
       "probe-command.test.ts",
       "orders-history-api.test.ts",
       "menu-api.test.ts",
-      "photo-route.test.ts"
+      "photo-route.test.ts",
+      "sales-report-api.test.ts"
     ]
   },
   "rules": "g2"

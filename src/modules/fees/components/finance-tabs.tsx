@@ -5,6 +5,7 @@ export const FINANCE_TABS = [
   { href: "/operacao/financeiro/conferencia", label: "Conferência" },
   { href: "/operacao/financeiro/taxas", label: "Taxas e maquininhas" },
   { href: "/operacao/financeiro/relatorio", label: "Relatório" },
+  { href: "/operacao/relatorios", label: "Vendas e margens" },
 ] as const;
 
 /** Navegação das telas financeiras da administração (lista simples, a aba atual marcada com texto e `aria-current`). */

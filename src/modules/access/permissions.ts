@@ -12,6 +12,8 @@ import { EXTRA_PERMISSIONS, type ExtraPermission, type Role } from "./roles";
  * Taxas e caixa (F20): `finance.manage` = cadastrar meios/maquininhas e regras de taxa, conferir taxa/liquidação reais, rever divergências de
  * caixa, reabrir fechamentos e ver relatórios/exportação financeiros (SÓ administração); `cash.operate` = abrir/fechar o PRÓPRIO caixa
  * (secretaria, cantina e administração) — nunca o de outro operador e sem acesso a custos, lucro, regras de taxa ou caixas alheios.
+ * Relatórios (F21): `reports.operational` = vendas, rankings por unidades/valor, perdas em quantidade, pedidos a realizar e cancelamentos SEM custo, margem, lucro, taxa
+ * nem carteira (cantina e administração); custos, CMV, margens, resultado, compras e taxas exigem `finance.manage` + `costs.read` + `profit.read` (SÓ administração).
  * Reagendamento/antecipação e troca de produtos (F16): `orders.amend` (cantina e administração), sempre com motivo e auditoria;
  * a exceção operacional de horário só existe nesse comando da equipe. O responsável NÃO reagenda nem troca (cancela e compra de novo).
  */
@@ -33,6 +35,7 @@ export const CAPABILITIES = [
   "payments.review",
   "finance.manage",
   "cash.operate",
+  "reports.operational",
   "costs.read",
   "profit.read",
   "audit.read",
@@ -45,7 +48,7 @@ export type Capability = (typeof CAPABILITIES)[number];
 const BY_ROLE: Record<Role, readonly Capability[]> = {
   guardian: [],
   student: [],
-  cantina: ["students.search", "orders.operate", "orders.cancel", "orders.amend", "pos.operate", "catalog.photos.manage", "inventory.read", "inventory.loss", "cash.operate"],
+  cantina: ["students.search", "orders.operate", "orders.cancel", "orders.amend", "pos.operate", "catalog.photos.manage", "inventory.read", "inventory.loss", "cash.operate", "reports.operational"],
   secretaria: ["students.search", "topup.register", "cash.operate"],
   admin: CAPABILITIES,
 };
