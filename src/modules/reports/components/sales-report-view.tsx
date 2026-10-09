@@ -510,6 +510,41 @@ export function ResultSection({ report }: { report: SalesReport }) {
   );
 }
 
+export function ReceiptsSection({ report }: { report: SalesReport }) {
+  const r = report.receipts;
+  if (!r) return null;
+  return (
+    <section aria-labelledby="rs-receipts">
+      <h2 id="rs-receipts">Recebimentos externos, taxas e liquidação</h2>
+      <p className="muted">
+        Dinheiro que ENTROU ({report.dateBasis.fees}), separado da venda e do crédito de carteira. Recarga credita a carteira pelo valor bruto, mas não é receita de lanche. Detalhe por forma e fonte em Financeiro → Relatório.
+      </p>
+      <dl className="receipt-grid" data-testid="sales-receipts">
+        <dt>Recebido (bruto)</dt>
+        <dd>
+          {formatBRL(r.grossCents)} · {r.count} recebimento(s)
+        </dd>
+        <dt>Estornado / devolvido</dt>
+        <dd>{formatBRL(r.reversedCents)}</dd>
+        <dt>Taxa conferida / informada / estimada</dt>
+        <dd>
+          {formatBRL(r.feeConfirmedCents)} / {formatBRL(r.feeInformedCents)} / {formatBRL(r.feeEstimatedCents)} (uma por recebimento)
+        </dd>
+        <dt>Sem taxa conhecida</dt>
+        <dd>{r.feeUnknownCount} recebimento(s), fora do líquido</dd>
+        <dt>Líquido previsto / real</dt>
+        <dd>
+          {formatBRL(r.netExpectedCents)} / {formatBRL(r.netRealCents)}
+        </dd>
+        <dt>Liquidado / a liquidar / vencido</dt>
+        <dd>
+          {formatBRL(r.settledGrossCents)} / {formatBRL(r.pendingGrossCents)} / {formatBRL(r.overdueGrossCents)}
+        </dd>
+      </dl>
+    </section>
+  );
+}
+
 export function PurchasesSection({ report }: { report: SalesReport }) {
   const p = report.purchases;
   if (!p) return null;
@@ -694,6 +729,7 @@ export function SalesReportView({ report, error = null, params, onParams, today,
           <GroupTable title="Por turno" rows={report.realized.byShift} scope={report.scope} testId="sales-by-shift" />
           <GroupTable title="Por dia" rows={report.realized.byDay} scope={report.scope} testId="sales-by-day" />
           {report.scope === "full" && <ResultSection report={report} />}
+          {report.scope === "full" && <ReceiptsSection report={report} />}
           <LossesSection report={report} />
           {report.scope === "full" && <PurchasesSection report={report} />}
           <PendingSection report={report} />

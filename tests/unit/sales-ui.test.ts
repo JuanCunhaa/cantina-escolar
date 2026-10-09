@@ -256,6 +256,16 @@ describe("F21 — administração vê custo, lucro e margem; parcial nunca vira 
     expect(full).toContain("Baixo giro");
   });
 
+  it("recebimentos externos e liquidação aparecem separados da venda", () => {
+    const r = buildSalesReport(input({ sales: [sale({ productId: "p1", units: 1, revenueCents: 100, costMicros: c(40) })], receipts: { count: 2, grossCents: 7000, reversedCents: 1000, feeConfirmedCents: 100, feeInformedCents: 50, feeEstimatedCents: 150, feeUnknownCount: 1, feeEffectiveCents: 300, netExpectedCents: 6200, netRealCents: 5000, settledGrossCents: 2000, pendingGrossCents: 5000, overdueGrossCents: 1000 } }));
+    const out = view(r);
+    expect(out).toContain("Recebimentos externos, taxas e liquidação");
+    expect(out).toMatch(brl("70,00"));
+    expect(out).toContain("Sem taxa conhecida");
+    expect(out).toContain("não é receita de lanche");
+    expect(view(toOperational(r))).not.toContain("Recebimentos externos");
+  });
+
   it("conferência que diverge aparece como alerta com os números", () => {
     const r = a20();
     r.checks = [{ id: "units_produto", label: "Unidades por produto = total", expected: 10, actual: 9, ok: false }];

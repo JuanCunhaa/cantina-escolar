@@ -58,6 +58,7 @@ beforeAll(async () => {
   ({ commandErrorResponse } = await import("@/modules/access/command-route"));
   reportsMod = await import("@/modules/reports/sales-report");
   routes["GET sales"] = (await import("@/app/api/reports/sales/route")).GET as unknown as Handler;
+  routes["GET finance report"] = (await import("@/app/api/admin/finance/report/route")).GET as unknown as Handler;
   routes["GET export"] = (await import("@/app/api/reports/sales/export/route")).GET as unknown as Handler;
   routes["POST receipts"] = (await import("@/app/api/inventory/receipts/route")).POST as unknown as Handler;
   routes["POST losses"] = (await import("@/app/api/inventory/losses/route")).POST as unknown as Handler;
@@ -623,6 +624,16 @@ describe("carteira, taxas e conferências da escola inteira (administração)", 
     expect(f.body.fees).toBeNull();
     expect(f.body.ledger).toBeNull();
     expect((f.body.skipped as Record<string, string>).result).toContain("turno");
+  });
+
+  it("recebimentos externos e liquidação = relatório financeiro da F20 (mesma função, sem recontar); venda direta em dinheiro entra uma vez", async () => {
+    const mine = (await report(admin)).body.receipts as Record<string, number>;
+    const f20 = (await call("GET finance report", admin, "GET", `/api/admin/finance/report?from=${BASE}&to=${BASE}`)).body.totals as Record<string, number>;
+    for (const k of ["count", "grossCents", "reversedCents", "feeConfirmedCents", "feeInformedCents", "feeEstimatedCents", "feeUnknownCount", "feeEffectiveCents", "netExpectedCents", "netRealCents", "settledGrossCents", "pendingGrossCents", "overdueGrossCents"]) expect(mine[k], k).toBe(f20[k]);
+    // as vendas diretas em dinheiro deste arquivo (R$ 20,00 + R$ 30,00 + R$ 5,00 + R$ 8,00 ...) estão no bruto recebido, que NÃO é a receita de vendas
+    expect(mine.grossCents).toBeGreaterThanOrEqual(2000 + 3000 + 500);
+    expect(((await report(admin, { productId: S.pa })).body as { receipts: unknown }).receipts).toBeNull(); // seção da escola inteira
+    expect(JSON.stringify((await report(cantina)).body)).not.toContain("grossCents");
   });
 
   it("ambiente de teste aparece identificado no relatório e na exportação", async () => {

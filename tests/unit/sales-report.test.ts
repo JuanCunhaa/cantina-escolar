@@ -289,6 +289,21 @@ describe("F21 — pedidos pagos a realizar, cancelamentos e carteira", () => {
   });
 });
 
+describe("F21 — recebimentos externos e liquidação (F20) como seção própria", () => {
+  const receipts = { count: 2, grossCents: 7000, reversedCents: 1000, feeConfirmedCents: 100, feeInformedCents: 50, feeEstimatedCents: 150, feeUnknownCount: 1, feeEffectiveCents: 300, netExpectedCents: 6200, netRealCents: 5000, settledGrossCents: 2000, pendingGrossCents: 5000, overdueGrossCents: 1000 };
+
+  it("entra sem virar receita de venda e some com filtro; a cantina nunca recebe", () => {
+    const r = buildSalesReport(input({ sales: [sale({ productId: "p1", units: 1, revenueCents: 100, costMicros: c(40) })], receipts }));
+    expect(r.receipts).toEqual(receipts);
+    expect(r.realized.totals.revenueCents).toBe(100); // R$ 70,00 recebidos não são receita de venda
+    expect(buildSalesReport(input({ filters: { channel: "direct" }, receipts })).receipts).toBeNull();
+    expect(buildSalesReport(input()).receipts).toBeNull();
+    expect(JSON.stringify(toOperational(r))).not.toContain("7000");
+    const rows = buildSalesTables(r, [], "full").summary!.rows.map((x) => x.slice(0, 2).join("|"));
+    expect(rows).toEqual(expect.arrayContaining(["Recebimentos externos (F20)|Recebido bruto (R$)", "Liquidação|Vencido (R$)"]));
+  });
+});
+
 describe("F21 — reversões externas (reembolso/chargeback): posição de hoje, sem virar receita nem perda", () => {
   const rev = (id: string, status: string, opened: number, outstanding: number, recovered: number, writtenOff: number) => ({ id, status, openedCents: opened, outstandingCents: outstanding, recoveredCents: recovered, writtenOffCents: writtenOff });
 

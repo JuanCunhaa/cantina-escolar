@@ -471,6 +471,23 @@ export const operationalPendency = (code: string): boolean => code === "origin_m
 /** Opções dos filtros da tela (nomes do cadastro de hoje; só rótulos). */
 export type FilterOptions = { shifts: { id: string; label: string }[]; categories: { id: string; label: string }[]; products: { id: string; name: string }[] };
 
+/** Recebimentos externos do período e sua liquidação (relatório financeiro da F20, sem recontar): dinheiro entrando ≠ venda ≠ crédito de carteira. */
+export type ReceiptsSummary = {
+  count: number;
+  grossCents: number;
+  reversedCents: number;
+  feeConfirmedCents: number;
+  feeInformedCents: number;
+  feeEstimatedCents: number;
+  feeUnknownCount: number;
+  feeEffectiveCents: number;
+  netExpectedCents: number;
+  netRealCents: number;
+  settledGrossCents: number;
+  pendingGrossCents: number;
+  overdueGrossCents: number;
+};
+
 export type Pendency = { code: string; count: number; detail: string; blocksResult: boolean };
 
 export type ResultSection = {
@@ -504,6 +521,8 @@ export type SalesInput = {
   reversals: readonly ReversalFact[];
   /** Taxa efetiva do período (relatório financeiro da F20: conferida > informada > estimada; uma só por recebimento). */
   fees: { effectiveCents: number; unknownCount: number; unknownGrossCents: number; fictitiousCount: number };
+  /** Totais do relatório financeiro da F20 (mesma função, mesmo período). */
+  receipts?: ReceiptsSummary | null;
   /** Custo médio atual por produto (estimativa dos pedidos a realizar); `null` = não calcular. */
   avgCost: ReadonlyMap<string, number | null> | null;
   walletBalanceCents: number | null;
@@ -545,6 +564,7 @@ export type SalesReport = {
   ledger: (LedgerSection & { walletBalanceCents: number | null; walletCount: number | null }) | null;
   reversals: ReversalSection | null;
   fees: SalesInput["fees"] | null;
+  receipts: ReceiptsSummary | null;
   result: ResultSection | null;
   pendencies: Pendency[];
   checks: Check[];
@@ -618,6 +638,7 @@ export function buildSalesReport(input: SalesInput): SalesReport {
   const ledger = section("ledger", () => ({ ...buildLedger(ledgerFacts), walletBalanceCents: input.walletBalanceCents, walletCount: input.walletCount }));
   const reversals = section("reversals", () => buildReversals(unique(input.reversals)));
   const fees = section("fees", () => input.fees);
+  const receipts = fees ? (input.receipts ?? null) : null;
 
   const pendencies: Pendency[] = [];
   const t = realized.totals;
@@ -667,6 +688,7 @@ export function buildSalesReport(input: SalesInput): SalesReport {
     ledger,
     reversals,
     fees,
+    receipts,
     result,
     pendencies,
     checks: [],

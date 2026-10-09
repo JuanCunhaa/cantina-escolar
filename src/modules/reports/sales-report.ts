@@ -216,6 +216,7 @@ export async function loadSalesSources(db: Firestore, query: SalesQuery, scope: 
   const purchases: PurchaseFact[] = [];
   const ledger: LedgerFact[] = [];
   const reversals: ReversalFact[] = [];
+  let receiptsSummary: SalesInput["receipts"] = null;
   let fees: SalesInput["fees"] = { effectiveCents: 0, unknownCount: 0, unknownGrossCents: 0, fictitiousCount: 0 };
   let walletBalanceCents: number | null = null;
   let walletCount: number | null = null;
@@ -244,6 +245,8 @@ export async function loadSalesSources(db: Firestore, query: SalesQuery, scope: 
       else bad("pendências de reversão");
     }
     const finance = buildReport(receipts.receipts, query, today, { truncated: receipts.truncated, production }).totals;
+    const { count, grossCents, reversedCents, feeConfirmedCents, feeInformedCents, feeEstimatedCents, feeUnknownCount, feeEffectiveCents, netExpectedCents, netRealCents, settledGrossCents, pendingGrossCents, overdueGrossCents } = finance;
+    receiptsSummary = { count, grossCents, reversedCents, feeConfirmedCents, feeInformedCents, feeEstimatedCents, feeUnknownCount, feeEffectiveCents, netExpectedCents, netRealCents, settledGrossCents, pendingGrossCents, overdueGrossCents };
     fees = { effectiveCents: finance.feeEffectiveCents, unknownCount: finance.feeUnknownCount, unknownGrossCents: finance.feeUnknownGrossCents, fictitiousCount: finance.fictitiousCount };
     for (const d of receiptDocs.docs.slice(0, cap)) {
       const f = purchaseFactOf(d.id, dataOf(d), products);
@@ -289,6 +292,7 @@ export async function loadSalesSources(db: Firestore, query: SalesQuery, scope: 
     ledger,
     reversals,
     fees,
+    receipts: receiptsSummary,
     avgCost,
     walletBalanceCents,
     walletCount,

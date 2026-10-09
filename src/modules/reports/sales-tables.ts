@@ -53,6 +53,16 @@ export function buildSalesTables(report: SalesReport, sales: readonly SaleFact[]
   if (full && report.adjustments) {
     for (const a of report.adjustments.rows) row("Ajustes de estoque (fora do resultado)", labelOf(ADJUSTMENT_LABEL, a.type), centsCell(microsToCents(a.costMicros)), `${a.units} unidade(s) líquidas, ${a.facts} registro(s)`);
   }
+  if (full && report.receipts) {
+    const r2 = report.receipts;
+    row("Recebimentos externos (F20)", "Recebido bruto (R$)", centsCell(r2.grossCents), `${r2.count} recebimento(s); ${report.dateBasis.fees}. Recarga credita a carteira mas NÃO é receita de venda`);
+    row("Recebimentos externos (F20)", "Estornado/devolvido (R$)", centsCell(r2.reversedCents));
+    row("Recebimentos externos (F20)", "Líquido previsto (R$)", centsCell(r2.netExpectedCents), "bruto − taxa efetiva, só com taxa conhecida");
+    row("Recebimentos externos (F20)", "Líquido real (R$)", centsCell(r2.netRealCents), "só taxa conferida e dinheiro");
+    row("Liquidação", "Liquidado (R$)", centsCell(r2.settledGrossCents));
+    row("Liquidação", "A liquidar (R$)", centsCell(r2.pendingGrossCents), "inclui vencidos");
+    row("Liquidação", "Vencido (R$)", centsCell(r2.overdueGrossCents), "previsão anterior a hoje");
+  }
   if (full && report.fees) {
     row("Taxas", "Taxa efetiva do período (R$)", centsCell(report.fees.effectiveCents), `${report.dateBasis.fees}; conferida > informada > estimada, uma só por recebimento`);
     row("Taxas", "Recebimentos sem taxa conhecida", intCell(report.fees.unknownCount), "não tratados como taxa zero");
