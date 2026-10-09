@@ -327,27 +327,42 @@ describe("F21 — achados da revisão: canal em todas as seções que o declaram
   });
 
   it("conferência ENTRE FONTES: as baixas de um pedido nunca passam do valor pago registrado nele", () => {
-    const ok = buildSalesReport(input({ sales: [sale({ productId: "p1", units: 2, revenueCents: 400, costMicros: c(100), origin: "order:x", originPaidCents: 500 }), sale({ productId: "p2", units: 1, revenueCents: 100, costMicros: c(30), origin: "order:x", originPaidCents: 500 })] }));
+    const ok = buildSalesReport(input({ sales: [sale({ productId: "p1", units: 2, revenueCents: 400, costMicros: c(100), origin: "order:x" }), sale({ productId: "p2", units: 1, revenueCents: 100, costMicros: c(30), origin: "order:x" })], paidViolations: 0 }));
     expect(ok.checks.find((x) => x.id === "sold_within_paid")).toMatchObject({ kind: "cross", expected: 0, actual: 0, ok: true });
-    const bad = buildSalesReport(input({ sales: [sale({ productId: "p1", units: 2, revenueCents: 400, costMicros: c(100), origin: "order:y", originPaidCents: 300 })] }));
+    const bad = buildSalesReport(input({ sales: [sale({ productId: "p1", units: 2, revenueCents: 400, costMicros: c(100), origin: "order:y" })], paidViolations: 1 }));
     expect(bad.checks.find((x) => x.id === "sold_within_paid")).toMatchObject({ expected: 0, actual: 1, ok: false });
-    const noOrigin = buildSalesReport(input({ sales: [sale({ productId: "p1", units: 2, revenueCents: 400, costMicros: c(100), originFound: false })] }));
+    const noOrigin = buildSalesReport(input({ sales: [sale({ productId: "p1", units: 2, revenueCents: 400, costMicros: c(100), originFound: false })] })); // sem a medição, a conferência não acusa nada
     expect(noOrigin.checks.find((x) => x.id === "sold_within_paid")?.ok).toBe(true);
     expect(ok.checks.filter((x) => x.kind === "internal").length).toBeGreaterThan(10);
   });
 });
 
+describe("F21 — pedidos em aberto antigos: só contados, visíveis e sem bloquear o resultado realizado", () => {
+  it("vira a pendência pending_older (também para a cantina) e não torna o resultado parcial", () => {
+    const r = buildSalesReport(input({ sales: [sale({ productId: "p1", units: 1, revenueCents: 100, costMicros: c(40) })], pendingOlder: { count: 7, before: "2026-08-25" } }));
+    const p = r.pendencies.find((x) => x.code === "pending_older")!;
+    expect([p.count, p.blocksResult]).toEqual([7, false]);
+    expect(p.detail).toContain("2026-08-25");
+    expect(r.result?.definitive).toBe(true);
+    expect(toOperational(r).pendencies.map((x) => x.code)).toContain("pending_older");
+    expect(buildSalesReport(input({ pendingOlder: { count: 0, before: "2026-08-25" } })).pendencies.map((x) => x.code)).not.toContain("pending_older");
+  });
+});
+
 describe("F21 — projeção diária na saída e nas tabelas", () => {
   it("estatística de origem dos dias vai na resposta, no resumo exportado e (sem custo) na visão da cantina", () => {
-    const projection = { cachedDays: 3, builtDays: 1, liveDays: 1, building: [] };
+    const projection = { cachedDays: 3, builtDays: 1, liveDays: 1, building: [], staleDays: 0, repairedDays: 0, unstableDays: 0, cacheErrors: 0 };
     const r = buildSalesReport(input({ sales: [sale({ productId: "p1", units: 1, revenueCents: 100, costMicros: c(40) })], projection }));
     expect(r.projection).toEqual(projection);
     expect(toOperational(r).projection).toEqual(projection);
     expect(buildSalesReport(input()).projection).toBeNull();
     const row = buildSalesTables(r, [], "full").summary!.rows.find((x) => x[0] === "Projeção diária")!;
     expect(row[2]).toBe("3 / 1 / 1 / 0");
+    const withReads = buildSalesReport(input({ projection: { ...projection, reads: { estimatedReads: 77, estimatedWrites: 0, byLabel: {} } } }));
+    expect(buildSalesTables(withReads, [], "full").summary!.rows.find((x) => x[1] === "Leituras estimadas da abertura")![2]).toMatchObject({ value: 77 });
+    expect(buildSalesTables(withReads, [], "operational").summary!.rows.some((x) => x[1] === "Leituras estimadas da abertura")).toBe(false);
     expect(r.pendencies.map((x) => x.code)).not.toContain("projection_building");
-    const waiting = buildSalesReport(input({ projection: { cachedDays: 0, builtDays: 0, liveDays: 0, building: ["2026-10-01", "2026-10-02"] } }));
+    const waiting = buildSalesReport(input({ projection: { cachedDays: 0, builtDays: 0, liveDays: 0, building: ["2026-10-01", "2026-10-02"], staleDays: 0, repairedDays: 0, unstableDays: 0, cacheErrors: 0 } }));
     expect(waiting.pendencies.find((x) => x.code === "projection_building")).toMatchObject({ count: 2, blocksResult: true });
     expect(waiting.result?.definitive).toBe(false);
     expect(toOperational(waiting).pendencies.map((x) => x.code)).toContain("projection_building");
@@ -419,7 +434,7 @@ describe("F21 — filtros, bases e seções da escola inteira", () => {
   it("agrupamentos conferem entre si (unidades, receita e CMV exato)", () => {
     const r = buildSalesReport(input({ sales: sales() }));
     expect(r.checks.every((x) => x.ok)).toBe(true);
-    expect(reconcileSales(r, sales())).toEqual(r.checks);
+    expect(reconcileSales(r)).toEqual(r.checks);
     expect(r.realized.byDay).toHaveLength(1);
     expect(r.realized.byCategory.map((x) => [x.label, x.units])).toEqual([["Salgados", 2], ["Doces", 4]]);
     expect(r.realized.byShift.map((x) => x.label)).toEqual(["Manhã", "Tarde"]);

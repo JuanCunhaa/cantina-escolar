@@ -504,6 +504,12 @@ describe("custo ou receita ausente e documento ilegível são PENDÊNCIA, nunca 
     const result = r.body.result as { resultCents: number; grossProfitCents: number; lossCostCents: number; feesCents: number; definitive: boolean };
     expect(result.definitive).toBe(false);
     expect(result.resultCents).toBe(result.grossProfitCents - result.lossCostCents - result.feesCents); // contas do resultado fecham
+    // exportação incompleta (documento de origem ilegível não vira linha): RECUSADA em vez de entregar arquivo sem ele
+    const refused = await exportRaw(admin, { view: "summary" });
+    expect(refused.status).toBe(409);
+    expect((await refused.json()).error).toBe("export_incomplete");
+    await db().doc(P.badPath).delete(); // corrigido: as demais exportações voltam a funcionar
+    expect((await exportRaw(admin, { view: "summary" })).status).toBe(200);
   });
 
   it("exportação mostra custo VAZIO e situação explícita (não '0,00'), e o produto como PARCIAL", async () => {
@@ -681,7 +687,9 @@ describe("projeção diária persistida: dia fechado é materializado uma vez, r
 
   it("a leitura ao vivo (relógio real) não grava cache; a primeira leitura do dia fechado materializa e a segunda lê do cache — números idênticos", async () => {
     await wipe();
-    // O documento ilegível criado mais acima impede a materialização: dia com origem ilegível NUNCA é gravado como completo.
+    // Documento ilegível impede a materialização: dia com origem ilegível NUNCA é gravado como completo.
+    synthetic.push(P.badPath);
+    await db().doc(P.badPath).set({ seq: 2, type: "sale_exit", referenceType: "order", referenceId: "x", createdAt: Timestamp.now() });
     const blocked = await asFull(later);
     expect(blocked.projection).toMatchObject({ builtDays: 0, liveDays: 1 });
     expect((blocked.pendencies as { code: string }[]).map((x) => x.code)).toContain("unreadable_baixas de venda");
@@ -696,7 +704,7 @@ describe("projeção diária persistida: dia fechado é materializado uma vez, r
     expect(first.projection).toMatchObject({ cachedDays: 0, builtDays: 1, liveDays: 0, building: [] });
     expect(sections(first)).toEqual(sections(liveBody));
     const m = (await meta())!;
-    expect(m).toMatchObject({ schemaVersion: 1 });
+    expect(m).toMatchObject({ schemaVersion: 2 });
     expect(m.parts).toBeGreaterThanOrEqual(1);
     expect(m.counts.sales).toBeGreaterThan(0);
     digest = m.digest;
@@ -733,10 +741,13 @@ describe("projeção diária persistida: dia fechado é materializado uma vez, r
     const verify = (await reportsMod.maintainDays(db(), actorOf(admin, "admin"), { mode: "verify", ...range() }, later)).days[0]!;
     expect(verify.status).toBe("diverged");
     expect(verify.cachedDigest).not.toBe(verify.sourceDigest);
-    expect(sold(await asFull(later))).toBe(5); // o cache é projeção materializada: só muda quando reaplicado
+    // a contagem das fontes mudou desde a materialização: o relatório descarta o dia e reconstrói sozinho (invalidação)
+    const healed = await asFull(later);
+    expect(healed.projection).toMatchObject({ staleDays: 1, builtDays: 1, cachedDays: 0 });
+    expect(sold(healed)).toBe(3);
+    expect((await asFull(later)).projection).toMatchObject({ cachedDays: 1, staleDays: 0 });
     const rebuild = (await reportsMod.maintainDays(db(), actorOf(admin, "admin"), { mode: "rebuild", ...range() }, later)).days[0]!;
-    expect(rebuild.status).toBe("rebuilt");
-    expect(sold(await asFull(later))).toBe(3);
+    expect(rebuild.status).toBe("unchanged"); // já estava reconstruído
     expect((await reportsMod.maintainDays(db(), actorOf(admin, "admin"), { mode: "verify", ...range() }, later)).days[0]!.status).toBe("equal");
     digest = (await meta())!.digest;
   });

@@ -66,7 +66,6 @@ export function saleFactOf(path: string, d: Data, origins: ReadonlyMap<string, O
     costMicros: cost === null ? null : Math.abs(cost),
     origin: key,
     originFound: origin !== undefined,
-    originPaidCents: origin?.paidCents ?? null,
   };
 }
 

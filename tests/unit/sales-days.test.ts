@@ -32,7 +32,8 @@ describe("F21 — digest do dia: estável na ordem de leitura e sensível a qual
 
   it("propriedade indefinida equivale a ausente; valor, fato a mais, ilegível e truncado mudam o digest", () => {
     const base = digestOf(day([sale("m1")]));
-    expect(digestOf(day([{ ...sale("m1"), originPaidCents: undefined }]))).toBe(base);
+    expect(digestOf(day([{ ...sale("m1"), extra: undefined } as SaleFact]))).toBe(base);
+    expect(digestOf(day([sale("m1")], { paidViolations: 1 }))).not.toBe(base);
     expect(digestOf(day([sale("m1", { units: 2 })]))).not.toBe(base);
     expect(digestOf(day([sale("m1", { costMicros: null })]))).not.toBe(base);
     expect(digestOf(day([sale("m1"), sale("m2")]))).not.toBe(base);
@@ -65,6 +66,14 @@ describe("F21 — partes do dia: respeitam o teto e reconstituem exatamente o me
     const joined = mergeDayFacts(parts.map((p) => JSON.parse(JSON.stringify(p)) as DayFacts));
     expect(digestOf(joined)).toBe(digestOf(original));
     expect(countsOf(joined)).toEqual(countsOf(original));
+  });
+
+  it("violações de valor pago acompanham a primeira parte e somam na fusão", () => {
+    const parts = chunkFacts(day(many(30), { paidViolations: 2 }), 1000);
+    expect(parts[0]!.paidViolations).toBe(2);
+    expect(parts.slice(1).every((p) => p.paidViolations === 0)).toBe(true);
+    expect(mergeDayFacts(parts).paidViolations).toBe(2);
+    expect(mergeDayFacts([day([], { paidViolations: 1 }), day([], { paidViolations: 3 })]).paidViolations).toBe(4);
   });
 
   it("ilegíveis e truncados acompanham a primeira parte; um fato maior que o teto é recusado em vez de cortado", () => {

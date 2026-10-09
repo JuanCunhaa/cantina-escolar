@@ -102,7 +102,11 @@ export function ReportNotices({ report }: { report: Report }) {
       )}
       {report.projection && (
         <p className="muted" data-testid="sales-projection">
-          Fonte dos dias: {report.projection.cachedDays} do cache diário, {report.projection.builtDays} preparados agora, {report.projection.liveDays} ao vivo{report.projection.building.length > 0 ? `, ${report.projection.building.length} em preparação` : ""}.
+          Fonte dos dias: {report.projection.cachedDays} do cache diário, {report.projection.builtDays} preparados agora, {report.projection.liveDays} ao vivo{report.projection.building.length > 0 ? `, ${report.projection.building.length} em preparação` : ""}
+          {report.projection.staleDays + report.projection.repairedDays > 0 ? `; ${report.projection.staleDays + report.projection.repairedDays} dia(s) do cache estavam desatualizados ou inválidos e foram reconstruídos` : ""}
+          {report.projection.unstableDays > 0 ? `; ${report.projection.unstableDays} dia(s) mudaram durante a leitura e não foram gravados` : ""}
+          {report.projection.cacheErrors > 0 ? `; ${report.projection.cacheErrors} falha(s) ao usar o cache (o relatório usou as fontes)` : ""}.
+          {report.projection.reads ? ` Leituras estimadas desta abertura: ${report.projection.reads.estimatedReads} (estimativa do servidor, não é a cobrança oficial do Firebase).` : ""}
         </p>
       )}
       {Object.entries(report.skipped).length > 0 && (

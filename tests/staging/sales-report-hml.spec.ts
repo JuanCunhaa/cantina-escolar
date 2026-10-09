@@ -4,6 +4,13 @@
 // saldo (recarga simulada ≠ receita), pedido futuro pago a realizar, cancelamento com reembolso, perda e compra de estoque fora do CMV,
 // visão da cantina sem custo, exportação CSV/XLSX, autorização e Security Rules publicadas (movimentos e cancelamentos fechados ao
 // cliente, inclusive por consulta de grupo, o que também exercita os `fieldOverrides` publicados). O Admin SDK não escreve nada.
+// Projeção diária: sobre os DIAS FECHADOS reais da homologação (ontem e anteontem) prova que a 2ª abertura lê o cache (nenhuma fonte),
+// que `verify` confere cache × fontes e que `rebuild` repetido não muda nada.
+//
+// ORÇAMENTO DE LEITURAS (a cota gratuita do Firestore é de 50 000/dia e já foi esgotada por uma rodada anterior): este arquivo faz poucas
+// chamadas de relatório e SOMA a estimativa de leituras que o próprio servidor devolve (`projection.reads.estimatedReads`, só para a
+// administração; NÃO é a cobrança oficial). Teto desta execução: BUDGET_READS (abaixo) ≈ 16 % da cota; passou do teto, o teste para. Resposta
+// 5xx/RESOURCE_EXHAUSTED interrompe tudo na hora (modo serial): NÃO há laço de repetição. Antes de rodar: `npm run staging:preflight`.
 // NÃO prova: taxas/prazos REAIS, pagamento real, produção, volume (teto de leitura), concorrência em escala nem latência.
 // Fica na homologação (auditável e marcado como teste): o histórico de estoque, os pedidos e a recarga simulada; os produtos fictícios
 // são ARQUIVADOS no fim e só as contas efêmeras saem no teardown.
@@ -12,7 +19,7 @@ import { expect, test, type APIRequestContext, type Page } from "@playwright/tes
 import { DEMO_SHIFTS } from "../../scripts/lib/demo-seed.ts";
 import { firestoreRest } from "../../scripts/staging/admin.ts";
 import { PUBLISHED_STATE_FILE, loadTarget } from "../../scripts/staging/target.ts";
-import { localDateOf } from "../../src/lib/dates/school-time";
+import { addDays, localDateOf } from "../../src/lib/dates/school-time";
 import { createTestUser, TEST_PASSWORD, type TestUser } from "../helpers/auth-emulator";
 import { createTempProduct, fixtureIds, prepareCatalog, retireTempProduct } from "../helpers/catalog-fixtures.ts";
 import { createFamily, type Family } from "../helpers/menu-fixtures.ts";
@@ -44,7 +51,29 @@ const call = async (request: APIRequestContext, user: TestUser | null, method: "
   return { status: response.status(), body: (await response.json().catch(() => ({}))) as Json };
 };
 const post = (request: APIRequestContext, user: TestUser | null, url: string, data: Record<string, unknown>, key = randomUUID()) => call(request, user, "POST", url, { key, ...data });
-const report = (request: APIRequestContext, user: TestUser | null, params: string) => call(request, user, "GET", `/api/reports/sales?from=${TODAY}&to=${TODAY}&${params}`);
+/** Teto de leituras ESTIMADAS (pelo servidor) para todo este arquivo; ver o cabeçalho. */
+const BUDGET_READS = 8000;
+let spent = 0;
+let calls = 0;
+let lastAdminReads = 0;
+/** Registra o consumo estimado de uma resposta do relatório (a visão da cantina não traz a estimativa: conta a última da administração). */
+function spend(label: string, body: Json, admin: boolean): void {
+  const reads = (body.projection as { reads?: { estimatedReads?: number } } | undefined)?.reads?.estimatedReads;
+  const est = admin && typeof reads === "number" ? reads : lastAdminReads;
+  if (admin && typeof reads === "number") lastAdminReads = reads;
+  spent += est;
+  calls += 1;
+  console.log(`[orçamento F21] #${calls} ${label}: ${est} leituras estimadas (acumulado ${spent}/${BUDGET_READS})`);
+  expect(spent, "orçamento de leituras estourado: parar e investigar").toBeLessThanOrEqual(BUDGET_READS);
+}
+/** Chamada ao relatório com orçamento. Erro 5xx = para tudo (nunca repete). */
+async function guarded(request: APIRequestContext, user: TestUser | null, url: string, label: string, admin = true) {
+  const r = await call(request, user, "GET", url);
+  if (r.status >= 500) throw new Error(`resposta ${r.status} (${String(r.body.error)}): possível cota do Firestore; parar sem repetir`);
+  if (r.status === 200) spend(label, r.body, admin);
+  return r;
+}
+const report = (request: APIRequestContext, user: TestUser | null, params: string, label = "hoje") => guarded(request, user, `/api/reports/sales?from=${TODAY}&to=${TODAY}&${params}`, label, user === fam.admin);
 type Totals = { units: number; revenueCents: number; cogsCents: number; costMicros: number; grossProfitCents: number; marginBp: number | null; complete: boolean };
 const realized = (r: { status?: number; body: Json }) => {
   expect(r.status, JSON.stringify(r.body)).toBe(200); // falha com o corpo do erro, não com TypeError
@@ -82,15 +111,22 @@ test.afterAll(async ({ request }) => {
 });
 
 test("autorização: administração completa; cantina só quantidades e valores; secretaria, família e anônimo negados", async ({ request }) => {
+  // negados NÃO leem nada (a autorização vem antes de qualquer consulta): custo de leitura zero
   expect((await report(request, null, "")).status).toBe(401);
   expect((await report(request, secretaria, "")).status).toBe(403);
   expect((await report(request, fam.guardian, "")).status).toBe(403);
-  const a = await report(request, fam.admin, "");
-  const c = await report(request, cantina, "");
+  expect((await report(request, fam.admin, "from=2026-01-01&to=2026-12-31")).status).toBe(409); // período maior que o limite (recusado antes de ler)
+  const a = await report(request, fam.admin, "", "administração, escola inteira");
+  const c = await report(request, cantina, "productId=" + pa, "cantina");
   expect([a.status, a.body.scope, a.body.production]).toEqual([200, "full", false]);
   expect([c.status, c.body.scope]).toEqual([200, "operational"]);
   expect(keysOf(c.body).filter((k) => COST_KEYS.test(k))).toEqual([]);
-  expect((await report(request, fam.admin, "from=2026-01-01&to=2026-12-31")).status).toBe(409); // período maior que o limite
+  // escola inteira: resultado, carteiras e conferências existem; as contas fecham
+  const result = a.body.result as { resultCents: number; grossProfitCents: number; lossCostCents: number; feesCents: number; definitive: boolean };
+  expect(result.resultCents).toBe(result.grossProfitCents - result.lossCostCents - result.feesCents);
+  expect(typeof result.definitive).toBe("boolean");
+  expect((a.body.checks as { id: string; ok: boolean }[]).filter((x) => /^(units|revenue|cost)_/.test(x.id)).every((x) => x.ok)).toBe(true);
+  expect(a.body.ledger).not.toBeNull();
 });
 
 test("A20 com vendas reais: 100×R$1,00 + 100×R$1,10; venda direta de 10 a R$2,00 → receita 20,00, CMV 10,50, lucro bruto 9,50", async ({ request }) => {
@@ -102,18 +138,15 @@ test("A20 com vendas reais: 100×R$1,00 + 100×R$1,10; venda direta de 10 a R$2,
   const key = randomUUID();
   const sale = await post(request, cantina, "/api/pos/direct-sales", body, key);
   expect(sale.status, JSON.stringify(sale.body)).toBe(200);
-  const r = await report(request, fam.admin, `productId=${pa}`);
-  expect(realized(r).totals).toMatchObject({ units: 10, revenueCents: 2000, cogsCents: 1050, costMicros: 1_050_000_000, grossProfitCents: 950, marginBp: 4750, complete: true });
-  expect(realized(r).byChannel).toEqual([expect.objectContaining({ key: "direct", units: 10, revenueCents: 2000 })]);
-  // repetir o mesmo comando não vende nem conta de novo
+  // repetir o mesmo comando (mesma chave) não vende nem conta de novo; mudar o preço atual não reescreve a baixa histórica
   expect((await post(request, cantina, "/api/pos/direct-sales", body, key)).body.replayed).toBe(true);
-  expect(realized(await report(request, fam.admin, `productId=${pa}`)).totals).toMatchObject({ units: 10, revenueCents: 2000 });
-  // mudar o preço atual não reescreve a baixa histórica
   const reprice = await post(request, fam.admin, "/api/catalog/products", { action: "setPrice", id: pa, priceCents: 350, expectedPriceVersion: 1, reason: `${MARK}: preço atual muda` });
   expect(reprice.status, JSON.stringify(reprice.body)).toBe(200);
-  expect(realized(await report(request, fam.admin, `productId=${pa}`)).totals).toMatchObject({ units: 10, revenueCents: 2000, cogsCents: 1050 });
+  const r = await report(request, fam.admin, `productId=${pa}`, "A20");
+  expect(realized(r).totals).toMatchObject({ units: 10, revenueCents: 2000, cogsCents: 1050, costMicros: 1_050_000_000, grossProfitCents: 950, marginBp: 4750, complete: true });
+  expect(realized(r).byChannel).toEqual([expect.objectContaining({ key: "direct", units: 10, revenueCents: 2000 })]);
   // a cantina vê as mesmas quantidades e valores, sem custo
-  const c = await report(request, cantina, `productId=${pa}`);
+  const c = await report(request, cantina, `productId=${pa}`, "cantina A20");
   expect(realized(c).totals).toMatchObject({ units: 10, revenueCents: 2000 });
   expect(keysOf(c.body).filter((k) => COST_KEYS.test(k))).toEqual([]);
 });
@@ -132,7 +165,7 @@ test("recarga simulada não é receita; venda no balcão com saldo, pedido futur
   expect(order.status, JSON.stringify(order.body)).toBe(200);
   orderId = (order.body.orders as { orderId: string }[])[0]!.orderId;
 
-  const before = await report(request, fam.admin, `productId=${pb}`);
+  const before = await report(request, fam.admin, `productId=${pb}`, "antes do cancelamento");
   expect(realized(before).totals).toMatchObject({ units: 2, revenueCents: 600, cogsCents: 200, grossProfitCents: 400, complete: true }); // o futuro e a recarga NÃO são receita
   expect(realized(before).byChannel).toEqual([expect.objectContaining({ key: "counter", units: 2, revenueCents: 600 })]);
   const pending = before.body.pending as { totals: { orders: number; units: number; valueCents: number }; estimate: { costCents: number; marginCents: number } };
@@ -141,7 +174,7 @@ test("recarga simulada não é receita; venda no balcão com saldo, pedido futur
 
   const cancel = await post(request, fam.guardian, `/api/orders/${orderId}/cancel`, { reason: `${MARK}: cancelamento` });
   expect(cancel.status, JSON.stringify(cancel.body)).toBe(200);
-  const after = await report(request, fam.admin, `productId=${pb}`);
+  const after = await report(request, fam.admin, `productId=${pb}`, "depois do cancelamento");
   expect((after.body.pending as { totals: { units: number } }).totals.units).toBe(0);
   expect(after.body.cancellations).toMatchObject({ totals: { events: 1, units: 2, refundCents: 600 }, byKind: [{ kind: "family", events: 1, units: 2, refundCents: 600 }] });
   expect(realized(after).totals).toMatchObject({ units: 2, revenueCents: 600 }); // cancelar não mexe na venda realizada
@@ -152,43 +185,75 @@ test("recarga simulada não é receita; venda no balcão com saldo, pedido futur
 test("perda e compra de estoque ficam fora do CMV e do resultado; cantina vê a perda só em unidades", async ({ request }) => {
   const loss = await post(request, cantina, "/api/inventory/losses", { productId: pb, quantity: 3, reason: "breakage", note: `${MARK}: quebra` });
   expect(loss.status, JSON.stringify(loss.body)).toBe(200);
-  const r = await report(request, fam.admin, `productId=${pb}`);
+  const r = await report(request, fam.admin, `productId=${pb}`, "perda e compra");
   expect(r.body.losses).toMatchObject({ totals: { units: 3, costCents: 300 }, rows: [expect.objectContaining({ reasonCode: "breakage", units: 3, costMicros: 300_000_000 })] });
   expect(r.body.purchases).toMatchObject({ netCostCents: 2000, rows: [expect.objectContaining({ kind: "purchase", units: 20, costMicros: 2_000_000_000 })] });
   expect(realized(r).totals.cogsCents).toBe(200); // a perda (R$ 3,00) e a compra (R$ 20,00) não entram no CMV
-  const c = await report(request, cantina, `productId=${pb}`);
+  const c = await report(request, cantina, `productId=${pb}`, "cantina perda");
   expect(c.body.losses).toMatchObject({ totalUnits: 3 });
   expect(keysOf(c.body.losses).filter((k) => COST_KEYS.test(k))).toEqual([]);
   expect(c.body.purchases).toBeUndefined();
-  // sem filtro: resultado, carteiras e conferências existem; as conferências fecham
-  const all = await report(request, fam.admin, "");
-  expect(all.body.result).toMatchObject({ definitive: expect.any(Boolean) });
-  const result = all.body.result as { resultCents: number; grossProfitCents: number; lossCostCents: number; feesCents: number };
-  expect(result.resultCents).toBe(result.grossProfitCents - result.lossCostCents - result.feesCents);
-  const checks = all.body.checks as { id: string; ok: boolean }[];
-  expect(checks.filter((x) => /^(units|revenue|cost)_/.test(x.id)).every((x) => x.ok)).toBe(true);
-  expect(all.body.ledger).not.toBeNull();
 });
 
 test("exportação: CSV com BOM e sem custo para a cantina; XLSX válido; compras e carteira só para a administração", async ({ request }) => {
   const url = `/api/reports/sales/export?from=${TODAY}&to=${TODAY}&productId=${pa}`;
-  const csv = await request.fetch(`${url}&view=products`, { headers: bearer(fam.admin.idToken) });
+  const exported = async (user: TestUser, view: string, label: string, admin: boolean) => {
+    const r = await request.fetch(`${url}&view=${view}`, { headers: bearer(user.idToken) });
+    if (r.status() >= 500) throw new Error(`exportação ${r.status()}: possível cota do Firestore; parar sem repetir`);
+    if (r.status() === 200) spend(label, {}, admin);
+    return r;
+  };
+  const csv = await exported(fam.admin, "products", "exportação CSV", true);
   expect(csv.status()).toBe(200);
   expect(csv.headers()["content-type"]).toContain("text/csv");
   const bytes = await csv.body();
   expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
   expect(bytes.toString("utf8")).toContain(`Relatório HML A ${tag}`);
-  const xlsx = await request.fetch(`${url}&view=detail&format=xlsx`, { headers: bearer(fam.admin.idToken) });
+  const xlsx = await exported(fam.admin, "detail&format=xlsx", "exportação XLSX", true);
   expect(xlsx.status()).toBe(200);
   const zip = await xlsx.body();
   expect(String.fromCharCode(zip[0]!, zip[1]!)).toBe("PK");
   expect(zip.toString("latin1")).not.toContain("<f>");
-  const op = await request.fetch(`${url}&view=products`, { headers: bearer(cantina.idToken) });
+  const op = await exported(cantina, "products", "exportação da cantina", false);
   expect(op.status()).toBe(200);
   expect(await op.text()).not.toMatch(/CMV|Lucro|Margem|custo/i);
   for (const view of ["purchases", "ledger"]) expect((await request.fetch(`${url}&view=${view}`, { headers: bearer(cantina.idToken) })).status(), view).toBe(403);
   expect((await request.fetch(`${url}&view=summary`, { headers: bearer(secretaria.idToken) })).status()).toBe(403);
   expect((await request.fetch(`${url}&view=summary`)).status()).toBe(401);
+});
+
+test("projeção diária (dias fechados REAIS da homologação): a 2ª abertura lê o cache e nenhuma fonte; verify confere; rebuild repetido não muda nada", async ({ request }) => {
+  const from = addDays(TODAY, -2);
+  const to = addDays(TODAY, -1);
+  const url = `/api/reports/sales?from=${from}&to=${to}`;
+  const first = await guarded(request, fam.admin, url, "1ª abertura de ontem e anteontem (constrói o que faltar)");
+  const p1 = first.body.projection as { cachedDays: number; builtDays: number; liveDays: number; building: string[] };
+  expect(p1.building).toEqual([]);
+  expect(p1.cachedDays + p1.builtDays + p1.liveDays).toBe(2);
+  const second = await guarded(request, fam.admin, url, "2ª abertura (do cache)");
+  const p2 = second.body.projection as { cachedDays: number; builtDays: number; staleDays: number; repairedDays: number; building: string[]; reads: { estimatedReads: number; byLabel: Record<string, number> } };
+  // um dia incompleto (fonte ilegível/truncada) nunca é gravado: nesse caso ele segue "ao vivo" e a prova fica registrada, sem forçar
+  const incomplete = p1.liveDays;
+  expect(p2).toMatchObject({ cachedDays: 2 - incomplete, staleDays: 0, repairedDays: 0, building: [] });
+  // NÃO relê o histórico: nenhuma leitura de fonte (movimentos, cancelamentos, lançamentos, entradas, pedidos de origem) nos dias do cache
+  if (incomplete === 0) expect(Object.keys(p2.reads.byLabel).filter((k) => k.startsWith("fontes:"))).toEqual([]);
+  console.log(`[orçamento F21] 2ª abertura por etiqueta: ${JSON.stringify(p2.reads.byLabel)}`);
+  const days = (body: Json) => (body.days as { date: string; status: string }[]).map((d) => d.status);
+  const verify = await call(request, fam.admin, "POST", "/api/admin/reports/days", { mode: "verify", from, to });
+  expect(verify.status, JSON.stringify(verify.body)).toBe(200);
+  spent += Number(verify.body.estimatedReads ?? 0);
+  console.log(`[orçamento F21] verify de 2 dias: ${String(verify.body.estimatedReads)} leituras estimadas (acumulado ${spent}/${BUDGET_READS})`);
+  for (const status of days(verify.body)) expect(["equal", "incomplete"], `verify: ${status}`).toContain(status);
+  const rebuild = await call(request, fam.admin, "POST", "/api/admin/reports/days", { mode: "rebuild", from, to });
+  expect(rebuild.status, JSON.stringify(rebuild.body)).toBe(200);
+  spent += Number(rebuild.body.estimatedReads ?? 0);
+  for (const status of days(rebuild.body)) expect(["unchanged", "incomplete"], `rebuild: ${status}`).toContain(status); // o cache já valia: replay não regrava
+  expect(spent).toBeLessThanOrEqual(BUDGET_READS);
+  // o dia corrente nunca tem cache e a manutenção diz isso
+  const open = await call(request, fam.admin, "POST", "/api/admin/reports/days", { mode: "verify", from: TODAY, to: TODAY });
+  expect(days(open.body)).toEqual(["open_day"]);
+  // só a administração
+  for (const user of [secretaria, cantina, fam.guardian]) expect((await call(request, user, "POST", "/api/admin/reports/days", { mode: "verify", from, to })).status).toBe(403);
 });
 
 test("Security Rules publicadas: custo, receita e cancelamentos não saem pelo cliente, nem por consulta de grupo", async () => {
@@ -210,6 +275,21 @@ test("Security Rules publicadas: custo, receita e cancelamentos não saem pelo c
   expect(await group(null, "movements")).toBe(403);
 });
 
+/** Conta, pela resposta do servidor, o consumo estimado de cada abertura do relatório feita pela TELA (a administração traz a estimativa). */
+function meterPage(page: Page, admin: boolean): void {
+  page.on("response", async (r) => {
+    if (!r.url().includes("/api/reports/sales?") || r.status() !== 200) return;
+    const body = (await r.json().catch(() => null)) as Json | null;
+    if (!body) return;
+    const reads = (body.projection as { reads?: { estimatedReads?: number } } | undefined)?.reads?.estimatedReads;
+    const est = admin && typeof reads === "number" ? reads : lastAdminReads;
+    if (admin && typeof reads === "number") lastAdminReads = reads;
+    spent += est;
+    calls += 1;
+    console.log(`[orçamento F21] #${calls} tela: ${est} leituras estimadas (acumulado ${spent}/${BUDGET_READS})`);
+  });
+}
+
 async function login(page: Page, email: string, path: string) {
   await page.goto(path);
   await page.getByLabel("Email").fill(email);
@@ -218,8 +298,13 @@ async function login(page: Page, email: string, path: string) {
 }
 
 test("tela publicada: administração vê CMV e lucro do produto A20, ambiente fictício identificado e celular sem rolagem lateral", async ({ page }) => {
+  meterPage(page, true);
   await login(page, fam.admin.email, "/operacao/relatorios");
   await expect(page.getByRole("heading", { name: "Relatórios de vendas" })).toBeVisible({ timeout: 45000 });
+  // 1ª abertura (mês até hoje, sem filtro): resultado, carteiras e conferências; depois UM filtro por produto
+  await expect(page.getByTestId("sales-result")).toBeVisible({ timeout: 45000 });
+  await expect(page.getByTestId("sales-checks")).toBeVisible();
+  await expect(page.getByTestId("sales-projection")).toContainText("do cache diário");
   await page.locator("#rs-product").selectOption(pa);
   const totals = page.getByTestId("sales-totals");
   await expect(totals).toContainText(/R\$\s20,00/, { timeout: 30000 });
@@ -227,15 +312,14 @@ test("tela publicada: administração vê CMV e lucro do produto A20, ambiente f
   await expect(page.getByTestId("sales-profit")).toContainText(/R\$\s9,50/);
   await expect(totals).toContainText("47,50 %");
   await expect(page.getByTestId("sales-fictitious")).toBeVisible();
-  await page.locator("#rs-product").selectOption("");
-  await expect(page.getByTestId("sales-result")).toBeVisible();
-  await expect(page.getByTestId("sales-checks")).toBeVisible();
   await page.screenshot({ path: "test-results/f21-publicada-relatorio-admin.png", fullPage: true });
   await page.setViewportSize({ width: 360, height: 760 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+  expect(spent, "orçamento de leituras estourado").toBeLessThanOrEqual(BUDGET_READS);
 });
 
 test("tela publicada: cantina vê quantidades e valores sem custo, CMV, lucro nem margem; secretaria é recusada", async ({ page, browser }) => {
+  meterPage(page, false);
   await login(page, cantina.email, "/operacao/relatorios");
   await expect(page.getByRole("heading", { name: "Relatórios de vendas" })).toBeVisible({ timeout: 45000 });
   await page.locator("#rs-product").selectOption(pa);

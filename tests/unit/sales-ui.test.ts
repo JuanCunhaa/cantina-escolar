@@ -268,13 +268,20 @@ describe("F21 — administração vê custo, lucro e margem; parcial nunca vira 
   });
 
   it("a origem dos dias aparece (cache, preparados agora, ao vivo) e dia em preparação é pendência que torna o relatório incompleto", () => {
-    const r = buildSalesReport(input({ sales: [sale({ productId: "p1", units: 1, revenueCents: 100, costMicros: c(40) })], projection: { cachedDays: 2, builtDays: 1, liveDays: 1, building: ["2026-10-03"] } }));
+    const r = buildSalesReport(input({ sales: [sale({ productId: "p1", units: 1, revenueCents: 100, costMicros: c(40) })], projection: { cachedDays: 2, builtDays: 1, liveDays: 1, building: ["2026-10-03"], staleDays: 0, repairedDays: 0, unstableDays: 0, cacheErrors: 0 } }));
     const out = view(r);
     expect(out).toContain("2 do cache diário, 1 preparados agora, 1 ao vivo, 1 em preparação");
     expect(out).toContain("Dias em preparação");
     expect(out).toContain("PARCIAL");
     expect(view(toOperational(r))).toContain("1 em preparação");
     expect(view(buildSalesReport(input()))).not.toContain("Fonte dos dias");
+    const detailed = buildSalesReport(input({ projection: { cachedDays: 1, builtDays: 2, liveDays: 1, building: [], staleDays: 1, repairedDays: 1, unstableDays: 1, cacheErrors: 2, reads: { estimatedReads: 123, estimatedWrites: 4, byLabel: {} } } }));
+    const text = view(detailed);
+    expect(text).toContain("2 dia(s) do cache estavam desatualizados ou inválidos e foram reconstruídos");
+    expect(text).toContain("1 dia(s) mudaram durante a leitura e não foram gravados");
+    expect(text).toContain("2 falha(s) ao usar o cache");
+    expect(text).toContain("Leituras estimadas desta abertura: 123 (estimativa do servidor, não é a cobrança oficial do Firebase)");
+    expect(view(toOperational(detailed))).not.toContain("Leituras estimadas");
   });
 
   it("conferência que diverge aparece como alerta com os números", () => {

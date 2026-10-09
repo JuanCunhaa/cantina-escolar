@@ -13,7 +13,8 @@
       "school-calendar.test.ts",
       "probe-route.test.ts",
       "cash-api.test.ts",
-      "finance-fees-api.test.ts"
+      "finance-fees-api.test.ts",
+      "sales-projection-api.test.ts"
     ],
     "g2": [
       "cancellation-api.test.ts",

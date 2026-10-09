@@ -58,8 +58,6 @@ export type SaleFact = {
   /** Documento de origem (`order:ID` ou `directSale:ID`). */
   origin: string;
   originFound: boolean;
-  /** Valor TOTAL pago do pedido/venda de origem (para conferir que as baixas não passam do pago); `null` sem origem. */
-  originPaidCents?: number | null;
 };
 
 export type LossFact = { id: string; date: LocalDate; productId: string; productName: string; categoryId: string | null; reasonCode: string; units: number; costMicros: number | null; origin: string };
@@ -494,7 +492,7 @@ function buildLedger(facts: readonly LedgerFact[]): LedgerSection {
 /* ---------------------------------------------------------------------------------------------- pendências e relatório */
 
 /** Pendências que a visão da cantina pode ver: sem custo, taxa nem margem (essas só existem na visão completa). */
-export const operationalPendency = (code: string): boolean => code === "origin_missing" || code === "projection_building" || code.startsWith("truncated_") || code.startsWith("unreadable_");
+export const operationalPendency = (code: string): boolean => code === "origin_missing" || code === "pending_older" || code === "projection_building" || code.startsWith("truncated_") || code.startsWith("unreadable_");
 
 /** Opções dos filtros da tela (nomes do cadastro de hoje; só rótulos). */
 export type FilterOptions = { shifts: { id: string; label: string }[]; categories: { id: string; label: string }[]; products: { id: string; name: string }[] };
@@ -517,7 +515,22 @@ export type ReceiptsSummary = {
 };
 
 /** De onde vieram os dias do período: cache diário, materializados agora, ao vivo (dia corrente / incompletos) ou ainda em construção. */
-export type ProjectionStats = { cachedDays: number; builtDays: number; liveDays: number; building: string[] };
+export type ProjectionStats = {
+  cachedDays: number;
+  builtDays: number;
+  liveDays: number;
+  building: string[];
+  /** Dias do cache descartados porque a contagem atual das fontes mudou (documento tardio ou removido) e reconstruídos. */
+  staleDays: number;
+  /** Dias do cache descartados por versão antiga, resumo/partes incompletos ou digest que não confere, e reconstruídos. */
+  repairedDays: number;
+  /** Dias cujas fontes mudaram DURANTE a leitura: usados agora, não gravados. */
+  unstableDays: number;
+  /** Falhas ao ler/gravar o cache (o relatório usa as fontes e segue). */
+  cacheErrors: number;
+  /** Estimativa do que a abertura consultou (só na visão completa); NÃO é a cobrança oficial. */
+  reads?: { estimatedReads: number; estimatedWrites: number; byLabel: Record<string, number> };
+};
 
 export type Pendency = { code: string; count: number; detail: string; blocksResult: boolean };
 
@@ -563,6 +576,10 @@ export type SalesInput = {
   /** Fontes cuja leitura bateu no teto (relatório parcial). */
   truncated: readonly string[];
   projection?: ProjectionStats;
+  /** Pedidos/vendas cujas baixas passam do valor pago registrado (medido na leitura dos fatos; 0 = ok). */
+  paidViolations?: number;
+  /** Pedidos em aberto anteriores à janela da posição de hoje (só contados). */
+  pendingOlder?: { count: number; before: string };
   /** Documentos de origem que não puderam ser lidos (campo ausente/ inválido) por fonte: viram pendência, nunca zero. */
   unreadable: readonly { source: string; count: number }[];
 };
@@ -686,6 +703,7 @@ export function buildSalesReport(input: SalesInput): SalesReport {
   if (pending?.estimate && pending.estimate.missingCostUnits > 0) pendencies.push({ code: "pending_cost_unknown", count: pending.estimate.missingCostUnits, detail: `${pending.estimate.missingCostUnits} unidade(s) a realizar sem custo médio atual: margem estimada indisponível para elas.`, blocksResult: false });
   if (reversals && reversals.open > 0) pendencies.push({ code: "reversal_open", count: reversals.open, detail: `${reversals.open} reversão(ões) externa(s) (reembolso/chargeback) aguardam regularização, ${reversals.outstandingCents} centavos a recuperar: ainda não são perda nem entram no resultado.`, blocksResult: false });
   for (const u of input.unreadable) if (u.count > 0) pendencies.push({ code: `unreadable_${u.source}`, count: u.count, detail: `${u.count} documento(s) de "${u.source}" ilegíveis (campo ausente ou inválido) ficaram fora do relatório.`, blocksResult: true });
+  if (input.pendingOlder && input.pendingOlder.count > 0) pendencies.push({ code: "pending_older", count: input.pendingOlder.count, detail: `${input.pendingOlder.count} pedido(s) ainda em aberto com data de consumo anterior a ${input.pendingOlder.before} ficaram fora da posição de hoje (só contados): resolva-os (entregar, não retirado ou cancelar) para saírem daqui.`, blocksResult: false });
   if (input.projection && input.projection.building.length > 0) pendencies.push({ code: "projection_building", count: input.projection.building.length, detail: `${input.projection.building.length} dia(s) do período ainda estão sendo preparados (${input.projection.building.join(", ")}): o relatório está incompleto; tente de novo em instantes.`, blocksResult: true });
   for (const source of input.truncated) pendencies.push({ code: `truncated_${source}`, count: 1, detail: `A leitura de "${source}" bateu no teto: o período está incompleto. Reduza o intervalo.`, blocksResult: true });
 
@@ -732,7 +750,7 @@ export function buildSalesReport(input: SalesInput): SalesReport {
     checks: [],
     duplicatesIgnored,
   };
-  report.checks = reconcileSales(report, sales);
+  report.checks = reconcileSales(report, input.paidViolations ?? 0);
   return report;
 }
 
@@ -764,7 +782,7 @@ const check = (id: string, label: string, kind: Check["kind"], expected: number,
  * receita e CMV EXATO em micro-centavos — nunca em centavos já arredondados). Conferem também as fontes cruzadas: o reembolso
  * dos cancelamentos × os lançamentos `order_refund` da carteira, e as transferências (anulam-se entre alunos).
  */
-export function reconcileSales(report: SalesReport, sales: readonly SaleFact[] = []): Check[] {
+export function reconcileSales(report: SalesReport, paidViolations = 0): Check[] {
   const t = report.realized.totals;
   const checks: Check[] = [];
   const groups: [string, GroupRow[] | ProductRow[]][] = [
@@ -780,14 +798,7 @@ export function reconcileSales(report: SalesReport, sales: readonly SaleFact[] =
     checks.push(check(`cost_${name}`, `CMV exato por ${name} = total`, "internal", t.costMicros, rows.reduce((n, r) => n + r.costMicros, 0)));
   }
   // Entre fontes: o que foi baixado de um pedido/venda nunca passa do valor PAGO registrado no próprio pedido/venda.
-  const perOrigin = new Map<string, { revenue: number; paid: number }>();
-  for (const f of sales) {
-    if (f.originPaidCents === null || f.originPaidCents === undefined || f.revenueCents === null) continue;
-    const e = perOrigin.get(f.origin) ?? { revenue: 0, paid: f.originPaidCents };
-    e.revenue += f.revenueCents;
-    perOrigin.set(f.origin, e);
-  }
-  checks.push(check("sold_within_paid", "Baixas de cada pedido/venda não passam do valor pago registrado nele", "cross", 0, [...perOrigin.values()].filter((e) => e.revenue > e.paid).length));
+  checks.push(check("sold_within_paid", "Baixas de cada pedido/venda não passam do valor pago registrado nele", "cross", 0, paidViolations));
   if (report.cancellations && report.ledger) {
     const refunds = report.ledger.rows.find((r) => r.type === "order_refund")?.amountCents ?? 0;
     checks.push(check("refunds_ledger", "Reembolsos dos cancelamentos = lançamentos order_refund da carteira", "cross", report.cancellations.totals.refundCents, refunds));
@@ -854,7 +865,8 @@ export function toOperational(report: SalesReport): OperationalReport {
     dateBasis: { sales: dateBasis.sales, losses: dateBasis.losses, pending: dateBasis.pending, cancellations: dateBasis.cancellations, retained: dateBasis.retained },
     truncated: [...report.truncated],
     skipped: Object.fromEntries(Object.entries(report.skipped).filter(([k]) => OPERATIONAL_SECTIONS.includes(k as SectionName))),
-    projection: report.projection,
+    // A estimativa de leituras (`reads`) é da administração: a visão da cantina só recebe a origem dos dias.
+    projection: report.projection ? (Object.fromEntries(Object.entries(report.projection).filter(([k]) => k !== "reads")) as unknown as ProjectionStats) : null,
     realized: {
       // Ticket médio = receita ÷ pedidos/vendas distintos de origem (não por linha entregue).
       totals: { facts: r.totals.facts, origins: r.origins, units: r.totals.units, revenueCents: r.totals.revenueCents, ticketAverageCents: r.origins > 0 ? roundDiv(r.totals.revenueCents, r.origins) : null },
