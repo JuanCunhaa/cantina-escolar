@@ -564,6 +564,27 @@ export function LedgerSection({ report }: { report: SalesReport }) {
   );
 }
 
+export function ReversalsSection({ report }: { report: SalesReport }) {
+  const r = report.reversals;
+  if (!r) return null;
+  return (
+    <section aria-labelledby="rs-reversals">
+      <h2 id="rs-reversals">Reversões externas pendentes (reembolso e chargeback)</h2>
+      <p className="muted">Posição de hoje, não do período. Pendência aberta ainda não é perda nem entra no resultado; o que a escola absorve é decisão de negócio registrada à parte.</p>
+      <dl className="receipt-grid" data-testid="sales-reversals">
+        <dt>Pendências abertas</dt>
+        <dd>
+          {r.open} · {formatBRL(r.outstandingCents)} a recuperar
+        </dd>
+        <dt>Recuperado do saldo das carteiras</dt>
+        <dd>{formatBRL(r.recoveredCents)}</dd>
+        <dt>Absorvido pela escola (acumulado)</dt>
+        <dd>{formatBRL(r.writtenOffCents)}</dd>
+      </dl>
+    </section>
+  );
+}
+
 export function ChecksSection({ report }: { report: SalesReport }) {
   const bad = report.checks.filter((c) => !c.ok);
   return (
@@ -678,6 +699,7 @@ export function SalesReportView({ report, error = null, params, onParams, today,
           <PendingSection report={report} />
           <CancellationsSection report={report} />
           {report.scope === "full" && <LedgerSection report={report} />}
+          {report.scope === "full" && <ReversalsSection report={report} />}
           {report.scope === "full" && <ChecksSection report={report} />}
         </>
       )}

@@ -7,10 +7,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, type Harness } from "../helpers/mini-react";
 
-const state = vi.hoisted(() => ({ data: null as unknown, status: "ready" as string, exported: [] as unknown[], exportResult: null as string | null }));
+const state = vi.hoisted(() => ({ session: { status: "loading" } as Record<string, unknown>, data: null as unknown, status: "ready" as string, exported: [] as unknown[], exportResult: null as string | null }));
 vi.mock("@/modules/orders/use-operations", () => ({
   useServerQuery: () => ({ status: state.status, data: state.data, errorCode: state.status === "error" ? "internal" : null, refreshing: false, reload: () => undefined }),
 }));
+vi.mock("@/modules/access/use-session", () => ({ useSession: () => state.session }));
 vi.mock("next/link", () => ({ default: (props: { href: string; children: unknown }) => createElement("a", { href: props.href }, props.children as string) }));
 vi.mock("@/modules/reports/sales-actions", async (importActual) => {
   const actual = await importActual<typeof import("@/modules/reports/sales-actions")>();
@@ -18,6 +19,7 @@ vi.mock("@/modules/reports/sales-actions", async (importActual) => {
 });
 
 import { buildSalesReport, toOperational, type SaleFact, type SalesInput } from "@/modules/reports/sales-model";
+import OperacaoRelatoriosPage from "@/app/operacao/relatorios/page";
 import { EXPORT_ERRORS, exportSalesAction, presetRange, salesQuery } from "@/modules/reports/sales-actions";
 import {
   ExportPanel,
@@ -67,6 +69,7 @@ const input = (over: Partial<SalesInput> = {}): SalesInput => ({
   retained: [],
   cancellations: [],
   ledger: [],
+  reversals: [],
   fees: { effectiveCents: 0, unknownCount: 0, unknownGrossCents: 0, fictitiousCount: 0 },
   avgCost: null,
   walletBalanceCents: null,
@@ -90,6 +93,7 @@ const base = { params: { from: "2026-10-01", to: "2026-10-09", filters: {} }, on
 const view = (report: unknown, over: Record<string, unknown> = {}) => html(createElement(SalesReportView as never, { ...base, report, ...over }));
 
 beforeEach(() => {
+  state.session = { status: "loading" };
   state.data = null;
   state.status = "ready";
   state.exported = [];
@@ -398,6 +402,27 @@ describe("F21 — página: consulta pelo servidor e exportação com mensagem", 
 
   it("a ação real nunca é chamada pela página de teste (vale o mock)", () => {
     expect(exportSalesAction).not.toBe(actualActions.exportSalesAction);
+  });
+});
+
+describe("F21 — página /operacao/relatorios: quem entra", () => {
+  const user = { uid: "u1", getIdToken: async () => "tok" };
+  it("sem sessão pronta não mostra nada; secretaria, responsável e aluno veem a recusa", () => {
+    expect(mount(OperacaoRelatoriosPage as never).text()).toBe("");
+    state.session = { status: "signedIn", user, role: "secretaria", permissions: [] };
+    expect(mount(OperacaoRelatoriosPage as never).text()).toContain("Seu perfil não acessa os relatórios de vendas.");
+    state.session = { status: "signedIn", user, role: "guardian", permissions: [] };
+    expect(mount(OperacaoRelatoriosPage as never).text()).toContain("Seu perfil não acessa os relatórios de vendas.");
+  });
+
+  it("cantina entra sem as abas do Financeiro; administração entra com elas", () => {
+    state.data = a20();
+    state.session = { status: "signedIn", user, role: "cantina", permissions: [] };
+    expect(mount(OperacaoRelatoriosPage as never).text()).not.toContain("Vendas e margens");
+    state.session = { status: "signedIn", user, role: "admin", permissions: [] };
+    const h = mount(OperacaoRelatoriosPage as never);
+    expect(h.text()).toContain("Relatórios de vendas");
+    expect(h.text()).toContain("Vendas e margens");
   });
 });
 

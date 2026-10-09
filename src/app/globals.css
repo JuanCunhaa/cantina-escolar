@@ -154,6 +154,7 @@ select {
   color: inherit;
 }
 .field { display: grid; gap: var(--space-1); margin-bottom: var(--space-3); max-width: 24rem; }
+.field select, .field input { max-width: 100%; min-width: 0; } /* opção longa não alarga a página no celular (F21) */
 
 .notice { padding: var(--space-2) 0; }
 .notice-error { color: var(--color-danger); }

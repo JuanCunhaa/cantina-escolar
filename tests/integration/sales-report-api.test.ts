@@ -553,6 +553,34 @@ describe("a cantina não recebe custo, margem, lucro, taxa nem dado de aluno (A3
   });
 });
 
+/* --------------------------------------------------------------------------- reversões externas pendentes */
+
+describe("reversões externas (reembolso/chargeback): posição de hoje separada de receita e de perda", () => {
+  it("pendências abertas e o já absorvido aparecem à parte; a cantina nem vê a seção", async () => {
+    const read = async () => (await report(admin)).body.reversals as { pendencies: number; open: number; openedCents: number; outstandingCents: number; recoveredCents: number; writtenOffCents: number };
+    const before = await read();
+    const open = `paymentPendencies/rvp_${tag}_1`;
+    const done = `paymentPendencies/rvp_${tag}_2`;
+    synthetic.push(open, done);
+    await db().doc(open).set({ pendencyId: `rvp_${tag}_1`, status: "open", openedCents: 1000, outstandingCents: 700, recoveredCents: 300, writtenOffCents: 0 });
+    await db().doc(done).set({ pendencyId: `rvp_${tag}_2`, status: "resolved", openedCents: 500, outstandingCents: 0, recoveredCents: 0, writtenOffCents: 500 });
+    const after = await read();
+    expect({ pendencies: after.pendencies - before.pendencies, open: after.open - before.open, openedCents: after.openedCents - before.openedCents, outstandingCents: after.outstandingCents - before.outstandingCents, recoveredCents: after.recoveredCents - before.recoveredCents, writtenOffCents: after.writtenOffCents - before.writtenOffCents }).toEqual({
+      pendencies: 2,
+      open: 1,
+      openedCents: 1500,
+      outstandingCents: 700,
+      recoveredCents: 300,
+      writtenOffCents: 500,
+    });
+    const codes = ((await report(admin)).body.pendencies as { code: string }[]).map((p) => p.code);
+    expect(codes).toContain("reversal_open");
+    expect(JSON.stringify((await report(cantina)).body)).not.toMatch(/reversal|pendenc.*revers/i);
+    // a receita realizada do dia não muda com a pendência
+    expect(realizedOf(await report(admin, { productId: S.pa })).totals.revenueCents).toBe(5000);
+  });
+});
+
 /* ------------------------------------------------------------------------------ carteiras e conferências */
 
 describe("carteira, taxas e conferências da escola inteira (administração)", () => {

@@ -84,6 +84,11 @@ export function buildSalesTables(report: SalesReport, sales: readonly SaleFact[]
     for (const l of report.ledger.rows) row("Carteiras (livro)", labelOf(LEDGER_TYPE_LABEL, l.type), centsCell(l.amountCents), `${l.entries} lançamento(s)`);
     row("Carteiras (livro)", "Saldo agregado atual das carteiras (R$)", centsCell(report.ledger.walletBalanceCents), report.ledger.walletBalanceCents === null ? "indisponível" : `${report.ledger.walletCount ?? 0} carteira(s)`);
   }
+  if (full && report.reversals) {
+    row("Reversões externas (posição de hoje)", "Pendências abertas", intCell(report.reversals.open), `${report.reversals.outstandingCents} centavos a recuperar; não é perda nem entra no resultado`);
+    row("Reversões externas (posição de hoje)", "Recuperado do saldo (R$)", centsCell(report.reversals.recoveredCents));
+    row("Reversões externas (posição de hoje)", "Absorvido pela escola, acumulado (R$)", centsCell(report.reversals.writtenOffCents), "decisão do dono: se entra no resultado");
+  }
   for (const p of report.pendencies.filter((x) => full || operationalPendency(x.code))) row("Pendências", pendencyLabel(p.code), intCell(p.count), p.detail);
   if (full) for (const c of report.checks) row("Conferências", c.label, c.ok ? "OK" : `DIVERGE (esperado ${c.expected}, obtido ${c.actual})`);
   for (const [sec, why] of Object.entries(report.skipped)) if (full || OPERATIONAL_SECTIONS.includes(sec as SectionName)) row("Seções omitidas", SECTION_LABEL[sec as SectionName], "omitida", why);

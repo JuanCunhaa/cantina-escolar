@@ -26,6 +26,7 @@ import {
   type PendingOrderFact,
   type PurchaseFact,
   type RetainedFact,
+  type ReversalFact,
   type SaleFact,
   type SalesInput,
   type SalesReport,
@@ -43,6 +44,7 @@ import {
   productOfMovementPath,
   purchaseFactOf,
   retainedFactOf,
+  reversalFactOf,
   saleFactOf,
   type OriginInfo,
   type ProductInfo,
@@ -154,7 +156,7 @@ export async function loadSalesSources(db: Firestore, query: SalesQuery, scope: 
     if ((type === "order" || type === "directSale") && typeof id === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(id)) wanted.set(originKey(dataOf(d)), db.doc(`${type === "order" ? "orders" : "directSales"}/${id}`));
   }
   const origins = new Map<string, OriginInfo>();
-  const shiftOfOrder = new Map<string, string | null>();
+  const cancelledOrders = new Map<string, OriginInfo>();
   for (const snap of await getMany(db, [...wanted.values()])) {
     if (!snap.exists) continue;
     const isOrder = snap.ref.parent.id === "orders";
@@ -184,10 +186,10 @@ export async function loadSalesSources(db: Firestore, query: SalesQuery, scope: 
   // Cancelamentos: o turno vem do pedido (a leitura do cancelamento não o guarda).
   const cancelDocs = cancellations.docs.slice(0, cap).filter((d) => orderOfCancellationPath(d.ref.path) !== null);
   const orderRefs = [...new Set(cancelDocs.map((d) => orderOfCancellationPath(d.ref.path)!))].map((id) => db.doc(`orders/${id}`));
-  for (const snap of await getMany(db, orderRefs)) if (snap.exists) shiftOfOrder.set(snap.id, typeof snap.get("shiftId") === "string" ? (snap.get("shiftId") as string) : null);
+  for (const snap of await getMany(db, orderRefs)) if (snap.exists) cancelledOrders.set(snap.id, originOfOrder(snap.data()!));
   const cancellationFacts: CancellationFact[] = [];
   for (const d of cancelDocs) {
-    const f = cancellationFactOf(d.ref.path, dataOf(d), shiftOfOrder, products);
+    const f = cancellationFactOf(d.ref.path, dataOf(d), cancelledOrders, products);
     if (f) cancellationFacts.push(f);
     else bad("cancelamentos");
   }
@@ -213,16 +215,18 @@ export async function loadSalesSources(db: Firestore, query: SalesQuery, scope: 
   // Seções só da administração: compras, livro das carteiras, taxas e custo médio atual.
   const purchases: PurchaseFact[] = [];
   const ledger: LedgerFact[] = [];
+  const reversals: ReversalFact[] = [];
   let fees: SalesInput["fees"] = { effectiveCents: 0, unknownCount: 0, unknownGrossCents: 0, fictitiousCount: 0 };
   let walletBalanceCents: number | null = null;
   let walletCount: number | null = null;
   let avgCost: Map<string, number | null> | null = null;
   const production = process.env.APP_ENV === "production";
   if (full) {
-    const [receipts, entries, receiptDocs, wallets] = await Promise.all([
+    const [receipts, entries, receiptDocs, pendencyDocs, wallets] = await Promise.all([
       readReceiptsInRange(db, query),
       range("entries").get(),
       db.collection("stockReceipts").where("createdAt", ">=", start).where("createdAt", "<", end).limit(cap + 1).get(),
+      db.collection("paymentPendencies").limit(cap + 1).get(),
       db
         .collection("wallets")
         .aggregate({ total: AggregateField.sum("balanceCents"), count: AggregateField.count() })
@@ -233,6 +237,12 @@ export async function loadSalesSources(db: Firestore, query: SalesQuery, scope: 
     if (receipts.truncated) truncated.push("recebimentos");
     if (entries.size > cap) truncated.push("lançamentos das carteiras");
     if (receiptDocs.size > cap) truncated.push("entradas de estoque");
+    if (pendencyDocs.size > cap) truncated.push("pendências de reversão");
+    for (const d of pendencyDocs.docs.slice(0, cap)) {
+      const f = reversalFactOf(d.id, dataOf(d));
+      if (f) reversals.push(f);
+      else bad("pendências de reversão");
+    }
     const finance = buildReport(receipts.receipts, query, today, { truncated: receipts.truncated, production }).totals;
     fees = { effectiveCents: finance.feeEffectiveCents, unknownCount: finance.feeUnknownCount, unknownGrossCents: finance.feeUnknownGrossCents, fictitiousCount: finance.fictitiousCount };
     for (const d of receiptDocs.docs.slice(0, cap)) {
@@ -277,6 +287,7 @@ export async function loadSalesSources(db: Firestore, query: SalesQuery, scope: 
     retained,
     cancellations: cancellationFacts,
     ledger,
+    reversals,
     fees,
     avgCost,
     walletBalanceCents,
@@ -317,7 +328,7 @@ export async function exportSales(db: Firestore, actor: Actor, raw: Record<strin
   if (!table) throw conflict("view_unavailable", "Esta exportação não está disponível com os filtros ativos.");
   const stem = `relatorio-${view}-${query.from}_${query.to}`;
   const fictitious = !report.production && (report.fees?.fictitiousCount ?? 0) > 0;
-  const dateBasis = "datas no fuso America/Sao_Paulo; base de cada seção na primeira linha de 'resumo'";
+  const dateBasis = "datas no fuso America/Sao_Paulo; veja a base de cada secao no resumo";
   if (format === "xlsx") {
     return { filename: `${stem}.xlsx`, contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", body: tableXlsx(table), dateBasis, scope, fictitious };
   }

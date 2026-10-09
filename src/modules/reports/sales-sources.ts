@@ -1,6 +1,6 @@
 import { localDateOf, type LocalDate } from "@/lib/dates/school-time";
 import { remainingOf, remainingValueOf } from "@/modules/orders/fulfillment-model";
-import type { AdjustmentFact, CancellationFact, LedgerFact, LossFact, PendingOrderFact, PurchaseFact, RetainedFact, SaleChannel, SaleFact } from "./sales-model";
+import type { AdjustmentFact, CancellationFact, LedgerFact, LossFact, PendingOrderFact, PurchaseFact, RetainedFact, ReversalFact, SaleChannel, SaleFact } from "./sales-model";
 
 /**
  * Leitura PURA dos documentos de origem (F21): transforma o que o Firestore devolve em fatos tipados. Nada aqui acessa a rede.
@@ -130,7 +130,8 @@ export function retainedFactOf(id: string, d: Data): RetainedFact | null {
 const CANCELLATION_PATH = /^orders\/([^/]+)\/cancellations\/([^/]+)$/;
 export const orderOfCancellationPath = (path: string): string | null => CANCELLATION_PATH.exec(path)?.[1] ?? null;
 
-export function cancellationFactOf(path: string, d: Data, shiftOf: ReadonlyMap<string, string | null>, products: ReadonlyMap<string, ProductInfo>): CancellationFact | null {
+/** Turno e categoria vêm do PEDIDO de origem (snapshot da compra); sem ele, o cadastro atual do produto. */
+export function cancellationFactOf(path: string, d: Data, orders: ReadonlyMap<string, OriginInfo>, products: ReadonlyMap<string, ProductInfo>): CancellationFact | null {
   const orderId = orderOfCancellationPath(path);
   const date = dateOfStamp(d.createdAt);
   if (!orderId || !date || !Array.isArray(d.lines)) return null;
@@ -139,9 +140,17 @@ export function cancellationFactOf(path: string, d: Data, shiftOf: ReadonlyMap<s
     const refund = int(l.refundCents);
     if (units === null || refund === null) return [];
     const productId = text(l.productId);
-    return [{ productId, name: text(l.name, productId), categoryId: products.get(productId)?.categoryId ?? null, units, refundCents: refund }];
+    const snapshot = orders.get(orderId)?.items.get(productId);
+    return [{ productId, name: text(l.name, productId), categoryId: snapshot ? snapshot.categoryId : (products.get(productId)?.categoryId ?? null), units, refundCents: refund }];
   });
-  return { id: path, date, orderId, kind: text(d.kind, "unknown"), shiftId: shiftOf.get(orderId) ?? null, lines };
+  return { id: path, date, orderId, kind: text(d.kind, "unknown"), shiftId: orders.get(orderId)?.shiftId ?? null, lines };
+}
+
+export function reversalFactOf(id: string, d: Data): ReversalFact | null {
+  const outstanding = int(d.outstandingCents);
+  const opened = int(d.openedCents);
+  if (outstanding === null || opened === null || typeof d.status !== "string") return null;
+  return { id: `paymentPendencies/${id}`, status: d.status, openedCents: opened, outstandingCents: outstanding, recoveredCents: int(d.recoveredCents) ?? 0, writtenOffCents: int(d.writtenOffCents) ?? 0 };
 }
 
 export function ledgerFactOf(path: string, d: Data): LedgerFact | null {

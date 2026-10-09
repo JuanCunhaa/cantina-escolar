@@ -77,6 +77,8 @@ export type CancellationFact = {
   shiftId: string | null;
   lines: { productId: string; name: string; categoryId: string | null; units: number; refundCents: number }[];
 };
+/** Pendência de reversão externa (reembolso/chargeback que não coube no saldo): posição de HOJE, não do período. */
+export type ReversalFact = { id: string; status: string; openedCents: number; outstandingCents: number; recoveredCents: number; writtenOffCents: number };
 export type LedgerFact = { id: string; date: LocalDate; type: string; amountCents: number };
 
 export type Labels = { categories: Record<string, string>; shifts: Record<string, string> };
@@ -233,6 +235,7 @@ export const SECTION_FILTERS = {
   retained: ["shiftId", "channel"],
   cancellations: ["shiftId", "productId", "categoryId", "channel"],
   ledger: [],
+  reversals: [],
   fees: [],
   result: [],
 } as const satisfies Record<string, readonly (keyof Filters)[]>;
@@ -247,6 +250,7 @@ export const SECTION_LABEL: Record<SectionName, string> = {
   retained: "Cobrança retida (não retirado)",
   cancellations: "Cancelamentos e reembolsos",
   ledger: "Carteiras (livro)",
+  reversals: "Reversões externas pendentes",
   fees: "Taxas",
   result: "Resultado após perdas e taxas",
 };
@@ -437,6 +441,13 @@ function buildCancellations(facts: readonly CancellationFact[], filters: Filters
   };
 }
 
+export type ReversalSection = { pendencies: number; open: number; openedCents: number; outstandingCents: number; recoveredCents: number; writtenOffCents: number };
+function buildReversals(facts: readonly ReversalFact[]): ReversalSection {
+  const open = facts.filter((f) => f.status === "open");
+  const sum = (pick: (f: ReversalFact) => number) => facts.reduce((n, f) => add(n, pick(f)), 0);
+  return { pendencies: facts.length, open: open.length, openedCents: sum((f) => f.openedCents), outstandingCents: open.reduce((n, f) => add(n, f.outstandingCents), 0), recoveredCents: sum((f) => f.recoveredCents), writtenOffCents: sum((f) => f.writtenOffCents) };
+}
+
 export type LedgerSection = { rows: { type: string; entries: number; amountCents: number }[]; creditedCents: number; spentCents: number; netCents: number };
 function buildLedger(facts: readonly LedgerFact[]): LedgerSection {
   const map = new Map<string, { type: string; entries: number; amountCents: number }>();
@@ -490,6 +501,7 @@ export type SalesInput = {
   retained: readonly RetainedFact[];
   cancellations: readonly CancellationFact[];
   ledger: readonly LedgerFact[];
+  reversals: readonly ReversalFact[];
   /** Taxa efetiva do período (relatório financeiro da F20: conferida > informada > estimada; uma só por recebimento). */
   fees: { effectiveCents: number; unknownCount: number; unknownGrossCents: number; fictitiousCount: number };
   /** Custo médio atual por produto (estimativa dos pedidos a realizar); `null` = não calcular. */
@@ -531,6 +543,7 @@ export type SalesReport = {
   retained: RetainedSection | null;
   cancellations: CancellationSection | null;
   ledger: (LedgerSection & { walletBalanceCents: number | null; walletCount: number | null }) | null;
+  reversals: ReversalSection | null;
   fees: SalesInput["fees"] | null;
   result: ResultSection | null;
   pendencies: Pendency[];
@@ -603,6 +616,7 @@ export function buildSalesReport(input: SalesInput): SalesReport {
   const cancellations = section("cancellations", () => buildCancellations(unique(input.cancellations), filters));
   const ledgerFacts = unique(input.ledger);
   const ledger = section("ledger", () => ({ ...buildLedger(ledgerFacts), walletBalanceCents: input.walletBalanceCents, walletCount: input.walletCount }));
+  const reversals = section("reversals", () => buildReversals(unique(input.reversals)));
   const fees = section("fees", () => input.fees);
 
   const pendencies: Pendency[] = [];
@@ -613,6 +627,7 @@ export function buildSalesReport(input: SalesInput): SalesReport {
   if (losses && losses.totals.missingCostUnits > 0) pendencies.push({ code: "loss_cost_missing", count: losses.totals.missingCostUnits, detail: `${losses.totals.missingCostUnits} unidade(s) perdida(s) sem custo registrado.`, blocksResult: true });
   if (fees && fees.unknownCount > 0) pendencies.push({ code: "fee_unknown", count: fees.unknownCount, detail: `${fees.unknownCount} recebimento(s) sem taxa conhecida (${fees.unknownGrossCents} centavos brutos): a taxa não foi tratada como zero.`, blocksResult: true });
   if (pending?.estimate && pending.estimate.missingCostUnits > 0) pendencies.push({ code: "pending_cost_unknown", count: pending.estimate.missingCostUnits, detail: `${pending.estimate.missingCostUnits} unidade(s) a realizar sem custo médio atual: margem estimada indisponível para elas.`, blocksResult: false });
+  if (reversals && reversals.open > 0) pendencies.push({ code: "reversal_open", count: reversals.open, detail: `${reversals.open} reversão(ões) externa(s) (reembolso/chargeback) aguardam regularização, ${reversals.outstandingCents} centavos a recuperar: ainda não são perda nem entram no resultado.`, blocksResult: false });
   for (const u of input.unreadable) if (u.count > 0) pendencies.push({ code: `unreadable_${u.source}`, count: u.count, detail: `${u.count} documento(s) de "${u.source}" ilegíveis (campo ausente ou inválido) ficaram fora do relatório.`, blocksResult: true });
   for (const source of input.truncated) pendencies.push({ code: `truncated_${source}`, count: 1, detail: `A leitura de "${source}" bateu no teto: o período está incompleto. Reduza o intervalo.`, blocksResult: true });
 
@@ -650,6 +665,7 @@ export function buildSalesReport(input: SalesInput): SalesReport {
     retained,
     cancellations,
     ledger,
+    reversals,
     fees,
     result,
     pendencies,

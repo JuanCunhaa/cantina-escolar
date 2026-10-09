@@ -64,6 +64,7 @@ function input(over: Partial<SalesInput> = {}): SalesInput {
     retained: [],
     cancellations: [],
     ledger: [],
+    reversals: [],
     fees: { effectiveCents: 0, unknownCount: 0, unknownGrossCents: 0, fictitiousCount: 0 },
     avgCost: null,
     walletBalanceCents: null,
@@ -288,6 +289,25 @@ describe("F21 — pedidos pagos a realizar, cancelamentos e carteira", () => {
   });
 });
 
+describe("F21 — reversões externas (reembolso/chargeback): posição de hoje, sem virar receita nem perda", () => {
+  const rev = (id: string, status: string, opened: number, outstanding: number, recovered: number, writtenOff: number) => ({ id, status, openedCents: opened, outstandingCents: outstanding, recoveredCents: recovered, writtenOffCents: writtenOff });
+
+  it("soma pendências abertas, recuperado e absorvido; pendência aberta avisa sem bloquear o resultado", () => {
+    const r = buildSalesReport(input({ sales: [sale({ productId: "p1", units: 1, revenueCents: 100, costMicros: c(40) })], reversals: [rev("a", "open", 1000, 700, 300, 0), rev("b", "resolved", 500, 0, 0, 500), rev("c", "open", 200, 200, 0, 0)] }));
+    expect(r.reversals).toEqual({ pendencies: 3, open: 2, openedCents: 1700, outstandingCents: 900, recoveredCents: 300, writtenOffCents: 500 });
+    const p = r.pendencies.find((x) => x.code === "reversal_open")!;
+    expect([p.count, p.blocksResult]).toEqual([2, false]);
+    expect(r.result?.definitive).toBe(true); // reversão pendente não é perda ainda: o resultado realizado segue definitivo
+    expect(r.realized.totals.revenueCents).toBe(100); // nem vira receita
+  });
+
+  it("sem pendência nada aparece; com filtro a seção da escola inteira é omitida", () => {
+    expect(buildSalesReport(input()).pendencies.map((x) => x.code)).not.toContain("reversal_open");
+    expect(buildSalesReport(input({ filters: { productId: "p1" }, reversals: [rev("a", "open", 1, 1, 0, 0)] })).reversals).toBeNull();
+    expect(toOperational(buildSalesReport(input({ reversals: [rev("a", "open", 1, 1, 0, 0)] }))).pendencies.map((x) => x.code)).not.toContain("reversal_open");
+  });
+});
+
 describe("F21 — filtros, bases e seções da escola inteira", () => {
   const sales = () => [
     sale({ productId: "p1", channel: "advance", shiftId: "turno_m", categoryId: "cat_a", units: 2, revenueCents: 400, costMicros: c(100) }),
@@ -310,7 +330,7 @@ describe("F21 — filtros, bases e seções da escola inteira", () => {
     expect(r.ledger).toBeNull();
     expect(r.fees).toBeNull();
     expect(r.losses).toBeNull();
-    expect(Object.keys(r.skipped).sort()).toEqual(["fees", "ledger", "losses", "purchases", "result"]);
+    expect(Object.keys(r.skipped).sort()).toEqual(["fees", "ledger", "losses", "purchases", "result", "reversals"]);
     const byProduct = buildSalesReport(input({ sales: sales(), filters: { productId: "p1" } }));
     expect(byProduct.losses).not.toBeNull();
     expect(byProduct.result).toBeNull();
