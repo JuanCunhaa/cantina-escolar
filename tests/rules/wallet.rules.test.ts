@@ -162,18 +162,24 @@ describe("Firestore rules — F19: eventos do provedor e pendências fechados ao
   });
 
   it("ninguém (responsável, outra família, aluno, equipe, administração, anônimo) lê, cria, altera ou apaga eventos e pendências", async () => {
+    let denied = 0;
+    const deny = async (operation: Promise<unknown>) => {
+      await assertFails(operation);
+      denied += 1;
+    };
     for (const [uid, role] of [["famA", "guardian"], ["famB", "guardian"], ["aluA", "student"], ["sec", "secretaria"], ["cant", "cantina"], ["adm", "admin"]] as const) {
       const db = (await as(uid, role)).firestore();
       for (const path of ["paymentEvents/pev_1", "paymentPendencies/tpi_1"]) {
-        await assertFails(getDoc(doc(db, path)));
-        await assertFails(updateDoc(doc(db, path), { status: "resolved", outstandingCents: 0 }));
-        await assertFails(deleteDoc(doc(db, path)));
+        await deny(getDoc(doc(db, path)));
+        await deny(updateDoc(doc(db, path), { status: "resolved", outstandingCents: 0 }));
+        await deny(deleteDoc(doc(db, path)));
       }
-      await assertFails(getDocs(query(collection(db, "paymentPendencies"), limit(5))));
-      await assertFails(getDocs(query(collection(db, "paymentEvents"), limit(5))));
-      await assertFails(setDoc(doc(db, "paymentEvents/pev_novo"), { orderId: "ORD2", outcome: "credited" }));
+      await deny(getDocs(query(collection(db, "paymentPendencies"), limit(5))));
+      await deny(getDocs(query(collection(db, "paymentEvents"), limit(5))));
+      await deny(setDoc(doc(db, "paymentEvents/pev_novo"), { orderId: "ORD2", outcome: "credited" }));
     }
-    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "paymentPendencies/tpi_1")));
+    await deny(getDoc(doc(env.unauthenticatedContext().firestore(), "paymentPendencies/tpi_1")));
+    expect(denied).toBe(6 * (2 * 3 + 3) + 1); // 6 perfis × (3 operações em 2 documentos + 2 listagens + 1 criação) + o anônimo
   });
 
   it("o responsável vê a própria carteira (inclusive o aviso de pendência), mas ninguém do cliente altera ou zera o bloqueio", async () => {

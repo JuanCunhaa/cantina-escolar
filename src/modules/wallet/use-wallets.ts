@@ -155,7 +155,7 @@ export function useWallets(user: User, studentIds: readonly string[]) {
   const blockedKey = Object.entries(slots)
     .filter(([, slot]) => slot.pendingCents > 0)
     .map(([id]) => id)
-    .sort()
+    .sort((a, b) => a.localeCompare(b))
     .join(",");
   useEffect(() => {
     if (!blockedKey) return;
