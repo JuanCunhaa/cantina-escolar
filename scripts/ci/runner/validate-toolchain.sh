@@ -55,8 +55,12 @@ console.log("chromium", browser.version(), await page.textContent("h1"));
 await browser.close();
 EOF
   if ! timed "Chromium headless abre e fecha uma página" 90 node "$script"; then
-    warn "bibliotecas do Chromium ausentes? Comando que o Playwright indica para ESTE sistema (rodar como administrador, uma vez):"
-    npx --no-install playwright install-deps --dry-run chromium 2>&1 | tail -n 6 | sed 's/^/         | /'
+    local shell missing
+    shell="$(find "$HOME/.cache/ms-playwright" -name chrome-headless-shell -type f 2>/dev/null | head -n 1)"
+    [ -n "$shell" ] && missing="$(ldd "$shell" 2>/dev/null | awk '/not found/{print $1}' | tr '\n' ' ')"
+    warn "bibliotecas ausentes do Chromium: ${missing:-nenhuma detectada por ldd}"
+    warn "comando que o Playwright indica para ESTE sistema (administrador, uma vez):"
+    npx --no-install playwright install-deps --dry-run chromium 2>&1 | sed 's/^/         | /'
   fi
   rm -f "$script"
 }

@@ -1,0 +1,4 @@
+# Rótulo personalizado do runner próprio (cantina-vps-01): sem isto o actionlint do job `fast` reprova `runs-on: [self-hosted, ..., cantina-ci]`.
+self-hosted-runner:
+  labels:
+    - cantina-ci
