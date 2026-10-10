@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Agente Veracode SCA (srcclr) fixado por versão, com cadeia de integridade conferida:
 # chave GPG do repositório (impressão digital fixada) -> assinatura do Release -> SHA-256 do Packages -> SHA-256 do .deb (fixado).
-# Idempotente: se a versão fixada já está instalada (runner próprio: instalada uma vez pelo administrador, scripts/ci/runner/setup-vps.sh),
-# não faz nada. A instalação exige root ou sudo; o usuário do job no runner próprio não tem nenhum dos dois.
 # Uso: bash scripts/ci/tools/install-srcclr.sh
 set -euo pipefail
 SRCCLR_VERSION=3.8.121
 SRCCLR_DEB_SHA256=602f27292a69c2c8b130795da0288626bb1b8ccfc1302dae9405f791d36eed6b
 KEY_FINGERPRINT=2B93609DA5A49D7F2082246FDF7DD7A50B746DD4
 REPO=https://download.sourceclear.com/ubuntu/stable
+# Idempotente: se a versão fixada já está instalada (runner próprio: instalada uma vez pelo administrador, scripts/ci/runner/setup-vps.sh),
+# não faz nada. A instalação exige root ou sudo; o usuário do job no runner próprio não tem nenhum dos dois.
 if dpkg -s srcclr 2>/dev/null | grep -q "^Version: ${SRCCLR_VERSION}"; then
   echo "srcclr ${SRCCLR_VERSION} já instalado"
   srcclr --version
