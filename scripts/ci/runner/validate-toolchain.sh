@@ -20,7 +20,7 @@ check_gnu_vs_uutils() {
   local tmp="${RUNNER_TEMP:-/tmp}/validate-coreutils"
   rm -rf "$tmp" && mkdir -p "$tmp/dir-a10" "$tmp/dir-a2" && cd "$tmp" || return 0
   [ "$(printf 'x-a2\nx-a10\nx-a9\n' | sort -V | tail -n 1)" = "x-a10" ] && ok "sort -V | tail -n 1 (ordem de tentativas do quality)" || fail "sort -V diferente do GNU"
-  [ "$(find . -maxdepth 1 -type d -name 'dir-a*' | sort -V | tail -n 1)" = "./dir-a2" ] && ok "find -maxdepth/-type/-name" || fail "find diferente do esperado"
+  [ "$(find . -maxdepth 1 -type d -name 'dir-a*' | sort -V | tail -n 1)" = "./dir-a10" ] && ok "find -maxdepth/-type/-name" || fail "find diferente do esperado"
   printf 'abc' >f.txt
   echo "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad  f.txt" | sha256sum -c - >/dev/null 2>&1 && ok "sha256sum -c - (instaladores com hash fixo)" || fail "sha256sum -c - não conferiu um hash conhecido"
   cd - >/dev/null || true
