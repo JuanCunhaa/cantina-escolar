@@ -61,7 +61,7 @@ check_tools() {
   need tar tar --version
   need gzip gzip --version
   need unzip unzip -v
-  need zip zip -v
+  command -v zip >/dev/null 2>&1 && ok "zip $(zip -v | sed -n 2p)" || info "zip ausente (só o probe com VERACODE_SEED_DIR usa; o pacote SAST é feito por git archive)"
   need gpg gpg --version
   need gpgv gpgv --version
   need sha256sum sha256sum --version
