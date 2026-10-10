@@ -59,7 +59,7 @@ export async function status(argv: string[], deps: { gh?: Gh; logDir?: string; f
   const out: string[] = [];
   out.push(`ci run ${m.run.id} · ${m.run.event} · ${m.run.branch} · ${m.run.head_sha.slice(0, 7)} · tentativas ${m.run.attempts} · ${m.run.status}/${m.run.conclusion ?? "—"}`);
   out.push(m.run.url);
-  out.push(`espera 1ª tentativa ${m.timing.first_attempt_wait_s ?? "—"} s · runners ${m.consumption.runner_raw_min} min brutos / ${m.consumption.rounded_estimate_min} min arredondados (estimativa)`);
+  out.push(`espera 1ª tentativa ${m.timing.first_attempt_wait_s ?? "—"} s · runners ${m.consumption.runner_raw_min} min brutos (hospedado ${m.consumption.github_hosted.jobs} job(s) / própria ${m.consumption.self_hosted.jobs} job(s), ${Math.round(m.consumption.self_hosted.raw_s / 6) / 10} min) / ${m.consumption.rounded_estimate_min} min arredondados só do hospedado (estimativa)`);
   const lastByName = new Map<string, (typeof m.jobs)[number]>();
   for (const j of m.jobs) lastByName.set(j.name, j);
   const logDir = deps.logDir ?? ".agent-logs";

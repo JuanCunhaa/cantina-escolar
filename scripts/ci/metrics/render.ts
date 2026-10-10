@@ -15,8 +15,12 @@ export function renderMarkdown(m: RunMetrics, extra?: { history?: ReturnType<typ
   lines.push("|---|---|---|");
   lines.push(`| Espera até o resultado da 1ª tentativa | ${fmt(m.timing.first_attempt_wait_s)} | tempo de parede |`);
   lines.push(`| Espera até o resultado final (inclui intervalos entre tentativas) | ${fmt(m.timing.result_wait_s)} | tempo de parede |`);
-  lines.push(`| Minutos brutos somados dos runners | ${m.consumption.runner_raw_min} min | medido (soma das durações) |`);
-  lines.push(`| Estimativa arredondada por job | ${m.consumption.rounded_estimate_min} min | estimativa, não é cobrança |`);
+  const own = m.consumption.self_hosted;
+  const host = m.consumption.github_hosted;
+  lines.push(`| Soma dos tempos de todos os runners | ${m.consumption.runner_raw_min} min | medido (soma das durações; em máquina própria roda em série) |`);
+  lines.push(`| Runner HOSPEDADO (GitHub): ${host.jobs} job(s) | ${fmt(host.raw_s)} brutos / ${host.rounded_estimate_min} min arred. | medido / estimativa, não é cobrança |`);
+  lines.push(`| Máquina PRÓPRIA (self-hosted): ${own.jobs} job(s) | ${fmt(own.raw_s)} | ocupação do runner; não é minuto hospedado nem cobrança |`);
+  if (own.jobs) lines.push(`| Fila na máquina própria (soma / maior) | ${own.queue_known ? `${fmt(own.queue_sum_s)} / ${fmt(own.queue_max_s)}` : "indisponível"} | job pronto → início (exclui espera por dependência; exige o grafo needs) |`);
   lines.push(`| Consumo das reexecuções | ${fmt(m.consumption.reruns_raw_s)} brutos / ${m.consumption.reruns_rounded_estimate_min} min arred. | medido |`);
   if (m.consumption.without_runner_s) lines.push(`| Jobs sem runner (fila/incidente; fora do consumo) | ${fmt(m.consumption.without_runner_s)} | medido |`);
   lines.push(`| Consumo/custo oficial | indisponível | ${cell(m.consumption.official.reason)} |`);
@@ -29,9 +33,9 @@ export function renderMarkdown(m: RunMetrics, extra?: { history?: ReturnType<typ
   }
   lines.push("");
   lines.push("### Jobs (cada execução contada uma vez)");
-  lines.push("| Job | Tentativa | Conclusão | Criação→início | Duração | Runner |");
-  lines.push("|---|---|---|---|---|---|");
-  for (const j of m.jobs) lines.push(`| ${cell(j.name)} | ${j.attempt} | ${cell(j.conclusion ?? j.status)} | ${fmt(j.start_delay_s)} | ${fmt(j.duration_s)} | ${cell(j.labels.join(","))} |`);
+  lines.push("| Job | Tentativa | Conclusão | Criação→início | Fila do runner | Duração | Origem | Runner |");
+  lines.push("|---|---|---|---|---|---|---|---|");
+  for (const j of m.jobs) lines.push(`| ${cell(j.name)} | ${j.attempt} | ${cell(j.conclusion ?? j.status)} | ${fmt(j.start_delay_s)} | ${fmt(j.queue_s)} | ${fmt(j.duration_s)} | ${j.runner_origin === "self-hosted" ? "própria" : "hospedado"} | ${cell(j.labels.join(","))} |`);
   const slow = m.jobs.flatMap((j) => j.steps.filter((s) => (s.duration_s ?? 0) >= 10).map((s) => ({ job: j.name, attempt: j.attempt, ...s })));
   if (slow.length) {
     lines.push("");

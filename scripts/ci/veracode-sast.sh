@@ -18,8 +18,12 @@ status=0
 # Credenciais pelos parâmetros documentados do Pipeline Scan (o Actions mascara os valores no log). Um arquivo de
 # credenciais montado no container NÃO foi lido pela imagem (probe P4: "Missing value for credential: 'ID'").
 # Roda com o usuário do runner: o usuário padrão da imagem não grava no diretório montado (probe P4).
-docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD/$out:/scan" -w /scan \
-  veracode/pipeline-scan@sha256:894fd6d68bb2b2177f1a6931806be426e547ec627a5e750e3d938b23752676da \
+# Em Docker/Podman rootless (runner próprio) o usuário do host é o root do contêiner: container-user.sh escolhe o --user.
+# Nome qualificado (docker.io/) porque o Podman não resolve nomes curtos; o digest é o mesmo.
+source scripts/ci/tools/container-user.sh
+# shellcheck disable=SC2046
+docker run --rm $(container_user_args) -e HOME=/tmp -v "$PWD/$out:/scan" -w /scan \
+  docker.io/veracode/pipeline-scan@sha256:894fd6d68bb2b2177f1a6931806be426e547ec627a5e750e3d938b23752676da \
   --veracode_api_id "$VERACODE_API_ID" --veracode_api_key "$VERACODE_API_KEY" \
   --file sast.zip --fail_on_severity="Very High, High" --json_output_file results.json --filtered_json_output_file filtered_results.json || status=$?
 echo "Pipeline Scan terminou com código $status (o critério é avaliado abaixo)"

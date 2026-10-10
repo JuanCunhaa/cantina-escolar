@@ -18,13 +18,19 @@ on:
 permissions:
   contents: read
 
+# Runner PRÓPRIO (cantina-vps-01, uma instância): os jobs executam em série nele. Provisionamento, hooks de limpeza, diferenças
+# em relação ao Ubuntu hospedado e limitações: docs/testing/runner-proprio.md. TZ=UTC mantém o fuso do runner hospedado
+# (a VPS está em outro fuso); a aplicação e os testes definem America/Sao_Paulo por conta própria.
+env:
+  TZ: UTC
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   changes:
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, cantina-ci]
     timeout-minutes: 5
     permissions:
       contents: read
@@ -55,7 +61,7 @@ jobs:
 
   fast:
     needs: changes
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, cantina-ci]
     timeout-minutes: 15
     env:
       MODE: ${{ needs.changes.outputs.mode }}
@@ -66,7 +72,6 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-          cache: ${{ needs.changes.outputs.mode == 'full' && 'npm' || '' }}
       - name: Documentos estruturados (JSON válido)
         run: node scripts/ci/validate-structured.ts
       - name: npm ci
@@ -123,7 +128,7 @@ jobs:
   backend:
     needs: changes
     if: needs.changes.outputs.mode == 'full'
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, cantina-ci]
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -136,7 +141,6 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-          cache: npm
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
@@ -202,7 +206,7 @@ jobs:
   build:
     needs: changes
     if: needs.changes.outputs.mode == 'full'
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, cantina-ci]
     timeout-minutes: 15
     outputs:
       artifact: ${{ steps.pack.outputs.artifact }}
@@ -213,7 +217,6 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-          cache: npm
       - run: npm ci
       - name: Ambiente hermético do build (emulador, valores fictícios)
         run: node scripts/ci/build-manifest.ts env >> "$GITHUB_ENV"
@@ -248,7 +251,7 @@ jobs:
     name: e2e (${{ matrix.group }})
     needs: [changes, build]
     if: needs.changes.outputs.mode == 'full'
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, cantina-ci]
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -263,7 +266,6 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-          cache: npm
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
@@ -287,11 +289,13 @@ jobs:
       - name: Listar testes (suíte e grupo)
         id: list
         run: node scripts/ci/e2e-groups.ts verify --list
-      # Normal: ~25 s. Limite curto para falhar rápido quando o espelho apt da Azure ou o CDN do Playwright travam
-      # (run 37664506782: 39 kB/s no apt, 15 min parados nos dois grupos); reexecutar só o job falho.
-      - name: Navegador do Playwright (chromium + dependências do sistema)
+      # Normal: ~30 s (o download vai para ~/.cache/ms-playwright, que persiste no runner próprio). Limite curto para falhar
+      # rápido quando o CDN do Playwright trava; reexecutar só o job falho. As bibliotecas do sistema (o que o --with-deps
+      # instalava via apt) são provisionadas UMA vez por um administrador: o job não é root nem tem sudo
+      # (scripts/ci/runner/setup-vps.sh; conferidas por scripts/ci/runner/validate.sh toolchain).
+      - name: Navegador do Playwright (chromium)
         timeout-minutes: 5
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
       - name: Recursos do runner (início do e2e)
         continue-on-error: true
         run: |
@@ -343,7 +347,7 @@ jobs:
 
   security:
     needs: changes
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, cantina-ci]
     timeout-minutes: 30
     env:
       MODE: ${{ needs.changes.outputs.mode }}
@@ -400,7 +404,7 @@ jobs:
   quality:
     needs: [changes, fast, backend]
     if: needs.changes.outputs.mode == 'full'
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, cantina-ci]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -456,7 +460,7 @@ jobs:
   check:
     needs: [changes, fast, backend, build, e2e, security, quality]
     if: always()
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, cantina-ci]
     timeout-minutes: 5
     permissions:
       contents: read

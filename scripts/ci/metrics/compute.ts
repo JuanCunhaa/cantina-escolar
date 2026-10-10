@@ -1,5 +1,6 @@
 // Cálculo das métricas FinOps de uma execução do Actions a partir dos metadados da API (fonte principal).
 // Funções puras: recebem os objetos da API e devolvem o relatório; testadas com fixtures de execuções reais.
+import { jobIdOf, type NeedsGraph } from "./graph.ts";
 
 export type ApiStep = { name: string; number: number; status: string; conclusion: string | null; started_at: string | null; completed_at: string | null };
 export type ApiJob = {
@@ -35,6 +36,9 @@ export type ApiRun = {
 };
 export type ApiArtifact = { id: number; name: string; size_in_bytes: number; created_at: string | null; expires_at: string | null; expired: boolean };
 
+/** Origem do runner: máquina própria (self-hosted) ou hospedado pelo GitHub. Minutos da máquina própria NÃO são minutos hospedados. */
+export type RunnerOrigin = "self-hosted" | "github-hosted";
+
 export type Execution = {
   job_ids: number[];
   name: string;
@@ -47,6 +51,9 @@ export type Execution = {
   start_delay_s: number | null;
   duration_s: number;
   rounded_min: number;
+  runner_origin: RunnerOrigin;
+  /** Fila do runner: do momento em que o job ficou PRONTO (criado e dependências concluídas) até o início. null = grafo indisponível ou job copiado. */
+  queue_s: number | null;
   /** Tempo do job sem runner atribuído (fila até cancelamento/conclusão): não é consumo de runner. */
   without_runner_s: number;
   runner_name: string | null;
@@ -59,6 +66,14 @@ const seconds = (from: string | null | undefined, to: string | null | undefined)
   if (!from || !to) return null;
   return Math.round((Date.parse(to) - Date.parse(from)) / 1000);
 };
+
+/** Pelo rótulo `self-hosted` de runs-on; sem rótulos, runner com nome fora do padrão "GitHub Actions N" também é próprio. */
+export function runnerOrigin(job: Pick<ApiJob, "labels" | "runner_name">): RunnerOrigin {
+  const labels = (job.labels ?? []).map((l) => l.toLowerCase());
+  if (labels.includes("self-hosted")) return "self-hosted";
+  if (!labels.length && job.runner_name && !/^GitHub Actions/i.test(job.runner_name)) return "self-hosted";
+  return "github-hosted";
+}
 
 /** Estimativa por job: o GitHub arredonda cada job para o minuto inteiro superior. Não é cobrança oficial. */
 export const roundedMinutes = (durationS: number): number => (durationS > 0 ? Math.ceil(durationS / 60) : 0);
@@ -99,7 +114,10 @@ export function dedupeExecutions(jobsByAttempt: ApiJob[][]): Execution[] {
         completed_at: job.completed_at,
         start_delay_s: carried ? null : seconds(job.created_at, job.started_at),
         duration_s: duration,
-        rounded_min: roundedMinutes(duration),
+        // Só runner hospedado entra na estimativa de minutos do GitHub; a máquina própria é tempo medido, sem arredondamento.
+        rounded_min: runnerOrigin(job) === "github-hosted" ? roundedMinutes(duration) : 0,
+        runner_origin: runnerOrigin(job),
+        queue_s: null,
         without_runner_s: waitedWithoutRunner,
         runner_name: job.runner_name,
         labels: job.labels ?? [],
@@ -111,6 +129,25 @@ export function dedupeExecutions(jobsByAttempt: ApiJob[][]): Execution[] {
     }
   });
   return ordered;
+}
+
+/**
+ * Fila do runner = início − momento em que o job ficou pronto. A API só dá criação→início (start_delay_s), que também inclui a
+ * espera pelas dependências (`needs`); com o grafo do workflow, pronto = max(criação, fim das dependências já concluídas).
+ * Sem grafo, job fora dele ou job copiado de tentativa anterior: null (desconhecido, nunca zero).
+ */
+export function applyQueue(executions: Execution[], needs: NeedsGraph | undefined): void {
+  if (!needs) return;
+  for (const e of executions) {
+    if (e.start_delay_s === null || !e.started_at) continue;
+    const id = jobIdOf(e.name, needs);
+    if (!id) continue;
+    const started = Date.parse(e.started_at);
+    const ready = (needs[id] ?? [])
+      .flatMap((dep) => executions.filter((d) => jobIdOf(d.name, needs) === dep && d.completed_at && Date.parse(d.completed_at) <= started + 1000).map((d) => Date.parse(d.completed_at ?? "")))
+      .reduce((max, t) => Math.max(max, t), Date.parse(e.created_at));
+    e.queue_s = Math.max(0, Math.round((started - ready) / 1000));
+  }
 }
 
 const countBy = (executions: Execution[]) => {
@@ -127,6 +164,8 @@ const maxIso = (values: (string | null)[]): string | null => {
   return times.length ? new Date(Math.max(...times)).toISOString() : null;
 };
 
+const ranOf = (executions: Execution[], origin: RunnerOrigin) => executions.filter((e) => e.duration_s > 0 && e.runner_origin === origin);
+
 export type RunMetrics = ReturnType<typeof computeRunMetrics>;
 
 export function computeRunMetrics(input: {
@@ -136,9 +175,16 @@ export function computeRunMetrics(input: {
   artifacts?: ApiArtifact[];
   vercel?: { state: string; created_at: string; updated_at: string } | null;
   generatedAt?: string;
+  /** Grafo `needs` do workflow (scripts/ci/metrics/graph.ts); sem ele a fila fica indisponível. */
+  needs?: NeedsGraph;
 }) {
   const { run, attempts } = input;
   const executions = dedupeExecutions(input.jobsByAttempt);
+  applyQueue(executions, input.needs);
+  const hosted = ranOf(executions, "github-hosted");
+  const own = ranOf(executions, "self-hosted");
+  const queues = own.map((e) => e.queue_s);
+  const queueKnown = own.length > 0 && queues.every((q) => q !== null);
   const ran = executions.filter((e) => e.duration_s > 0);
   const rawS = ran.reduce((sum, e) => sum + e.duration_s, 0);
   const roundedMin = ran.reduce((sum, e) => sum + e.rounded_min, 0);
@@ -213,7 +259,17 @@ export function computeRunMetrics(input: {
       runner_raw_s: rawS,
       runner_raw_min: Math.round((rawS / 60) * 10) / 10,
       rounded_estimate_min: roundedMin,
-      rounded_estimate_note: "estimativa: cada job arredondado ao minuto superior; não é cobrança",
+      rounded_estimate_note: "estimativa só dos jobs em runner HOSPEDADO: cada job arredondado ao minuto superior; não é cobrança. Máquina própria não entra",
+      // Por origem do runner. A soma dos tempos da máquina própria mede ocupação (serial, uma instância), não cobrança.
+      github_hosted: { jobs: hosted.length, raw_s: hosted.reduce((s, e) => s + e.duration_s, 0), rounded_estimate_min: hosted.reduce((s, e) => s + e.rounded_min, 0) },
+      self_hosted: {
+        jobs: own.length,
+        raw_s: own.reduce((s, e) => s + e.duration_s, 0),
+        queue_known: queueKnown,
+        queue_sum_s: queueKnown ? queues.reduce((s: number, q) => s + (q ?? 0), 0) : null,
+        queue_max_s: queueKnown ? Math.max(...queues.map((q) => q ?? 0)) : null,
+        note: "tempo de máquina própria: ocupação do runner, não é minuto hospedado nem cobrança; fila exige o grafo needs do workflow",
+      },
       official: { available: false, reason: "consumo/custo oficial não consultado: /timing devolve billable 0 e a API de cobrança exige escopo de conta não concedido" },
       reruns_raw_s: reruns.reduce((s, e) => s + e.duration_s, 0),
       without_runner_s: executions.reduce((s, e) => s + e.without_runner_s, 0),
@@ -232,8 +288,11 @@ export function computeRunMetrics(input: {
 
 /** Assinatura de equivalência para comparação histórica: evento + conjunto de jobs que executaram na 1ª tentativa. */
 export function equivalenceKey(metrics: RunMetrics): string {
-  const names = new Set(metrics.jobs.filter((j) => j.attempt === 1 && j.duration_s > 0).map((j) => j.name));
-  return `${metrics.run.event === "push" ? "push" : metrics.run.event}|${[...names].sort((a, b) => a.localeCompare(b)).join(",")}`;
+  const ran = metrics.jobs.filter((j) => j.attempt === 1 && j.duration_s > 0);
+  const names = new Set(ran.map((j) => j.name));
+  // Origem entra na chave: execução paralela hospedada e serial na máquina própria não são equivalentes (espera e soma diferem).
+  const origins = new Set(ran.map((j) => j.runner_origin));
+  return `${metrics.run.event}|${[...origins].sort((a, b) => a.localeCompare(b)).join("+")}|${[...names].sort((a, b) => a.localeCompare(b)).join(",")}`;
 }
 
 export function percentile(values: number[], p: number): number | null {

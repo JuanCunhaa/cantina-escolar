@@ -1,14 +1,15 @@
 // Coletor FinOps do CI: lê só metadados da API (run, tentativas, jobs, artefatos, status do commit) e grava JSON + Markdown.
 // Não baixa nem executa artefatos/código do PR, não dispara workflows e não altera o resultado do CI.
 // Uso: node scripts/ci/metrics/collect.ts --repo dono/repo --run <id> [--out dir] [--history 30] [--collector-run <id>] [--gh]
-import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { computeRunMetrics, equivalenceKey, summarizeHistory, type ApiArtifact, type ApiAttempt, type ApiJob, type ApiRun, type RunMetrics } from "./compute.ts";
 import { ghCliFetcher, paginate, tokenFetcher, type Fetcher } from "./github.ts";
+import { parseNeeds, type NeedsGraph } from "./graph.ts";
 import { renderMarkdown } from "./render.ts";
 import { writeLines } from "../lib/output.ts";
 
-export async function fetchRunMetrics(fetcher: Fetcher, repo: string, runId: number, withExtras = true): Promise<RunMetrics> {
+export async function fetchRunMetrics(fetcher: Fetcher, repo: string, runId: number, withExtras = true, needs?: NeedsGraph): Promise<RunMetrics> {
   const run = (await fetcher(`repos/${repo}/actions/runs/${runId}`)) as ApiRun;
   const attempts: ApiAttempt[] = [];
   const jobsByAttempt: ApiJob[][] = [];
@@ -27,7 +28,7 @@ export async function fetchRunMetrics(fetcher: Fetcher, repo: string, runId: num
       vercel = null; // sem permissão/sem status: relatado como indisponível
     }
   }
-  return computeRunMetrics({ run, attempts, jobsByAttempt, artifacts, vercel });
+  return computeRunMetrics({ run, attempts, jobsByAttempt, artifacts, vercel, needs });
 }
 
 async function history(fetcher: Fetcher, repo: string, current: RunMetrics, limit: number) {
@@ -50,17 +51,19 @@ async function collectorUsage(fetcher: Fetcher, repo: string, collectorRunId: nu
   const previous = await paginate<ApiRun>(fetcher, `repos/${repo}/actions/workflows/${own.workflow_id}/runs?status=completed`, "workflow_runs", 1);
   let previousRawS = 0;
   let previousRounded = 0;
+  let previousOwnRawS = 0;
   const sample = previous.filter((r) => r.id !== collectorRunId).slice(0, 10);
   for (const r of sample) {
     const m = await fetchRunMetrics(fetcher, repo, r.id, false);
     previousRawS += m.consumption.runner_raw_s;
     previousRounded += m.consumption.rounded_estimate_min;
+    previousOwnRawS += m.consumption.self_hosted.raw_s;
   }
   return {
     run_id: collectorRunId,
     partial_duration_s: started ? Math.round((Date.now() - Date.parse(started)) / 1000) : null,
     partial_note: "parcial: medida antes do fim do próprio job",
-    previous_runs_final: { n: sample.length, runner_raw_s: previousRawS, rounded_estimate_min: previousRounded },
+    previous_runs_final: { n: sample.length, runner_raw_s: previousRawS, rounded_estimate_min: previousRounded, self_hosted_raw_s: previousOwnRawS },
   };
 }
 
@@ -85,12 +88,15 @@ export async function main(argv: string[], env: Record<string, string | undefine
   const repo = String(args.repo ?? env.GITHUB_REPOSITORY ?? "");
   const runId = Number(args.run);
   if (!/^[\w.-]+\/[\w.-]+$/.test(repo) || !Number.isSafeInteger(runId) || runId <= 0) {
-    console.error("Uso: node scripts/ci/metrics/collect.ts --repo dono/repo --run <id> [--out dir] [--history N] [--collector-run <id>] [--gh]");
+    console.error("Uso: node scripts/ci/metrics/collect.ts --repo dono/repo --run <id> [--out dir] [--history N] [--collector-run <id>] [--workflow-file <ci.yml>] [--gh]");
     return 2;
   }
   try {
     const fetcher = deps.fetcher ?? (args.gh || !env.GITHUB_TOKEN ? ghCliFetcher() : tokenFetcher(env.GITHUB_TOKEN));
-    const metrics = await fetchRunMetrics(fetcher, repo, runId);
+    // Grafo needs do workflow da branch padrão (checkout esparso do coletor): dado lido, nunca executado.
+    const workflowFile = String(args["workflow-file"] ?? ".github/workflows/ci.yml");
+    const needs = existsSync(workflowFile) ? parseNeeds(readFileSync(workflowFile, "utf8")) : undefined;
+    const metrics = await fetchRunMetrics(fetcher, repo, runId, true, needs);
     const limit = args.history === undefined ? 0 : Number(args.history);
     const hist = limit > 0 ? await history(fetcher, repo, metrics, limit) : null;
     const collector = args["collector-run"] ? await collectorUsage(fetcher, repo, Number(args["collector-run"])) : null;

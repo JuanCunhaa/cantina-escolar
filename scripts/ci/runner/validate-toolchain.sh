@@ -3,7 +3,7 @@
 # com Node 24 e Java 21 já configurados e SEM a suíte: confere só o que difere entre o Ubuntu hospedado e a VPS.
 # Escreve apenas em RUNNER_TEMP e nos caches intencionais (~/.npm, ~/.cache/ms-playwright, ~/.cache/firebase, imagem do contêiner).
 
-PIPELINE_SCAN_IMAGE="${PIPELINE_SCAN_IMAGE:-veracode/pipeline-scan@sha256:894fd6d68bb2b2177f1a6931806be426e547ec627a5e750e3d938b23752676da}"
+PIPELINE_SCAN_IMAGE="${PIPELINE_SCAN_IMAGE:-docker.io/veracode/pipeline-scan@sha256:894fd6d68bb2b2177f1a6931806be426e547ec627a5e750e3d938b23752676da}"
 
 timed() { # timed <rótulo> <segundos-limite> <comando...>: ok/falha com a duração; saída só em caso de falha
   local label="$1" limit="$2" start out rc
