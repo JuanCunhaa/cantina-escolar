@@ -33,7 +33,7 @@ Nada mais permanece hospedado. **Reversão**: trocar `runs-on` de volta para `ub
 | Node / Java | `setup-node`/`setup-java` | os mesmos actions (Node 24.21, Temurin 21.0.12 no `_work/_tool`, persistente) | sem mudança |
 | npm | `setup-node` com cache do Actions | cache local `~/.npm` persistente | `cache: npm` removido (restauro/salvamento via GitHub deixa de ser necessário) |
 | Chromium | `playwright install --with-deps` (apt) | sem sudo | bibliotecas instaladas uma vez pelo administrador; o job só baixa o navegador (`~/.cache/ms-playwright`) |
-| Contêiner (Veracode SAST) | Docker | **Podman rootless** (`podman-docker`) | `scripts/ci/tools/container-user.sh`: em rootless o usuário do host é o root do contêiner (`--user 0:0`); imagem qualificada `docker.io/…@sha256:…` (mesmo digest) |
+| Contêiner (Veracode SAST) | Docker | **Docker 29.9** instalado pelo administrador (daemon com privilégio; `ghrunner` no grupo `docker`) | `scripts/ci/tools/container-user.sh` escolhe `--user`: usuário do job em Docker comum (medido: `1001:1001`, arquivos do contêiner pertencem ao `ghrunner`) e `0:0` em runtime rootless; imagem qualificada `docker.io/…@sha256:…` (mesmo digest). **Ver o risco em Segurança** |
 | Veracode SCA (`srcclr`) | instalado a cada job (`sudo dpkg`) | instalado uma vez (versão e hash fixados) | `install-srcclr.sh` pula se a versão fixada já existe; sem root/sudo e sem o pacote, reprova com instrução |
 | Recursos | 2–4 CPUs | 4 CPUs, 7,9 GB, sem swap | swap de 4 GB opcional (`--swap 4G`); `resource-snapshot.sh` segue gravando os recursos |
 | Portas fixas | máquina nova a cada job | máquina compartilhada | `validate.sh` confere 9099, 8080, 4000, 4400, 4500, 9150, 3100; hooks encerram restos |
@@ -53,7 +53,7 @@ ssh -t ADMIN@VPS 'sudo bash ~/cantina-ci-setup/runner/setup-vps.sh --swap 4G'
 ```
 
 `setup-vps.sh` (idempotente): pacotes do Chromium (lista que o Playwright indicou para esta VPS), `podman`, `podman-docker`,
-`uidmap`, `zip`; subuid/subgid e `loginctl enable-linger` para o `ghrunner`; `srcclr` fixado; hooks em `/opt/cantina-ci/hooks`
+`passt`, `uidmap`, `zip` (o Podman fica pronto como alternativa; a VPS hoje usa o Docker instalado pelo administrador); subuid/subgid e `loginctl enable-linger` para o `ghrunner`; `srcclr` fixado; hooks em `/opt/cantina-ci/hooks`
 (root, 755); `ACTIONS_RUNNER_HOOK_JOB_STARTED/COMPLETED` e `XDG_RUNTIME_DIR` no `.env` do runner; swap opcional; reinicia o
 serviço **somente se não houver job executando**. Verificação: executar o `runner-smoke` (push na branch ou `workflow_dispatch`).
 
@@ -71,7 +71,7 @@ serviço **somente se não houver job executando**. Verificação: executar o `r
 
 ## Segurança e limitações
 
-- Jobs rodam como `ghrunner`: não é root, não tem sudo (`validate.sh` falha se tiver), não está no grupo `docker` (Podman rootless).
+- Jobs rodam como `ghrunner`: não é root e não tem sudo (`validate.sh` falha se tiver). **Exceção medida (smoke 38017538721): `ghrunner` está no grupo `docker` e o Docker NÃO é rootless** — acesso ao daemon equivale a root na VPS (um job pode montar `/` em um contêiner). É risco aceito pelo dono para o Veracode SAST, não isolamento; o `validate.sh` o mantém como AVISO. Alternativas sem root efetivo, por ordem de esforço: (1) Podman rootless (`podman`, `podman-docker`, `passt`, `uidmap`, `loginctl enable-linger`; `setup-vps.sh` já prepara), com `ghrunner` fora do grupo `docker`; (2) Docker rootless (`dockerd-rootless-setuptool.sh`); (3) deixar só o job `security` em runner hospedado. `container-user.sh` já cobre rootless.
 - **Runner persistente executa código de quem puder abrir PR/branch no repositório**, com os segredos do `ci`
   (Veracode, SonarQube Cloud). Aceitável porque o repositório é **privado** e de um dono; condição: sem colaboradores externos e,
   se houver, *Settings → Actions → Fork pull request workflows*: exigir aprovação. Guarda dentro do workflow não protege (o PR
