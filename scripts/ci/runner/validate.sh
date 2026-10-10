@@ -114,6 +114,30 @@ check_hooks() {
   done
 }
 
+# ---------------------------------------------------------------- estado ocioso (nada de job anterior consumindo recursos)
+check_idle() {
+  local owner n names containers
+  owner="$(ps -eo user=,comm= | awk '$2=="Runner.Listener"{print $1}' | sort -u | tr '\n' ' ')"
+  case "$owner" in
+    "") warn "Runner.Listener não visível neste job" ;;
+    "$(id -un) ") ok "serviço do runner (Runner.Listener) executa como $(id -un)" ;;
+    *) fail "Runner.Listener executa como: $owner" ;;
+  esac
+  info "carga (1/5/15 min): $(cut -d' ' -f1-3 /proc/loadavg); processos do usuário: $(ps -u "$(id -u)" --no-headers | wc -l)"
+  names="$(ps -u "$(id -u)" -o comm= | grep -E '^(java|firebase|chrome|chromium|headless_shell|next-server|gitleaks|srcclr|vitest|playwright)' | sort | uniq -c | tr '\n' ' ')"
+  n="$(printf '%s' "$names" | wc -w)"
+  if [ "$n" -eq 0 ]; then ok "sem processos de job remanescentes (java/firebase/chromium/next/scanners)"; else fail "processos remanescentes de job anterior: $names"; fi
+  if command -v docker >/dev/null 2>&1; then
+    if docker version --format '{{.Server.Version}}' >/dev/null 2>&1; then
+      ok "docker acessível como $(id -un) (servidor $(docker version --format '{{.Server.Version}}'))"
+      containers="$(docker ps -q | wc -l)"
+      if [ "$containers" -eq 0 ]; then ok "nenhum contêiner em execução ($(docker ps -aq | wc -l) parado(s) no total)"; else fail "$containers contêiner(es) em execução de job anterior"; fi
+    else
+      fail "docker sem acesso ao daemon como $(id -un)"
+    fi
+  fi
+}
+
 case "$mode" in
   base)
     check_identity
@@ -122,6 +146,7 @@ case "$mode" in
     check_ports
     check_writes
     check_hooks
+    check_idle
     ;;
   toolchain)
     # shellcheck source=/dev/null

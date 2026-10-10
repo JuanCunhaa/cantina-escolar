@@ -130,12 +130,18 @@ branch padrão, checkout esparso, sem npm, sem artefatos/código do PR, sem segr
 `ci-metrics-<run>-a<tentativa>` (JSON + Markdown, 30 dias):
 
 - espera do desenvolvedor (1ª tentativa e final, esta incluindo o intervalo humano entre tentativas, que não é runner);
-- minutos brutos (soma das durações com runner), estimativa arredondada por job (não é cobrança) e cobrança oficial =
-  **indisponível**; consumo das reexecuções; jobs sem runner à parte;
-- por job/tentativa: criação→início (inclui fila; **não separa** fila do runner de espera de dependência), duração,
-  etapas, runner (rótulos); artefatos (tamanho, retenção) e transferências (etapas `Artefato:`); status da Vercel separado;
-- histórico de execuções equivalentes (mesmo evento e mesmo conjunto de jobs executados): mediana com n ≥ 5, p95 com n ≥ 20;
+- minutos brutos (soma das durações com runner) **por origem**; estimativa arredondada por job **só para runner hospedado** (não é
+  cobrança; tempo de máquina própria não é arredondado nem vira minuto hospedado) e cobrança oficial = **indisponível**; consumo
+  das reexecuções; jobs sem runner à parte;
+- por job/tentativa: criação→início, **fila do runner** (job pronto → início; no run 38019996252 o `created_at` da API coincidiu com
+  o instante em que as dependências terminaram, e o grafo `needs` do `ci.yml` da branch padrão confere o mesmo valor), duração,
+  etapas, **origem do runner** (`self-hosted` × hospedado, pelo rótulo) e rótulos; artefatos (tamanho, retenção) e transferências (etapas `Artefato:`); status da Vercel separado;
+- histórico de execuções equivalentes (mesmo evento, mesma origem de runner e mesmo conjunto de jobs executados): mediana com n ≥ 5, p95 com n ≥ 20;
 - consumo do próprio coletor: parcial na execução corrente; total final das execuções anteriores.
+
+Runner e operação da máquina própria: docs/testing/runner-proprio.md. **`workflow_run` usa a definição da branch padrão**: o
+`ci-metrics` migrado só passa a rodar na máquina própria depois do merge (até lá roda o da `main`, hospedado); o ensaio dos mesmos
+passos está no `runner-smoke` (job `metrics`).
 
 Versões de Node/Next ficam no manifesto do build (resumo do job `build`); o coletor não lê artefatos do PR.
 

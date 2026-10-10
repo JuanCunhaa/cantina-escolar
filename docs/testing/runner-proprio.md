@@ -94,9 +94,11 @@ rodar jobs pesados em paralelo na mesma VPS sem medição**: o critério é a fi
 
 - **Soma dos tempos** de todos os runners, e separada por origem: *hospedado* (brutos + estimativa arredondada por job, que
   continua sendo estimativa, não cobrança) e *máquina própria* (tempo medido, **sem arredondamento e sem virar minuto hospedado**).
-- **Fila na máquina própria** (soma e maior): início − momento em que o job ficou pronto (criação ou fim das dependências). A API só
-  informa criação→início, que mistura espera por dependência; o coletor lê o grafo `needs` do `ci.yml` da branch padrão (como
-  dado). Sem o grafo ou para job fora dele: "indisponível", nunca zero. Job copiado de tentativa anterior não tem fila.
+- **Fila na máquina própria** (soma e maior): início − momento em que o job ficou pronto (criação ou fim das dependências). Medido no
+  run 38019996252: o `created_at` do job na API **já é** o instante em que ele ficou pronto (o `e2e` foi criado quando o `build`
+  terminou), então criação→início e fila coincidem; o coletor ainda lê o grafo `needs` do `ci.yml` da branch padrão (como dado) como
+  conferência independente, e sem o grafo a fila fica "indisponível", nunca zero. Job copiado de tentativa anterior não tem fila.
+  A **soma das filas** é soma de esperas que se sobrepõem (vários jobs esperam ao mesmo tempo): não é tempo decorrido.
 - Colunas **Origem**, **Criação→início** e **Fila do runner** por job. O histórico de execuções equivalentes **inclui a origem na
   chave**: execuções hospedadas (paralelas) e na VPS (seriais) não se misturam nas medianas.
 - Cobrança oficial segue indisponível; faturamento não foi alterado.
@@ -107,3 +109,48 @@ rodar jobs pesados em paralelo na mesma VPS sem medição**: o critério é a fi
 - Atualização do runner: automática pelo serviço; reiniciar o serviço só ocioso (`./svc.sh stop|start`).
 - Atualizar hooks/pacotes: repetir `setup-vps.sh` com os scripts da versão revisada.
 - Conferência periódica: `runner-smoke` (workflow_dispatch) — inventário e toolchain, sem suíte.
+
+## Evidências (PR #36)
+
+**Execução completa** — `ci` 38019996252, commit `390c9c6`, evento `pull_request`, tentativa 1: **success** (10 jobs, gate `check` verde).
+Todos os 10 jobs em `[self-hosted, linux, x64, cantina-ci]`; **0 jobs em runner hospedado**.
+
+| Medida | Valor | Natureza |
+|---|---|---|
+| Duração total (criação do run → fim do `check`) | 35m55s | tempo de parede |
+| Soma dos tempos executados (máquina própria) | 35m39s | medido; ocupação do runner de 99,3% (2139 s de 2155 s) |
+| Soma das filas por job | 78m59s | soma de esperas **sobrepostas**, não é tempo decorrido |
+| Maior fila | 16m34s (`backend (g2)`) | medido |
+| Minutos hospedados (GitHub) | 0 jobs | estimativa de arredondamento = 0; consumo/cobrança oficial **indisponível** (API de cobrança sem escopo) |
+
+Por job (duração · fila): changes 13s · 1s; backend g1 8m32s · 1s; fast 2m35s · 8m35s; security 3m06s · 11m11s; build 2m13s · 14m19s;
+backend g2 7m35s · 16m34s; e2e g2 4m22s · 7m37s; e2e g1 4m13s · 12m00s; quality 2m35s · 8m39s; check 15s · 2s. Execução: o runner
+rodou um job por vez, com 1–2 s entre eles (a espera acima é fila, não execução).
+
+**Comparação com o hospedado** (3 execuções completas verdes, mesmos 10 jobs: 37956346980, 37957400207, 37959552356):
+parede 7m14s–7m35s; soma 24,8–26,7 min; estimativa arredondada 31–33 min hospedados por execução. Na VPS: parede ≈ 4,8× maior e
+soma ≈ 1,4× maior. Jobs de CPU ficaram ~1,5× mais lentos por job (ex.: backend g1 8m32s × ~5m17s; build 2m13s × ~1m33s); o
+`security` empatou (3m06s × ~3m11s, dominado por serviços externos). A causa da lentidão por job **não foi diagnosticada**.
+Estas são 3 amostras hospedadas e 1 na VPS: indicam ordem de grandeza, não mediana (a estatística do coletor exige n ≥ 5).
+
+**Primeira execução** (38017730740, commit `ccee68f`): `security` reprovou por minha mudança (a linha da impressão digital
+pública da Veracode saiu da linha 8 do `install-srcclr.sh` e a exceção revisada do Gitleaks é por linha — corrigido movendo o
+comentário, sem tocar em `.gitleaksignore`); `backend (g1)` reprovou em 2 testes de `amend-api` por corrida de virada do dia (BASE
+calculada às 23:5x BRT no carregamento do arquivo, rota às 00:0x BRT): falha do teste, não do runner; nenhum teste, gate,
+timeout ou retry foi alterado. Os passos Veracode SAST (Docker) e SCA (`srcclr` pré-instalado) já passaram nessa execução.
+
+**Smoke** (`runner-smoke`): 38015414070 → 38017538721, o último com `smoke` e `toolchain` verdes: Node 24.21, Java 21.0.12,
+`npm ci` 38 s, emuladores Auth+Firestore 22 s, Chromium 1 s, Gitleaks/actionlint com SHA-256, contêiner do Pipeline Scan grava
+no diretório montado (`--user 1001:1001`, arquivos do `ghrunner`), hooks configurados e executando (processos de job
+encerrados: 0; disco livre 86 GB), swap 4 GB. Usuário do job: `ghrunner` (uid 1001); Docker 29.9 funciona nesse usuário.
+
+**`ci-metrics`**: as execuções recentes do `ci-metrics` da `main` (hospedado) **falharam sem iniciar** (0 etapas, sem runner): o
+GitHub recusou o job por pagamento/limite de gastos da conta (anotação "recent account payments have failed or your spending limit
+needs to be increased"; 9 falhas nas últimas 30 execuções, incluindo as deste PR). É o bloqueio de cobrança que motiva a
+migração; faturamento **não** foi alterado. Como `workflow_run` usa a definição da branch padrão, a versão migrada só roda após o
+merge; antes disso, o job `metrics` do `runner-smoke` ensaia os mesmos passos na máquina própria. As métricas deste PR foram
+geradas com o mesmo coletor (`scripts/ci/metrics/collect.ts --gh`).
+
+**Estado ocioso do runner** (dono do serviço, Docker acessível, nenhum contêiner nem processo de job remanescente, carga): verificado
+por `validate.sh base` (função `check_idle`) no `runner-smoke` do HEAD do PR; o resultado está no comentário de fechamento do PR.
+
