@@ -73,11 +73,12 @@ check_tools() {
   command -v dpkg >/dev/null 2>&1 && ok "dpkg disponível" || fail "dpkg ausente"
   command -v srcclr >/dev/null 2>&1 && ok "srcclr: $(dpkg -s srcclr 2>/dev/null | awk '/^Version:/{print $2}')" || warn "srcclr (Veracode SCA) não instalado: instalar como administrador (ver docs/testing/runner-proprio.md)"
   if command -v docker >/dev/null 2>&1; then
-    local sec
+    local rootless sec
+    rootless="$(docker info --format '{{.Host.Security.Rootless}}' 2>/dev/null || true)"
     sec="$(docker info --format '{{.SecurityOptions}}' 2>/dev/null || true)"
-    if [ -z "$sec" ]; then fail "docker presente, mas sem acesso ao daemon para este usuário"; else
-      case "$sec" in *rootless*) ok "docker rootless ($sec)" ;; *) warn "docker NÃO rootless ($sec): acesso ao daemon equivale a root" ;; esac
-    fi
+    if [ "$rootless" = "true" ]; then ok "Podman rootless ($(docker --version))"
+    elif [ -n "$sec" ]; then case "$sec" in *rootless*) ok "docker rootless ($sec)" ;; *) warn "docker NÃO rootless ($sec): acesso ao daemon equivale a root" ;; esac
+    else fail "docker/podman presente, mas indisponível para este usuário (XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-vazio})"; fi
   else
     fail "docker/podman ausente (o Veracode Pipeline Scan roda em contêiner)"
   fi

@@ -40,7 +40,7 @@ PLAYWRIGHT_DEPS="at-spi2-common fontconfig fontconfig-config fonts-freefont-ttf 
 step "1/7 Pacotes: Chromium do Playwright, contêiner rootless (Podman) e utilitários"
 run apt-get update -qq
 # shellcheck disable=SC2086
-run env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $PLAYWRIGHT_DEPS podman podman-docker uidmap zip
+run env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $PLAYWRIGHT_DEPS podman podman-docker passt uidmap zip
 
 step "2/7 Podman rootless para $RUNNER_USER (sem grupo docker, sem daemon com privilégio)"
 run touch /etc/containers/nodocker
