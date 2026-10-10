@@ -25,7 +25,9 @@ export default defineConfig({
   // homologação, com o sandbox real do Mercado Pago, é staging/online-confirmation-sandbox.spec.ts.
   // Recarga online (F18): o e2e usa o provedor de DEMONSTRAÇÃO e escreve no emulador (127.0.0.1:8080), então não roda contra a HML
   // (achado da suíte publicada completa de 07/10/2026: ECONNREFUSED); o equivalente é staging/online-topup-sandbox.spec.ts.
-  testIgnore: ["e2e/online-topup*.spec.ts", "e2e/payments-confirmation*.spec.ts", "e2e/wallet*.spec.ts", "e2e/policies*.spec.ts", "e2e/checkout*.spec.ts", "e2e/my-orders*.spec.ts", "e2e/fulfillment*.spec.ts", "e2e/cancellation*.spec.ts", "e2e/pos*.spec.ts", "e2e/amend*.spec.ts", "e2e/topups*.spec.ts", "e2e/finance*.spec.ts"],
+  // Relatórios de vendas (F21): e2e escreve fixtures direto no emulador; o equivalente na homologação, com dados FICTÍCIOS pelo fluxo normal
+  // das rotas e recebimento simulado, é staging/sales-report-hml.spec.ts.
+  testIgnore: ["e2e/online-topup*.spec.ts", "e2e/payments-confirmation*.spec.ts", "e2e/wallet*.spec.ts", "e2e/policies*.spec.ts", "e2e/checkout*.spec.ts", "e2e/my-orders*.spec.ts", "e2e/fulfillment*.spec.ts", "e2e/cancellation*.spec.ts", "e2e/pos*.spec.ts", "e2e/amend*.spec.ts", "e2e/topups*.spec.ts", "e2e/finance*.spec.ts", "e2e/sales-report*.spec.ts"],
   timeout: 120000,
   fullyParallel: false,
   workers: 1,

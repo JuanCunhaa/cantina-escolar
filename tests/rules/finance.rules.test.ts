@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { assertFails, initializeTestEnvironment, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
-import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc } from "firebase/firestore";
+import { collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc } from "firebase/firestore";
 
 let env: RulesTestEnvironment;
 
@@ -22,6 +22,8 @@ const PATHS = [
   "feeSeries/term_abc__card_credit",
   "topups/tpm_1/reconciliations/rcn_1",
   "directSales/dsl_1/reconciliations/rcn_2",
+  "reportDays/2026-10-08", // F21: projeção diária dos relatórios (custo e receita por fato)
+  "reportDays/2026-10-08/parts/p000",
 ] as const;
 
 beforeAll(async () => {
@@ -51,6 +53,8 @@ describe("Firestore rules — F20: caixa, taxas e conferências são fechados ao
     await assertFails(deleteDoc(doc(db, PATHS[1])));
     await assertFails(setDoc(doc(db, "feeSeries/term_x__pix"), { versions: [{ n: 1, percentBp: 1 }] }));
     await assertFails(updateDoc(doc(db, "feeSeries/term_abc__card_credit"), { versions: [] }));
+    await assertFails(setDoc(doc(db, "reportDays/2026-10-09"), { digest: "forjado", parts: 1, schemaVersion: 1 })); // F21: ninguém grava a projeção pelo cliente
+    await assertFails(updateDoc(doc(db, "reportDays/2026-10-08"), { digest: "forjado" }));
     await assertFails(setDoc(doc(db, "topups/tpm_1/reconciliations/rcn_9"), { after: { fee: { status: "confirmed", cents: 0 } } }));
   };
   it("admin não lê nem lista nenhuma coleção financeira da F20", () => cannotRead("admin"));
@@ -66,5 +70,38 @@ describe("Firestore rules — F20: caixa, taxas e conferências são fechados ao
     const db = env.unauthenticatedContext().firestore();
     for (const path of PATHS) await assertFails(getDoc(doc(db, path)));
     await assertFails(setDoc(doc(db, "cashSessions/x"), { a: 1 }));
+  });
+});
+
+// F21: o relatório de vendas lê, SÓ pelo servidor, os movimentos de estoque (custo e receita), os cancelamentos e o livro das carteiras
+// por consulta de grupo de coleções. As Rules não ganharam permissão nenhuma: nenhum papel lê esses dados pelo cliente, nem listando o
+// grupo inteiro (que seria a forma de montar um relatório de custos e lucro pelo navegador).
+describe("Firestore rules — F21: custo, receita e cancelamentos não saem pelo cliente, nem por consulta de grupo", () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "stockCosts/prd_a/movements/m000000001"), { type: "sale_exit", quantity: -1, totalCostMicros: -105_000_000, revenueCents: 200 });
+      await setDoc(doc(db, "orders/ord_1/cancellations/can_1"), { orderId: "ord_1", kind: "family", refundCents: 500 });
+      await setDoc(doc(db, "wallets/stu_a/entries/e1"), { type: "topup", amountCents: 5000 });
+    });
+  });
+  const cannotGroup = async (role: string) => {
+    const db = (await as(`g_${role}`, role)).firestore();
+    await assertFails(getDocs(collectionGroup(db, "movements")));
+    await assertFails(getDocs(collectionGroup(db, "cancellations")));
+    await assertFails(getDocs(collectionGroup(db, "entries")));
+    await assertFails(getDoc(doc(db, "stockCosts/prd_a/movements/m000000001")));
+    await assertFails(getDoc(doc(db, "orders/ord_1/cancellations/can_1")));
+  };
+  it("admin não lista movimentos, cancelamentos nem livro por grupo de coleções", () => cannotGroup("admin"));
+  it("secretaria não lista movimentos, cancelamentos nem livro por grupo de coleções", () => cannotGroup("secretaria"));
+  it("cantina não lista movimentos, cancelamentos nem livro por grupo de coleções", () => cannotGroup("cantina"));
+  it("guardian não lista movimentos, cancelamentos nem livro por grupo de coleções", () => cannotGroup("guardian"));
+  it("student não lista movimentos, cancelamentos nem livro por grupo de coleções", () => cannotGroup("student"));
+  it("sem login: nenhuma consulta de grupo", async () => {
+    const db = env.unauthenticatedContext().firestore();
+    await assertFails(getDocs(collectionGroup(db, "movements")));
+    await assertFails(getDocs(collectionGroup(db, "cancellations")));
+    await assertFails(getDocs(collectionGroup(db, "entries")));
   });
 });

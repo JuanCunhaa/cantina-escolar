@@ -23,7 +23,8 @@
       "checkout.spec.ts",
       "my-orders.spec.ts",
       "amend.spec.ts",
-      "cancellation.spec.ts"
+      "cancellation.spec.ts",
+      "sales-report.spec.ts"
     ]
   },
   "diagnostic": {

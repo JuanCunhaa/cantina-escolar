@@ -1,0 +1,236 @@
+import { Timestamp, type DocumentData, type DocumentReference, type Firestore, type QueryDocumentSnapshot } from "firebase-admin/firestore";
+import { addDays, localInstant, type LocalDate } from "@/lib/dates/school-time";
+import type { DayFacts } from "./sales-days";
+import type { ReadMeter } from "./sales-meter";
+import { emptyDayFacts } from "./sales-days";
+import type { AdjustmentFact, CancellationFact, LedgerFact, LossFact, PurchaseFact, PurchaseReversalFact, RetainedFact, SaleFact } from "./sales-model";
+import {
+  adjustmentFactOf,
+  cancellationFactOf,
+  ledgerFactOf,
+  lossFactOf,
+  originKey,
+  originOfDirectSale,
+  originOfOrder,
+  orderOfCancellationPath,
+  productOfMovementPath,
+  purchaseFactOf,
+  purchaseReversalFactOf,
+  retainedFactOf,
+  saleFactOf,
+  type OriginInfo,
+  type ProductInfo,
+} from "./sales-sources";
+
+/**
+ * Leitura dos documentos de origem de um INTERVALO de dias (F21): produz os fatos tipados (`DayFacts`). É a única porta de
+ * entrada dos fatos — o dia corrente é lido assim ao vivo e cada dia fechado é lido assim UMA vez para ser materializado
+ * (`sales-days.ts`). Consultas por intervalo de campo único; o grupo de coleções tem `fieldOverrides` em firestore.indexes.json.
+ */
+const ID = /^[A-Za-z0-9_-]{1,128}$/;
+
+export const chunks = <T>(list: readonly T[], size: number): T[][] => {
+  const out: T[][] = [];
+  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+  return out;
+};
+
+export async function getMany(db: Firestore, refs: readonly DocumentReference[], meter?: ReadMeter, label = "documentos por ID") {
+  const parts = await Promise.all(chunks(refs, 300).map((c) => db.getAll(...c)));
+  const all = parts.flat();
+  if (refs.length > 0) meter?.read(label, all.length);
+  return all;
+}
+
+const dataOf = (d: QueryDocumentSnapshot): DocumentData => d.data();
+
+/**
+ * Nome/categoria dos produtos: carrega só os ATIVOS de uma vez (rankings de baixo giro) e busca por ID, sob demanda, os que
+ * aparecem nos fatos e não estão ativos (produto retirado do catálogo continua nos movimentos antigos).
+ */
+export class ProductDirectory {
+  readonly map = new Map<string, ProductInfo>();
+  readonly active: { productId: string; name: string; categoryId: string | null }[] = [];
+  private constructor(
+    private readonly db: Firestore,
+    private readonly meter?: ReadMeter,
+  ) {}
+
+  static async load(db: Firestore, meter?: ReadMeter): Promise<ProductDirectory> {
+    const dir = new ProductDirectory(db, meter);
+    const snap = await db.collection("products").where("status", "==", "active").limit(5000).get();
+    meter?.query("produtos ativos", snap.size);
+    for (const d of snap.docs) {
+      const info = ProductDirectory.infoOf(d.id, d.data());
+      dir.map.set(d.id, info);
+      dir.active.push({ productId: d.id, ...info });
+    }
+    return dir;
+  }
+
+  private static infoOf(id: string, x: DocumentData): ProductInfo {
+    return { name: typeof x.name === "string" ? x.name : id, categoryId: typeof x.categoryId === "string" ? x.categoryId : null };
+  }
+
+  /** Garante no mapa os produtos citados (inclusive inativos). */
+  async ensure(ids: Iterable<string>): Promise<void> {
+    const missing = [...new Set(ids)].filter((id) => ID.test(id) && !this.map.has(id));
+    for (const snap of await getMany(this.db, missing.map((id) => this.db.doc(`products/${id}`)), this.meter, "produtos por ID")) if (snap.exists) this.map.set(snap.id, ProductDirectory.infoOf(snap.id, snap.data()!));
+  }
+}
+
+/**
+ * Liga nome/categoria ATUAIS do cadastro aos fatos que só têm o marcador (perdas, ajustes, compras, estornos de entrada, baixas sem pedido
+ * de origem e linhas de cancelamento sem categoria da época). Roda DEPOIS de ler o cache e do mesmo jeito para o dia ao vivo, então o
+ * relatório mostra o rótulo de hoje e o cache nunca guarda dado que muda sem mudar a contagem de documentos.
+ */
+export async function bindLabels(facts: DayFacts, dir: ProductDirectory): Promise<void> {
+  const ids = new Set<string>();
+  for (const f of [...facts.losses, ...facts.adjustments, ...facts.purchases, ...facts.purchaseReversals]) ids.add(f.productId);
+  for (const f of facts.sales) if (!f.originFound) ids.add(f.productId);
+  for (const c of facts.cancellations) for (const l of c.lines) if (l.categoryId === null) ids.add(l.productId);
+  await dir.ensure(ids);
+  const bind = (f: { productId: string; productName: string; categoryId: string | null }) => {
+    const info = dir.map.get(f.productId);
+    if (info) {
+      f.productName = info.name;
+      f.categoryId = info.categoryId;
+    }
+  };
+  for (const f of [...facts.losses, ...facts.adjustments, ...facts.purchases, ...facts.purchaseReversals]) bind(f);
+  for (const f of facts.sales) if (!f.originFound) bind(f);
+  for (const c of facts.cancellations) for (const l of c.lines) if (l.categoryId === null) l.categoryId = dir.map.get(l.productId)?.categoryId ?? null;
+}
+
+export type ReadOptions = { cap: number; meter?: ReadMeter };
+
+/** Lê e tipa os fatos de `[from, to]` (datas locais, fim inclusivo). Estouro de `cap` em qualquer fonte = `truncated`. */
+export async function readFacts(db: Firestore, range: { from: LocalDate; to: LocalDate }, opts: ReadOptions): Promise<DayFacts> {
+  const { cap, meter } = opts;
+  const start = Timestamp.fromDate(localInstant(range.from, "00:00"));
+  const end = Timestamp.fromDate(localInstant(addDays(range.to, 1), "00:00"));
+  const group = (name: string, fields: string[]) =>
+    db
+      .collectionGroup(name)
+      .where("createdAt", ">=", start)
+      .where("createdAt", "<", end)
+      .select(...fields)
+      .limit(cap + 1)
+      .get();
+
+  const [movements, cancellations, entries, receiptDocs, resolved] = await Promise.all([
+    group("movements", ["type", "quantity", "totalCostMicros", "revenueCents", "referenceType", "referenceId", "reasonCode", "createdAt"]),
+    group("cancellations", ["kind", "lines", "shiftId", "channel", "createdAt"]),
+    group("entries", ["type", "amountCents", "createdAt"]),
+    db.collection("stockReceipts").where("createdAt", ">=", start).where("createdAt", "<", end).limit(cap + 1).get(),
+    // Só as resoluções do PERÍODO (intervalo em campo único), nunca o histórico inteiro de não retirados encerrados.
+    db.collection("orders").where("nonPickup.resolution.resolvedAt", ">=", start).where("nonPickup.resolution.resolvedAt", "<", end).limit(cap + 1).get(),
+  ]);
+
+  meter?.query("fontes: movimentos de estoque", movements.size);
+  meter?.query("fontes: cancelamentos", cancellations.size);
+  meter?.query("fontes: lançamentos das carteiras", entries.size);
+  meter?.query("fontes: entradas de estoque", receiptDocs.size);
+  meter?.query("fontes: resoluções de não retirado", resolved.size);
+  const facts = emptyDayFacts();
+  const bad = (source: string) => (facts.unreadable[source] = (facts.unreadable[source] ?? 0) + 1);
+  if (movements.size > cap) facts.truncated.push("movimentos de estoque");
+  if (cancellations.size > cap) facts.truncated.push("cancelamentos");
+  if (entries.size > cap) facts.truncated.push("lançamentos das carteiras");
+  if (receiptDocs.size > cap) facts.truncated.push("entradas de estoque");
+  if (resolved.size > cap) facts.truncated.push("não retirados encerrados");
+
+  const moves = movements.docs.slice(0, cap).filter((d) => productOfMovementPath(d.ref.path) !== null);
+  const cancelDocs = cancellations.docs.slice(0, cap).filter((d) => orderOfCancellationPath(d.ref.path) !== null);
+  const receipts = receiptDocs.docs.slice(0, cap);
+
+  // Nome/categoria vindos do CADASTRO ATUAL do produto são mutáveis sem mudar a quantidade de documentos: não entram nos fatos (ficam
+  // como marcador) e são ligados na LEITURA por `bindLabels`. Só o snapshot do pedido/venda de origem (imutável) é gravado.
+  const productMap: ReadonlyMap<string, ProductInfo> = new Map();
+
+  const wanted = new Map<string, DocumentReference>();
+  for (const d of moves) {
+    if (d.get("type") !== "sale_exit") continue;
+    const type = d.get("referenceType");
+    const id = d.get("referenceId");
+    if ((type === "order" || type === "directSale") && typeof id === "string" && ID.test(id)) wanted.set(originKey(dataOf(d)), db.doc(`${type === "order" ? "orders" : "directSales"}/${id}`));
+  }
+  const origins = new Map<string, OriginInfo>();
+  for (const snap of await getMany(db, [...wanted.values()], meter, "fontes: pedidos/vendas de origem")) {
+    if (!snap.exists) continue;
+    const isOrder = snap.ref.parent.id === "orders";
+    origins.set(`${isOrder ? "order" : "directSale"}:${snap.id}`, isOrder ? originOfOrder(snap.data()!) : originOfDirectSale(snap.data()!));
+  }
+
+  const sales: SaleFact[] = facts.sales;
+  const losses: LossFact[] = facts.losses;
+  const adjustments: AdjustmentFact[] = facts.adjustments;
+  const purchaseReversals: PurchaseReversalFact[] = facts.purchaseReversals;
+  for (const d of moves) {
+    const type = d.get("type");
+    if (type === "sale_exit") {
+      const f = saleFactOf(d.ref.path, dataOf(d), origins, productMap);
+      if (f) sales.push(f);
+      else bad("baixas de venda");
+    } else if (type === "loss") {
+      const f = lossFactOf(d.ref.path, dataOf(d), productMap);
+      if (f) losses.push(f);
+      else bad("perdas");
+    } else if (type === "receipt_reversal") {
+      const f = purchaseReversalFactOf(d.ref.path, dataOf(d), productMap);
+      if (f) purchaseReversals.push(f);
+      else bad("estornos de entrada");
+    } else if (type === "count_adjustment" || type === "adjustment") {
+      const f = adjustmentFactOf(d.ref.path, dataOf(d), productMap);
+      if (f) adjustments.push(f);
+      else bad("ajustes de estoque");
+    }
+  }
+
+  // Cancelamentos: turno, canal e categoria da época vêm do PEDIDO (o cancelamento não os guarda).
+  const cancelledOrders = new Map<string, OriginInfo>();
+  const orderRefs = [...new Set(cancelDocs.map((d) => orderOfCancellationPath(d.ref.path)!))].map((id) => db.doc(`orders/${id}`));
+  for (const snap of await getMany(db, orderRefs, meter, "fontes: pedidos dos cancelamentos")) if (snap.exists) cancelledOrders.set(snap.id, originOfOrder(snap.data()!));
+  const cancellationFacts: CancellationFact[] = facts.cancellations;
+  for (const d of cancelDocs) {
+    const f = cancellationFactOf(d.ref.path, dataOf(d), cancelledOrders, productMap);
+    if (f) cancellationFacts.push(f);
+    else bad("cancelamentos");
+  }
+
+  // Conferência ENTRE FONTES medida aqui (o valor pago do pedido muda com troca e NÃO é guardado nos fatos): as baixas de um
+  // pedido/venda nunca passam do valor pago registrado nele.
+  const perOrigin = new Map<string, { revenue: number; paid: number }>();
+  for (const f of sales) {
+    const paid = origins.get(f.origin)?.paidCents;
+    if (paid === null || paid === undefined || f.revenueCents === null) continue;
+    const e = perOrigin.get(f.origin) ?? { revenue: 0, paid };
+    e.revenue += f.revenueCents;
+    perOrigin.set(f.origin, e);
+  }
+  facts.paidViolations = [...perOrigin.values()].filter((e) => e.revenue > e.paid).length;
+
+  const retained: RetainedFact[] = facts.retained;
+  for (const d of resolved.docs.slice(0, cap)) {
+    const res = (d.get("nonPickup") as { resolution?: { kind?: string } } | undefined)?.resolution;
+    if (res?.kind !== "close_charged") continue;
+    const f = retainedFactOf(d.id, dataOf(d));
+    if (f) retained.push(f);
+    else bad("não retirados encerrados");
+  }
+
+  const purchases: PurchaseFact[] = facts.purchases;
+  for (const d of receipts) {
+    const f = purchaseFactOf(d.id, dataOf(d), productMap);
+    if (f) purchases.push(f);
+    else bad("entradas de estoque");
+  }
+  const ledger: LedgerFact[] = facts.ledger;
+  for (const d of entries.docs.slice(0, cap)) {
+    if (!/^wallets\/[^/]+\/entries\/[^/]+$/.test(d.ref.path)) continue;
+    const f = ledgerFactOf(d.ref.path, dataOf(d));
+    if (f) ledger.push(f);
+    else bad("lançamentos das carteiras");
+  }
+  return facts;
+}

@@ -21,6 +21,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/operacao/estoque", label: "Estoque", roles: ["cantina", "admin"], ready: true },
   { href: "/operacao/recebimentos", label: "Recebimentos", roles: ["secretaria", "admin"], ready: true },
   { href: "/operacao/caixa", label: "Caixa", roles: ["cantina", "secretaria", "admin"], ready: true },
+  { href: "/operacao/relatorios", label: "Relatórios", roles: ["cantina", "admin"], ready: true },
   { href: "/operacao/pagamentos", label: "Pagamentos online", roles: ["admin"], ready: true },
   { href: "/operacao/financeiro", label: "Financeiro", roles: ["admin"], ready: true },
   { href: "/operacao/responsaveis", label: "Responsáveis", roles: ["admin"], ready: true },
