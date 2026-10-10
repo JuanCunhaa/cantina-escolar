@@ -1,0 +1,50 @@
+# Smoke do runner próprio (cantina-vps-01): checkout, versões, permissões de escrita e execução básica. NÃO roda a suíte e não
+# usa segredos. Somente leitura sobre a VPS (scripts/ci/runner/validate.sh); serve também de inventário antes da migração.
+# Dispara por push nesta branch quando o smoke ou os scripts do runner mudam, e manualmente.
+name: runner-smoke
+
+on:
+  push:
+    branches: [ci/runner-proprio]
+    paths:
+      - .github/workflows/runner-smoke.yml
+      - scripts/ci/runner/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runner-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: [self-hosted, linux, x64, cantina-ci]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Execução básica (identidade, relógio, variáveis do runner)
+        run: |
+          echo "usuário: $(id)"
+          echo "host: $(hostname) · $(uname -srm)"
+          echo "runner: ${RUNNER_NAME} (${RUNNER_OS}/${RUNNER_ARCH}, ${RUNNER_ENVIRONMENT})"
+          echo "workspace: $GITHUB_WORKSPACE · temp: $RUNNER_TEMP · tool cache: $RUNNER_TOOL_CACHE"
+          echo "commit: $(git rev-parse --short HEAD)"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Versões
+        run: |
+          node --version
+          npm --version
+          java -version 2>&1 | head -n 1
+          git --version
+      - name: Validação do runner (somente leitura)
+        run: bash scripts/ci/runner/validate.sh base
