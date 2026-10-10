@@ -196,6 +196,9 @@ export async function planCancellation(
         studentId,
         seq,
         kind,
+        // Turno e canal NO MOMENTO do cancelamento (o pedido pode ser reagendado depois): o relatório de vendas (F21) não depende do pedido atual.
+        shiftId: typeof order.data.shiftId === "string" ? order.data.shiftId : null,
+        channel: typeof order.data.channel === "string" ? order.data.channel : "advance",
         lines: lines.map((l) => ({ lineNo: l.lineNo, productId: l.productId, name: l.name, quantity: l.quantity, refundCents: l.refundCents })),
         canceledUnits,
         refundCents,

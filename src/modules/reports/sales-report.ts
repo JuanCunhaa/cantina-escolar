@@ -27,7 +27,7 @@ import {
 } from "./sales-model";
 import { CLOSE_GRACE_MS, countSources, countsOf, digestOf, emptyDayFacts, isComplete, mergeDayFacts, readDay, sameCounts, writeDay, type DayFacts, type DayRead, type SourceCounts } from "./sales-days";
 import { ReadMeter } from "./sales-meter";
-import { ProductDirectory, getMany, readFacts } from "./sales-read";
+import { ProductDirectory, bindLabels, getMany, readFacts } from "./sales-read";
 import { pendingOrderOf, reversalFactOf } from "./sales-sources";
 import { buildSalesTables, SALES_VIEWS, type SalesView } from "./sales-tables";
 import { tableCsv } from "./table";
@@ -115,6 +115,20 @@ async function pool<T, R>(items: readonly T[], limit: number, fn: (item: T) => P
   return out;
 }
 
+/**
+ * Lê as fontes de um dia fechado de forma ESTÁVEL: conta as fontes, lê os fatos duas vezes e conta de novo. Só é estável se a contagem
+ * não mudou E os dois conjuntos de fatos têm o mesmo digest — contagem igual não prova conteúdo igual (um documento enriquecido pode mudar
+ * sem mudar a quantidade), então o conteúdo também é comparado. `twice: false` (verify) lê uma vez.
+ */
+async function readStable(db: Firestore, date: LocalDate, cap: number, meter: ReadMeter, hooks: LoadOptions["hooks"], twice = true): Promise<{ facts: DayFacts; counts: SourceCounts; stable: boolean }> {
+  const first = await countSources(db, date, meter);
+  const facts = await readFacts(db, { from: date, to: date }, { cap, meter });
+  await hooks?.afterRead?.(date);
+  const again = twice ? await readFacts(db, { from: date, to: date }, { cap, meter }) : facts;
+  const second = await countSources(db, date, meter);
+  return { facts, counts: second, stable: sameCounts(first, second) && (!twice || digestOf(facts) === digestOf(again)) };
+}
+
 const emptyProjection = (): ProjectionStats => ({ cachedDays: 0, builtDays: 0, liveDays: 0, building: [], staleDays: 0, repairedDays: 0, unstableDays: 0, cacheErrors: 0 });
 
 /**
@@ -123,7 +137,7 @@ const emptyProjection = (): ProjectionStats => ({ cachedDays: 0, builtDays: 0, l
  * descartado e reconstruído. Reconstruir mede as fontes antes e depois da leitura: se mudaram no meio, o dia é usado mas NÃO gravado.
  * Falha ao ler ou gravar o cache nunca derruba o relatório: segue pelas fontes.
  */
-async function loadFacts(db: Firestore, range: { from: LocalDate; to: LocalDate }, now: Date, cap: number, budgetMs: number, products: () => Promise<ProductDirectory>, meter: ReadMeter, hooks: LoadOptions["hooks"]): Promise<{ facts: DayFacts; projection: ProjectionStats }> {
+async function loadFacts(db: Firestore, range: { from: LocalDate; to: LocalDate }, now: Date, cap: number, budgetMs: number, meter: ReadMeter, hooks: LoadOptions["hooks"]): Promise<{ facts: DayFacts; projection: ProjectionStats }> {
   const projection = emptyProjection();
   const before = closedBefore(now);
   const days = eachDay(range.from, range.to);
@@ -138,9 +152,8 @@ async function loadFacts(db: Firestore, range: { from: LocalDate; to: LocalDate 
     } catch {
       projection.cacheErrors += 1;
     }
-    let known: SourceCounts | null = null; // contagem fresca já obtida (reaproveitada como "antes" da reconstrução)
     if (cached.status === "hit") {
-      known = await countSources(db, date, meter);
+      const known = await countSources(db, date, meter);
       if (sameCounts(known, cached.sourceCounts)) {
         projection.cachedDays += 1;
         return cached.facts;
@@ -152,12 +165,9 @@ async function loadFacts(db: Firestore, range: { from: LocalDate; to: LocalDate 
       projection.building.push(date);
       return null;
     }
-    const first = known ?? (await countSources(db, date, meter));
-    const facts = await readFacts(db, { from: date, to: date }, { cap, products: await products(), meter });
-    await hooks?.afterRead?.(date);
-    const second = await countSources(db, date, meter);
-    if (!sameCounts(first, second)) {
-      projection.unstableDays += 1; // as fontes mudaram durante a leitura: usa agora, não grava
+    const { facts, counts: second, stable } = await readStable(db, date, cap, meter, hooks);
+    if (!stable) {
+      projection.unstableDays += 1; // as fontes (contagem OU conteúdo) mudaram durante a leitura: usa agora, não grava
       projection.liveDays += 1;
       return facts;
     }
@@ -177,7 +187,7 @@ async function loadFacts(db: Firestore, range: { from: LocalDate; to: LocalDate 
   });
   projection.building.sort();
 
-  const live = open.length > 0 ? await readFacts(db, { from: open[0]!, to: open.at(-1)! }, { cap, products: await products(), meter }) : emptyDayFacts();
+  const live = open.length > 0 ? await readFacts(db, { from: open[0]!, to: open.at(-1)! }, { cap, meter }) : emptyDayFacts();
   projection.liveDays += open.length;
   return { facts: mergeDayFacts([...perDay.filter((f): f is DayFacts => f !== null), live]), projection };
 }
@@ -203,12 +213,13 @@ export async function loadSalesSources(db: Firestore, query: SalesQuery, scope: 
   const today = localDateOf(now);
   const full = scope === "full";
   const meter = new ReadMeter();
+  meter.read("perfil do ator (autenticação)", 1); // `requireActor` lê `users/{uid}` em toda chamada autenticada
   const pendingFrom = addDays(today, -PENDING_LOOKBACK_DAYS);
   let directory: Promise<ProductDirectory> | null = null;
   const products = () => (directory ??= ProductDirectory.load(db, meter));
 
   const [{ facts, projection }, categoriesSnap, shiftsSnap, openSnaps] = await Promise.all([
-    loadFacts(db, query, now, cap, opts.buildBudgetMs ?? BUILD_BUDGET_MS, products, meter, opts.hooks),
+    loadFacts(db, query, now, cap, opts.buildBudgetMs ?? BUILD_BUDGET_MS, meter, opts.hooks),
     db.collection("categories").limit(1000).get(),
     db.collection("shifts").limit(200).get(),
     // Posição de HOJE: pedidos pagos ainda não realizados (sempre ao vivo), só da janela; os mais antigos são apenas contados.
@@ -216,6 +227,7 @@ export async function loadSalesSources(db: Firestore, query: SalesQuery, scope: 
   ]);
   const olderOpen = await countOlderOpenOrders(db, pendingFrom, meter);
   const dir = await products();
+  await bindLabels(facts, dir); // rótulos do cadastro atual, nunca gravados no cache
   meter.query("categorias", categoriesSnap.size);
   meter.query("turnos", shiftsSnap.size);
   for (const snap of openSnaps) meter.query("pedidos em aberto (posição de hoje)", snap.size);
@@ -349,18 +361,14 @@ export async function maintainDays(db: Firestore, actor: Actor, raw: unknown, cl
   const cap = opts.cap ?? SOURCE_CAP;
   const before = closedBefore(clock());
   const meter = new ReadMeter();
-  const directory = await ProductDirectory.load(db, meter);
   const days = await pool(eachDay(q.from, q.to), BUILD_CONCURRENCY, async (date): Promise<DayMaintenance> => {
     if (date >= before) return { date, status: "open_day", cachedDigest: null, sourceDigest: null, counts: {} };
     const cached = await readDay(db, date, meter);
-    const first = await countSources(db, date, meter);
-    const facts = await readFacts(db, { from: date, to: date }, { cap, products: directory, meter });
-    await opts.hooks?.afterRead?.(date);
-    const second = await countSources(db, date, meter);
+    const { facts, counts: second, stable } = await readStable(db, date, cap, meter, opts.hooks, q.mode === "rebuild");
     const sourceDigest = digestOf(facts);
     const cachedDigest = cached.status === "hit" ? cached.digest : null;
     const base = { date, cachedDigest, sourceDigest, counts: countsOf(facts) as Record<string, number> };
-    if (!sameCounts(first, second)) return { ...base, status: "unstable" };
+    if (!stable) return { ...base, status: "unstable" };
     if (!isComplete(facts)) return { ...base, status: "incomplete" };
     if (q.mode === "verify") {
       if (cached.status === "absent") return { ...base, status: "missing" };

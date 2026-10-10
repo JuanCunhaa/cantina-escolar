@@ -59,6 +59,7 @@ beforeAll(async () => {
   reportsMod = await import("@/modules/reports/sales-report");
   routes["GET sales"] = (await import("@/app/api/reports/sales/route")).GET as unknown as Handler;
   routes["GET finance report"] = (await import("@/app/api/admin/finance/report/route")).GET as unknown as Handler;
+  routes["POST reschedule"] = (await import("@/app/api/operations/orders/[id]/reschedule/route")).POST as unknown as Handler;
   routes["POST days"] = (await import("@/app/api/admin/reports/days/route")).POST as unknown as Handler;
   routes["GET export"] = (await import("@/app/api/reports/sales/export/route")).GET as unknown as Handler;
   routes["POST receipts"] = (await import("@/app/api/inventory/receipts/route")).POST as unknown as Handler;
@@ -750,6 +751,32 @@ describe("projeção diária persistida: dia fechado é materializado uma vez, r
     expect(rebuild.status).toBe("unchanged"); // já estava reconstruído
     expect((await reportsMod.maintainDays(db(), actorOf(admin, "admin"), { mode: "verify", ...range() }, later)).days[0]!.status).toBe("equal");
     digest = (await meta())!.digest;
+  });
+
+  it("fluxos suportados não mudam os campos persistidos de uma baixa de pedido: reagendar entregue/parcial é recusado; cancelar o restante só soma o evento novo", async () => {
+    const pr = await newProduct({ price: 300, stock: 20, unitCost: "1,00", cat: CAT2 });
+    const student = await newStudent({ shift: ST });
+    const orderId = await placeOrder(student, pr, 3);
+    const delivered = await deliver(orderId, student, [{ lineNo: 1, quantity: 1 }]);
+    expect(delivered.status, JSON.stringify(delivered.body)).toBe(200);
+    const asFullFor = async (productId: string) => (await reportsMod.salesReport(db(), actorOf(admin, "admin"), { ...range(), productId }, later)) as unknown as Record<string, unknown> & { projection: { builtDays: number; staleDays: number }; cancellations: unknown };
+    await wipe();
+    const before = await asFullFor(pr);
+    expect(before.projection.builtDays).toBe(1);
+    const factsBefore = JSON.stringify(sections(before).realized);
+    const resched = await call("POST reschedule", cantina, "POST", `/api/operations/orders/${orderId}/reschedule`, { key: randomUUID(), reason: "Tentativa de reagendar pedido com entrega parcial", toDate: d(1), toShiftId: ST }, orderId);
+    expect(resched.status).toBe(409);
+    expect(resched.body.error).toBe("partially_delivered");
+    expect((await reportsMod.maintainDays(db(), actorOf(admin, "admin"), { mode: "verify", ...range() }, later)).days[0]!.status).toBe("equal"); // nada mudou
+    const cancelled = await cancelAll(guardian, "guardian", orderId); // evento NOVO (cancelamento do restante) no mesmo dia
+    expect(cancelled.status, JSON.stringify(cancelled.body)).toBe(200);
+    const after = await asFullFor(pr);
+    expect(after.projection).toMatchObject({ staleDays: 1, builtDays: 1 }); // a contagem acusou o evento novo
+    expect(JSON.stringify(sections(after).realized)).toBe(factsBefore); // a baixa em si não mudou
+    expect((after.cancellations as { totals: { events: number } }).totals.events).toBe(1);
+    const event = (await db().collection(`orders/${orderId}/cancellations`).get()).docs[0]!.data();
+    expect(event).toMatchObject({ shiftId: ST, channel: "advance" }); // turno/canal gravados no evento
+    digest = (await meta())!.digest; // o dia ganhou fatos novos: o digest de referência acompanha
   });
 
   it("parte do cache adulterada é descartada pelo digest e o dia é reconstruído certo", async () => {

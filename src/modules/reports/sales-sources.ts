@@ -151,10 +151,14 @@ export function cancellationFactOf(path: string, d: Data, orders: ReadonlyMap<st
     const refund = int(l.refundCents);
     if (units === null || refund === null) return [];
     const productId = text(l.productId);
+    // Categoria da época = a da linha do PEDIDO (linhas nunca são apagadas); sem pedido fica nula e é ligada ao cadastro na LEITURA (`bindLabels`).
     const snapshot = orders.get(orderId)?.items.get(productId);
     return [{ productId, name: text(l.name, productId), categoryId: snapshot ? snapshot.categoryId : (products.get(productId)?.categoryId ?? null), units, refundCents: refund }];
   });
-  return { id: path, date, orderId, kind: text(d.kind, "unknown"), shiftId: orders.get(orderId)?.shiftId ?? null, channel: orders.get(orderId)?.channel ?? "unknown", lines };
+  // Turno/canal gravados no evento (imutáveis); evento antigo, sem os campos, cai no pedido atual (limitação documentada).
+  const channel: SaleChannel = d.channel === "advance" ? "advance" : d.channel === "counter" ? "counter" : (orders.get(orderId)?.channel ?? "unknown");
+  const shiftId = typeof d.shiftId === "string" ? d.shiftId : (orders.get(orderId)?.shiftId ?? null);
+  return { id: path, date, orderId, kind: text(d.kind, "unknown"), shiftId, channel, lines };
 }
 
 export function reversalFactOf(id: string, d: Data): ReversalFact | null {

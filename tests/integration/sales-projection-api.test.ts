@@ -39,6 +39,7 @@ const PID = `pj_${tag}_a`;
 const PID2 = `pj_${tag}_b`;
 const SHIFT = `pjs_${tag}`;
 const CAT = `pjc_${tag}`;
+const CAT2 = `pjc2_${tag}`;
 let BASE = "";
 let seq = 0;
 const d = (n: number) => school.addDays(BASE, n);
@@ -354,6 +355,72 @@ describe("conferência de taxa e liquidação não exige reconstruir o dia; esto
   });
 });
 
+/* --------------------------------------------- campos persistidos: nada mutável entra no cache sem a contagem acusar */
+
+describe("campos persistidos: o que muda sem mudar a quantidade de documentos não pode ficar no cache", () => {
+  const PID3 = `pj_${tag}_c`;
+
+  it("renomear o produto ou trocar a categoria DEPOIS da materialização não muda o digest, não reconstrói, e o relatório mostra o rótulo de hoje", async () => {
+    await track(`products/${PID3}`, { name: `Nome antigo ${tag}`, categoryId: CAT, status: "active" });
+    await loss(d(-14), 2, 40, PID3);
+    await track(`stockReceipts/${tag}r${++seq}`, { productId: PID3, kind: "purchase", quantity: 5, totalCostMicros: 500_000_000, status: "active", createdAt: at(d(-14)) });
+    await wipeDay(d(-14));
+    const first = await report({ from: d(-14), to: d(-14) }, () => new Date(), {}, { productId: PID3 });
+    expect(first.projection.builtDays).toBe(1);
+    const rows = (r: Full) => (r.losses as unknown as { rows: { name: string }[] }).rows.map((x) => x.name);
+    expect(rows(first)).toEqual([`Nome antigo ${tag}`]);
+    const digest = (await meta(d(-14)))!.digest;
+
+    await db().doc(`products/${PID3}`).update({ name: `Nome novo ${tag}`, categoryId: CAT2 });
+    const again = await report({ from: d(-14), to: d(-14) }, () => new Date(), {}, { productId: PID3 });
+    expect(again.projection).toMatchObject({ cachedDays: 1, builtDays: 0, staleDays: 0, repairedDays: 0 }); // o cache segue válido
+    expect(rows(again)).toEqual([`Nome novo ${tag}`]); // rótulo ligado na leitura
+    expect((await report({ from: d(-14), to: d(-14) }, () => new Date(), {}, { categoryId: CAT2 })).losses).not.toBeNull();
+    expect((await meta(d(-14)))!.digest).toBe(digest);
+    expect((await verify(d(-14), d(-14))).days[0]).toMatchObject({ status: "equal", cachedDigest: digest, sourceDigest: digest });
+    const raw = (await db().collection(`reportDays/${d(-14)}/parts`).get()).docs.map((x) => x.get("json") as string).join("");
+    expect(raw).not.toContain("Nome antigo");
+    expect(raw).not.toContain("Nome novo");
+  });
+
+  it("turno e canal do cancelamento vêm do EVENTO: reagendar o pedido depois não muda o dia materializado (verify igual, filtro por turno estável)", async () => {
+    const order = `${tag}ro${++seq}`;
+    await track(`orders/${order}`, { channel: "advance", shiftId: SHIFT, status: "paid", consumptionDate: d(2), items: [{ lineNo: 1, productId: PID, name: "Produto P", categoryId: CAT, quantity: 2, canceledQty: 1, subtotalCents: 200 }] });
+    await track(`orders/${order}/cancellations/c${++seq}`, { kind: "family", shiftId: SHIFT, channel: "advance", lines: [{ productId: PID, name: "Produto P", quantity: 1, refundCents: 100 }], createdAt: at(d(-15)) });
+    await wipeDay(d(-15));
+    const range = { from: d(-15), to: d(-15) };
+    const first = await report(range, () => new Date(), {}, { shiftId: SHIFT });
+    expect(first.cancellations!.totals).toMatchObject({ events: 1, refundCents: 100 });
+    // o pedido é reagendado para outro turno (supõe-se parcialmente cancelado e ainda sem entrega: o reagendamento é permitido)
+    await db().doc(`orders/${order}`).update({ shiftId: `${SHIFT}_outro`, consumptionDate: d(3) });
+    expect((await verify(d(-15), d(-15))).days[0]!.status).toBe("equal");
+    const stillThere = await report(range, () => new Date(), {}, { shiftId: SHIFT });
+    expect(stillThere.projection).toMatchObject({ cachedDays: 1, builtDays: 0 });
+    expect(stillThere.cancellations!.totals).toMatchObject({ events: 1, refundCents: 100 });
+    expect((await report(range, () => new Date(), {}, { shiftId: `${SHIFT}_outro` })).cancellations!.totals).toMatchObject({ events: 0 });
+    // limitação CONHECIDA: evento ANTIGO, sem turno gravado, depende do pedido atual na materialização (documentada)
+    const legacy = `${tag}lg${++seq}`;
+    await track(`orders/${legacy}`, { channel: "advance", shiftId: SHIFT, status: "paid", consumptionDate: d(2), items: [{ lineNo: 1, productId: PID, name: "Produto P", categoryId: CAT, quantity: 2, canceledQty: 1, subtotalCents: 200 }] });
+    await track(`orders/${legacy}/cancellations/c${++seq}`, { kind: "family", lines: [{ productId: PID, name: "Produto P", quantity: 1, refundCents: 50 }], createdAt: at(d(-16)) });
+    await wipeDay(d(-16));
+    expect((await report({ from: d(-16), to: d(-16) }, () => new Date(), {}, { shiftId: SHIFT })).cancellations!.totals).toMatchObject({ events: 1, refundCents: 50 });
+    await db().doc(`orders/${legacy}`).update({ shiftId: `${SHIFT}_outro` });
+    expect((await verify(d(-16), d(-16))).days[0]!.status).toBe("diverged"); // o único caso em que o conteúdo muda sem a contagem: só evento SEM turno gravado
+  });
+
+  it("contagens iguais não bastam: enriquecimento que muda ENTRE as duas leituras da reconstrução (sem mudar a contagem) torna o dia instável e não é gravado", async () => {
+    const id = await sale(d(-18), 500, 100, 1);
+    await wipeDay(d(-18));
+    const racing = await report({ from: d(-18), to: d(-18) }, () => new Date(), { hooks: { afterRead: async () => void (await db().doc(`directSales/${id}`).update({ shiftId: `${SHIFT}_trocado` })) } });
+    expect(racing.projection).toMatchObject({ unstableDays: 1, builtDays: 0, liveDays: 1 });
+    expect(await meta(d(-18))).toBeUndefined();
+    const stable = await report({ from: d(-18), to: d(-18) });
+    expect(stable.projection).toMatchObject({ builtDays: 1, unstableDays: 0 });
+    const verifyStatus = (await verify(d(-18), d(-18), "rebuild", () => new Date(), { hooks: { afterRead: async () => void (await db().doc(`directSales/${id}`).update({ shiftId: `${SHIFT}_outra_vez` })) } })).days[0]!.status;
+    expect(verifyStatus).toBe("unstable"); // o rebuild administrativo também recusa gravar leitura instável
+  });
+});
+
 /* ----------------------------------------------------------- posição de pedidos a realizar: janela de leitura */
 
 describe("pedidos a realizar: a janela limita a leitura; os antigos são só contados e ficam visíveis", () => {
@@ -425,7 +492,7 @@ describe("custo de consulta (estimativa por interceptação no cliente Admin, n�
     cold = await measured();
     row("1) primeira construção (8 dias, sem filtro)", cold);
     expect(cold.stats).toMatchObject({ builtDays: DAYS, cachedDays: 0, staleDays: 0 });
-    expect(cold.tally.byLabel["grupo:movements"]).toBe(DAYS * 12); // 10 vendas + 2 perdas por dia, cada documento UMA vez
+    expect(cold.tally.byLabel["grupo:movements"]).toBe(DAYS * 12 * 2); // 10 vendas + 2 perdas por dia, lidos DUAS vezes (leitura estável: contagem e conteúdo)
     expect(cold.stats.reads!.estimatedWrites).toBe(DAYS * 2); // 1 parte + 1 resumo por dia
   });
 
@@ -435,7 +502,7 @@ describe("custo de consulta (estimativa por interceptação no cliente Admin, n�
     expect(again.stats).toMatchObject({ cachedDays: DAYS, builtDays: 0, staleDays: 0 });
     for (const label of SOURCE_LABELS) expect(again.tally.byLabel[label] ?? 0, label).toBe(0); // não relê o histórico
     // nem os pedidos/vendas de origem: o único `getAll` possível é o custo médio ATUAL dos produtos dos pedidos em aberto (posição de hoje)
-    expect(again.tally.byLabel["getAll"] ?? 0).toBe(again.stats.reads!.byLabel["custo médio atual"] ?? 0);
+    expect(again.tally.byLabel["getAll"] ?? 0).toBe((again.stats.reads!.byLabel["custo médio atual"] ?? 0) + (again.stats.reads!.byLabel["produtos por ID"] ?? 0)); // custo médio atual + rótulos de produto inativo ligados na leitura
     expect(again.stats.reads!.byLabel["fontes: pedidos/vendas de origem"]).toBeUndefined();
     expect(again.tally.total - (again.tally.byLabel["colecao:orders"] ?? 0)).toBeLessThan(cold.tally.total / 3);
     // orçamento por dia: resumo + parte + 5 contagens (≥ 1 cada) = 7; o resto é constante (cadastros, posições de hoje, F20)
@@ -447,6 +514,31 @@ describe("custo de consulta (estimativa por interceptação no cliente Admin, n�
     expect(Math.abs(again.stats.reads!.estimatedReads - again.tally.total)).toBeLessThanOrEqual(15);
     expect(again.stats.reads!.byLabel["cache: resumo do dia"]).toBe(DAYS);
     note(`   orçamento reaberto: ${again.tally.total} leituras = ${DAYS} dias × 7 (resumo, parte, 5 contagens) + ${again.tally.total - DAYS * 7} de posições de hoje/cadastros`);
+  });
+
+  it("a cobrança de count() é por ENTRADAS DE ÍNDICE, não fixa: um dia com 3 200 movimentos custa 4 leituras só na contagem dos movimentos (e o dia se divide em várias partes)", async () => {
+    const day = d(-19);
+    const batchOf = async (from: number, to: number) => {
+      const batch = db().batch();
+      for (let i = from; i < to; i += 1) {
+        const path = `stockCosts/${PID}/movements/m${String(900_000 + i).padStart(9, "0")}`;
+        created.push(path);
+        batch.set(db().doc(path), { seq: 900_000 + i, type: "sale_exit", quantity: -1, totalCostMicros: -40_000_000, revenueCents: 100, referenceType: "order", referenceId: `volume${i}`, createdAt: at(day) });
+      }
+      await batch.commit();
+    };
+    for (let from = 0; from < 3200; from += 400) await batchOf(from, Math.min(3200, from + 400));
+    await wipeDay(day);
+    const built = await report({ from: day, to: day }, () => new Date(), {}, {});
+    expect(built.projection).toMatchObject({ builtDays: 1 });
+    expect((await meta(day))!.parts).toBeGreaterThanOrEqual(2); // 3 200 fatos passam de uma parte
+    const reopened = await report({ from: day, to: day }, () => new Date(), {}, {});
+    expect(reopened.projection).toMatchObject({ cachedDays: 1, builtDays: 0 });
+    const labels = reopened.projection.reads!.byLabel;
+    expect(labels["contagem: movimentos"]).toBe(4); // ceil(3 200 / 1 000), não 1
+    expect(labels["contagem: cancelamentos"]).toBe(1); // vazio: mínimo de 1
+    expect(labels["cache: partes do dia"]).toBe((await meta(day))!.parts);
+    expect(dayUnits(reopened, day)).toBe(3200);
   });
 
   it("mudar de filtro não relê as fontes (o cache é do dia inteiro; o recorte é em memória)", async () => {
@@ -465,9 +557,9 @@ describe("custo de consulta (estimativa por interceptação no cliente Admin, n�
     row("4) após alteração em 1 dia (reconstrói 1)", run);
     expect(run.stats).toMatchObject({ staleDays: 1, builtDays: 1, cachedDays: DAYS - 1 });
     // fontes lidas = só o dia alterado, 2 vezes não: 1 leitura de cada fonte para esse dia (11 movimentos + 1 de origem...)
-    expect(run.tally.byLabel["grupo:movements"]).toBe(10 + 1 + 2); // 10 vendas + 1 tardia + 2 perdas do dia reconstruído
-    expect(run.tally.byLabel["grupo:cancellations"]).toBe(1);
-    expect(run.tally.byLabel["colecao:stockReceipts"]).toBe(1);
+    expect(run.tally.byLabel["grupo:movements"]).toBe((10 + 1 + 2) * 2); // 10 vendas + 1 tardia + 2 perdas do dia reconstruído, lidos duas vezes
+    expect(run.tally.byLabel["grupo:cancellations"]).toBe(2);
+    expect(run.tally.byLabel["colecao:stockReceipts"]).toBe(2);
     expect(run.tally.total - (run.tally.byLabel["colecao:orders"] ?? 0)).toBeLessThan(cold.tally.total / 2);
   });
 
@@ -475,10 +567,10 @@ describe("custo de consulta (estimativa por interceptação no cliente Admin, n�
     const { result: rebuild, tally: t1 } = await measureReads(db(), () => verify(d(-30), d(-30), "rebuild"));
     note(`5) rebuild de 1 dia (admin)                      leituras(intercept.)=${String(t1.total).padStart(4)}  estimativa do servidor=${rebuild.estimatedReads}  status=${rebuild.days[0]!.status}`);
     expect(rebuild.days[0]!.status).toBe("unchanged");
-    expect(t1.byLabel["grupo:movements"]).toBe(12);
+    expect(t1.byLabel["grupo:movements"]).toBe(24); // rebuild lê duas vezes
     const { result: all, tally: t2 } = await measureReads(db(), () => verify(from(), to(), "verify"));
     note(`6) verify de ${DAYS} dias (admin, relê as fontes)        leituras(intercept.)=${String(t2.total).padStart(4)}  estimativa do servidor=${all.estimatedReads}  todos=${all.days.every((x) => x.status === "equal")}`);
     expect(all.days.every((x) => x.status === "equal")).toBe(true);
-    expect(t2.byLabel["grupo:movements"]).toBeGreaterThanOrEqual(DAYS * 12);
+    expect(t2.byLabel["grupo:movements"]).toBeGreaterThanOrEqual(DAYS * 12); // verify lê uma vez
   });
 });

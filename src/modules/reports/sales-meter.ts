@@ -1,8 +1,18 @@
 /**
  * Medidor de leituras do relatório de vendas (F21): conta, no servidor, os documentos que cada abertura consulta, por etiqueta.
- * É ESTIMATIVA do que a aplicação pediu ao Firestore (documentos devolvidos por consulta, mínimo 1 por consulta; agregação = 1 por
- * 1 000 entradas de índice, mínimo 1) — NÃO é a cobrança oficial, que só o console/faturamento do Firebase mostra. Serve para provar
- * que reabrir um período não relê o histórico e para orçar a cota gratuita (50 000 leituras/dia) das validações.
+ * É uma ESTIMATIVA do que a aplicação pediu ao Firestore — NÃO é a cobrança oficial, que só o console/faturamento do Firebase mostra.
+ *
+ * INCLUI: documentos devolvidos por cada consulta (mínimo 1 por consulta, mesmo vazia); documentos lidos por ID (`getAll`/`get`);
+ * AGREGAÇÕES `count()`/`sum()` a 1 leitura por 1 000 entradas de índice correspondidas, mínimo 1 por agregação — o custo de uma
+ * contagem CRESCE com o volume (um dia com 3 200 movimentos custa 4 leituras só na contagem de movimentos), aqui estimado pelo próprio
+ * resultado da contagem (para consultas só por intervalo de `createdAt`, entradas de índice = documentos correspondentes); a listagem
+ * de partes existentes (1 por documento); a leitura do perfil do ator na autenticação (1 por chamada); e os recebimentos da F20
+ * (estimados pelo número de recebimentos devolvidos).
+ * EXCLUI: escritas (contadas à parte, `estimatedWrites`); leituras do Auth; as demais leituras de uma requisição fora do relatório
+ * (login, perfil no navegador, outras telas); leituras que o F20 faz e descarta (recebimentos não confirmados, por exemplo — a
+ * estimativa dos recebimentos pode ficar abaixo do real); entradas de índice de consultas com mais de um filtro de igualdade
+ * (a cobrança de agregação com filtro composto pode diferir do número de documentos); novas tentativas internas do cliente; o
+ * emulador (que não cobra). Use para comparar operações e orçar a cota, nunca como fatura.
  */
 export type ReadStats = { estimatedReads: number; estimatedWrites: number; byLabel: Record<string, number> };
 

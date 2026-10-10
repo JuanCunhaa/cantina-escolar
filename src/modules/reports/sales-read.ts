@@ -79,11 +79,34 @@ export class ProductDirectory {
   }
 }
 
-export type ReadOptions = { cap: number; products: ProductDirectory; meter?: ReadMeter };
+/**
+ * Liga nome/categoria ATUAIS do cadastro aos fatos que só têm o marcador (perdas, ajustes, compras, estornos de entrada, baixas sem pedido
+ * de origem e linhas de cancelamento sem categoria da época). Roda DEPOIS de ler o cache e do mesmo jeito para o dia ao vivo, então o
+ * relatório mostra o rótulo de hoje e o cache nunca guarda dado que muda sem mudar a contagem de documentos.
+ */
+export async function bindLabels(facts: DayFacts, dir: ProductDirectory): Promise<void> {
+  const ids = new Set<string>();
+  for (const f of [...facts.losses, ...facts.adjustments, ...facts.purchases, ...facts.purchaseReversals]) ids.add(f.productId);
+  for (const f of facts.sales) if (!f.originFound) ids.add(f.productId);
+  for (const c of facts.cancellations) for (const l of c.lines) if (l.categoryId === null) ids.add(l.productId);
+  await dir.ensure(ids);
+  const bind = (f: { productId: string; productName: string; categoryId: string | null }) => {
+    const info = dir.map.get(f.productId);
+    if (info) {
+      f.productName = info.name;
+      f.categoryId = info.categoryId;
+    }
+  };
+  for (const f of [...facts.losses, ...facts.adjustments, ...facts.purchases, ...facts.purchaseReversals]) bind(f);
+  for (const f of facts.sales) if (!f.originFound) bind(f);
+  for (const c of facts.cancellations) for (const l of c.lines) if (l.categoryId === null) l.categoryId = dir.map.get(l.productId)?.categoryId ?? null;
+}
+
+export type ReadOptions = { cap: number; meter?: ReadMeter };
 
 /** Lê e tipa os fatos de `[from, to]` (datas locais, fim inclusivo). Estouro de `cap` em qualquer fonte = `truncated`. */
 export async function readFacts(db: Firestore, range: { from: LocalDate; to: LocalDate }, opts: ReadOptions): Promise<DayFacts> {
-  const { cap, products, meter } = opts;
+  const { cap, meter } = opts;
   const start = Timestamp.fromDate(localInstant(range.from, "00:00"));
   const end = Timestamp.fromDate(localInstant(addDays(range.to, 1), "00:00"));
   const group = (name: string, fields: string[]) =>
@@ -97,7 +120,7 @@ export async function readFacts(db: Firestore, range: { from: LocalDate; to: Loc
 
   const [movements, cancellations, entries, receiptDocs, resolved] = await Promise.all([
     group("movements", ["type", "quantity", "totalCostMicros", "revenueCents", "referenceType", "referenceId", "reasonCode", "createdAt"]),
-    group("cancellations", ["kind", "lines", "createdAt"]),
+    group("cancellations", ["kind", "lines", "shiftId", "channel", "createdAt"]),
     group("entries", ["type", "amountCents", "createdAt"]),
     db.collection("stockReceipts").where("createdAt", ">=", start).where("createdAt", "<", end).limit(cap + 1).get(),
     // Só as resoluções do PERÍODO (intervalo em campo único), nunca o histórico inteiro de não retirados encerrados.
@@ -121,13 +144,9 @@ export async function readFacts(db: Firestore, range: { from: LocalDate; to: Loc
   const cancelDocs = cancellations.docs.slice(0, cap).filter((d) => orderOfCancellationPath(d.ref.path) !== null);
   const receipts = receiptDocs.docs.slice(0, cap);
 
-  // Nome/categoria dos produtos citados (só os que faltam), e o pedido/venda de origem (canal, turno, snapshot da época).
-  await products.ensure([
-    ...moves.map((d) => productOfMovementPath(d.ref.path)!),
-    ...receipts.map((d) => String(d.get("productId") ?? "")),
-    ...cancelDocs.flatMap((d) => ((d.get("lines") as { productId?: unknown }[] | undefined) ?? []).map((l) => String(l.productId ?? ""))),
-  ]);
-  const productMap = products.map;
+  // Nome/categoria vindos do CADASTRO ATUAL do produto são mutáveis sem mudar a quantidade de documentos: não entram nos fatos (ficam
+  // como marcador) e são ligados na LEITURA por `bindLabels`. Só o snapshot do pedido/venda de origem (imutável) é gravado.
+  const productMap: ReadonlyMap<string, ProductInfo> = new Map();
 
   const wanted = new Map<string, DocumentReference>();
   for (const d of moves) {
