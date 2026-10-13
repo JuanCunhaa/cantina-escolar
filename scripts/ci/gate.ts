@@ -11,15 +11,23 @@ import { paginate, tokenFetcher, type Fetcher } from "./metrics/github.ts";
 
 export type Needs = Record<string, { result: string; outputs?: Record<string, string> }>;
 
+// Confiança do evento (job changes): `trusted` = push ou PR da própria origem (recebe os segredos dos scanners);
+// `external` = PR de fork ou de bot, sem segredos. Os jobs que recebem segredo (appsec, quality) só rodam em `trusted`; em
+// `external` o gate exige que tenham sido dispensados (skipped), nunca aprovados em silêncio. Push na `main` é sempre `trusted`.
 export const RULES = {
   full: {
-    success: ["changes", "fast", "backend", "build", "e2e", "security", "quality"],
+    success: ["changes", "fast", "backend", "build", "e2e", "security", "appsec", "quality"],
     skipped: [] as string[],
+    suites: ["unit", "rules", "integration-g1", "integration-g2", "e2e-g1", "e2e-g2"],
+  },
+  external: {
+    success: ["changes", "fast", "backend", "build", "e2e", "security"],
+    skipped: ["appsec", "quality"],
     suites: ["unit", "rules", "integration-g1", "integration-g2", "e2e-g1", "e2e-g2"],
   },
   docs: {
     success: ["changes", "fast", "security"],
-    skipped: ["backend", "build", "e2e", "quality"],
+    skipped: ["backend", "build", "e2e", "appsec", "quality"],
     suites: [] as string[],
   },
 } as const;
@@ -45,7 +53,12 @@ export function evaluateGate(needs: Needs, summaries: Record<string, SuiteSummar
     problems.push(`modo de execução desconhecido: "${mode}"`);
     return { ok: false, mode, problems, rows, suites: {} };
   }
-  const rule = RULES[mode];
+  const trust = needs.changes?.outputs?.trust ?? "";
+  if (trust !== "trusted" && trust !== "external") {
+    problems.push(`confiança do evento desconhecida: "${trust}"`);
+    return { ok: false, mode, problems, rows, suites: {} };
+  }
+  const rule = mode === "docs" ? RULES.docs : trust === "external" ? RULES.external : RULES.full;
   const known = new Set<string>([...RULES.full.success, ...RULES.full.skipped, ...RULES.docs.success, ...RULES.docs.skipped]);
   for (const job of Object.keys(needs)) if (!known.has(job)) problems.push(`job ${job} sem regra no gate`);
   for (const job of [...rule.success, ...rule.skipped]) {

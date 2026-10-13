@@ -28,12 +28,13 @@ const suite = (name: string, over: Partial<SuiteSummary> = {}): SuiteSummary => 
 });
 const allSuites = () => Object.fromEntries(RULES.full.suites.map((s) => [s, suite(s)]));
 const fullNeeds = (over: Partial<Needs> = {}): Needs => ({
-  changes: { result: "success", outputs: { mode: "full" } },
+  changes: { result: "success", outputs: { mode: "full", trust: "trusted" } },
   fast: { result: "success" },
   backend: { result: "success" },
   build: { result: "success" },
   e2e: { result: "success" },
   security: { result: "success" },
+  appsec: { result: "success" },
   quality: { result: "success" },
   ...over,
 });
@@ -45,7 +46,7 @@ describe("gate final (check)", () => {
 
   it.each(["failure", "cancelled", "skipped"])("job exigido em %s reprova", (result) => {
     for (const job of RULES.full.success) {
-      const r = evaluateGate(fullNeeds({ [job]: { result, outputs: job === "changes" ? { mode: "full" } : undefined } }), allSuites(), SHA);
+      const r = evaluateGate(fullNeeds({ [job]: { result, outputs: job === "changes" ? { mode: "full", trust: "trusted" } : undefined } }), allSuites(), SHA);
       expect(r.ok, job).toBe(false);
       expect(r.problems.join(" "), job).toContain(`${job}: ${result} (esperado success)`);
     }
@@ -72,12 +73,13 @@ describe("gate final (check)", () => {
 
   it("só documentação: exige skipped exatamente nos jobs da aplicação", () => {
     const docs: Needs = {
-      changes: { result: "success", outputs: { mode: "docs" } },
+      changes: { result: "success", outputs: { mode: "docs", trust: "trusted" } },
       fast: { result: "success" },
       security: { result: "success" },
       backend: { result: "skipped" },
       build: { result: "skipped" },
       e2e: { result: "skipped" },
+      appsec: { result: "skipped" },
       quality: { result: "skipped" },
     };
     expect(evaluateGate(docs, {}, SHA).ok).toBe(true);
@@ -85,9 +87,30 @@ describe("gate final (check)", () => {
     expect(evaluateGate({ ...docs, security: { result: "skipped" } }, {}, SHA).problems).toEqual(["security: skipped (esperado success)"]);
   });
 
+  const externalNeeds = (over: Partial<Needs> = {}): Needs =>
+    fullNeeds({ changes: { result: "success", outputs: { mode: "full", trust: "external" } }, appsec: { result: "skipped" }, quality: { result: "skipped" }, ...over });
+
+  it("PR externo: testes e scanners sem segredo obrigatórios; appsec e quality exigidos como skipped", () => {
+    expect(evaluateGate(externalNeeds(), allSuites(), SHA)).toMatchObject({ ok: true, problems: [] });
+    expect(evaluateGate(externalNeeds({ appsec: { result: "success" } }), allSuites(), SHA).problems).toEqual(["appsec: success (esperado skipped)"]);
+    expect(evaluateGate(externalNeeds({ quality: { result: "success" } }), allSuites(), SHA).problems).toEqual(["quality: success (esperado skipped)"]);
+    expect(evaluateGate(externalNeeds({ security: { result: "failure" } }), allSuites(), SHA).problems).toEqual(["security: failure (esperado success)"]);
+    expect(evaluateGate(externalNeeds({ e2e: { result: "skipped" } }), allSuites(), SHA).problems).toEqual(["e2e: skipped (esperado success)"]);
+    const suites = allSuites();
+    delete suites["e2e-g1"];
+    expect(evaluateGate(externalNeeds(), suites, SHA).problems).toEqual(["resumo da suíte e2e-g1 ausente"]);
+  });
+
+  it("evento confiável nunca aceita appsec ou quality dispensados; confiança ausente ou desconhecida reprova", () => {
+    expect(evaluateGate(fullNeeds({ appsec: { result: "skipped" } }), allSuites(), SHA).problems).toEqual(["appsec: skipped (esperado success)"]);
+    expect(evaluateGate(fullNeeds({ quality: { result: "skipped" } }), allSuites(), SHA).problems).toEqual(["quality: skipped (esperado success)"]);
+    expect(evaluateGate(fullNeeds({ changes: { result: "success", outputs: { mode: "full" } } }), allSuites(), SHA).problems).toEqual(['confiança do evento desconhecida: ""']);
+    expect(evaluateGate(fullNeeds({ changes: { result: "success", outputs: { mode: "full", trust: "admin" } } }), allSuites(), SHA).ok).toBe(false);
+  });
+
   it("modo desconhecido, classificação falha e job sem regra reprovam", () => {
     expect(evaluateGate(fullNeeds({ changes: { result: "success", outputs: {} } }), allSuites(), SHA).problems).toEqual(['modo de execução desconhecido: ""']);
-    expect(evaluateGate(fullNeeds({ changes: { result: "failure", outputs: { mode: "full" } } }), allSuites(), SHA).ok).toBe(false);
+    expect(evaluateGate(fullNeeds({ changes: { result: "failure", outputs: { mode: "full", trust: "trusted" } } }), allSuites(), SHA).ok).toBe(false);
     expect(evaluateGate(fullNeeds({ deploy: { result: "success" } }), allSuites(), SHA).problems).toEqual(["job deploy sem regra no gate"]);
   });
 

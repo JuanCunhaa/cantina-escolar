@@ -31,6 +31,7 @@ jobs:
       actions: read
     outputs:
       mode: ${{ steps.classify.outputs.mode }}
+      trust: ${{ steps.trust.outputs.trust }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -47,6 +48,23 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           PR_BASE: ${{ github.event.pull_request.base.sha }}
         run: node scripts/ci/reference-sha.ts
+      # Repositório público: PR de fork (e de bot, sem acesso a segredos) é `external` e nunca chega aos jobs com segredo
+      # (appsec, quality). O GitHub já não entrega segredos a esses PRs; isto torna a regra explícita e verificada pelo gate.
+      - name: Confiança do evento (segredos só para push e PR da própria origem)
+        id: trust
+        env:
+          EVENT: ${{ github.event_name }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          THIS_REPO: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          if [ "$EVENT" = push ] || { [ "$EVENT" = pull_request ] && [ "$HEAD_REPO" = "$THIS_REPO" ] && [ "$ACTOR" != "dependabot[bot]" ]; }; then
+            trust=trusted
+          else
+            trust=external
+          fi
+          echo "trust=$trust" >> "$GITHUB_OUTPUT"
+          echo "Evento $EVENT de $HEAD_REPO por $ACTOR: confiança $trust" >> "$GITHUB_STEP_SUMMARY"
       - name: Classificar mudanças (lista documental explícita)
         id: classify
         env:
@@ -366,9 +384,25 @@ jobs:
       - name: npm audit (produção, a partir do lockfile)
         if: ${{ !cancelled() && env.MODE == 'full' }}
         run: npm audit --omit=dev --audit-level=high --package-lock-only
+
+  # Veracode (SAST + SCA): único job de segurança que recebe segredos. Só roda em evento `trusted` (push e PR da própria
+  # origem); PR de fork não recebe segredos nem executa este job (o gate exige `skipped`). Não instala dependências do
+  # projeto nem executa código do PR além dos scripts versionados de leitura de relatório.
+  appsec:
+    needs: changes
+    if: needs.changes.outputs.mode == 'full' && needs.changes.outputs.trust == 'trusted'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
       # Veracode Pipeline Scan (SAST): fonte do commit enviado ao motor remoto da Veracode, sem publicação na plataforma.
       - name: Veracode Pipeline Scan (SAST)
-        if: ${{ !cancelled() && env.MODE == 'full' }}
+        if: ${{ !cancelled() }}
         env:
           VERACODE_API_ID: ${{ secrets.VERACODE_API_ID }}
           VERACODE_API_KEY: ${{ secrets.VERACODE_API_KEY }}
@@ -376,13 +410,13 @@ jobs:
         run: bash scripts/ci/veracode-sast.sh
       # Veracode SCA (agente) com --no-upload: não publica resultados; não é offline.
       - name: Veracode SCA (agente, --no-upload)
-        if: ${{ !cancelled() && env.MODE == 'full' }}
+        if: ${{ !cancelled() }}
         env:
           SRCCLR_API_TOKEN: ${{ secrets.SRCCLR_API_TOKEN }}
           VERACODE_REGION: ${{ vars.VERACODE_REGION }}
         run: bash scripts/ci/veracode-sca.sh
       - name: "Artefato: relatórios de segurança"
-        if: ${{ !cancelled() && env.MODE == 'full' }}
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: security-relatorios-${{ github.run_id }}-${{ github.run_attempt }}
@@ -399,7 +433,7 @@ jobs:
   # SonarQube Cloud deve ficar DESLIGADA para não duplicar (configuração externa).
   quality:
     needs: [changes, fast, backend]
-    if: needs.changes.outputs.mode == 'full'
+    if: needs.changes.outputs.mode == 'full' && needs.changes.outputs.trust == 'trusted'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -454,7 +488,7 @@ jobs:
         run: node scripts/ci/sonar-gate.ts .scannerwork/report-task.txt
 
   check:
-    needs: [changes, fast, backend, build, e2e, security, quality]
+    needs: [changes, fast, backend, build, e2e, security, appsec, quality]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

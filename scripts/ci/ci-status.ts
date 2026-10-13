@@ -17,7 +17,8 @@ const REPRO: Record<string, string> = {
   backend: "npm run test:rules; npm run test:integration (um grupo: $env:INTEGRATION_GROUP='g1'; npm run test:integration)",
   build: "npm run build (CI, Turbopack) — nesta máquina Windows: npm run build:webpack",
   e2e: "npm run build:webpack; $env:E2E_SERVER_MODE='start'; npm run test:e2e:group -- <g1|g2>   (sem build: modo dev, npm run test:e2e:group -- <g1|g2>)",
-  security: "npm run audit:prod (Gitleaks/Veracode só no CI; Gitleaks é bloqueado nesta máquina)",
+  security: "npm run audit:prod (Gitleaks só no CI; é bloqueado nesta máquina)",
+  appsec: "Veracode só no CI (segredos do repositório; não roda em PR de fork)",
   quality: "npm test -- --coverage (o Quality Gate só existe no SonarQube Cloud)",
   check: "node scripts/ci/ci-status.ts --run <id> (o gate só agrega os demais jobs)",
 };
