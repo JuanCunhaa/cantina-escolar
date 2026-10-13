@@ -55,7 +55,7 @@ ssh -t ADMIN@VPS 'sudo bash ~/cantina-ci-setup/runner/setup-vps.sh --swap 4G'
 `setup-vps.sh` (idempotente): pacotes do Chromium (lista que o Playwright indicou para esta VPS), `podman`, `podman-docker`,
 `passt`, `uidmap`, `zip` (o Podman fica pronto como alternativa; a VPS hoje usa o Docker instalado pelo administrador); subuid/subgid e `loginctl enable-linger` para o `ghrunner`; `srcclr` fixado; hooks em `/opt/cantina-ci/hooks`
 (root, 755); `ACTIONS_RUNNER_HOOK_JOB_STARTED/COMPLETED` e `XDG_RUNTIME_DIR` no `.env` do runner; swap opcional; reinicia o
-serviço **somente se não houver job executando**. Verificação: executar o `runner-smoke` (push na branch ou `workflow_dispatch`).
+serviço **somente se não houver job executando**. Verificação: executar o `runner-smoke` (push na `main` que altere o smoke ou `scripts/ci/runner/**`, ou `workflow_dispatch`).
 
 ## Limpeza entre jobs (hooks do runner)
 

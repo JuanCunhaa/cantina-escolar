@@ -1,11 +1,11 @@
 # Smoke do runner próprio (cantina-vps-01): checkout, versões, permissões de escrita e execução básica. NÃO roda a suíte e não
 # usa segredos. Somente leitura sobre a VPS (scripts/ci/runner/validate.sh); serve também de inventário antes da migração.
-# Dispara por push nesta branch quando o smoke ou os scripts do runner mudam, e manualmente.
+# Dispara por push na main quando o smoke ou os scripts do runner mudam, e manualmente (workflow_dispatch).
 name: runner-smoke
 
 on:
   push:
-    branches: [ci/runner-proprio]
+    branches: [main]
     paths:
       - .github/workflows/runner-smoke.yml
       - scripts/ci/runner/**
@@ -73,7 +73,7 @@ jobs:
         run: bash scripts/ci/runner/validate.sh toolchain
 
   # Ensaio do ci-metrics na máquina própria ANTES do merge: workflow_run usa a definição da branch padrão, então o ci-metrics
-  # migrado só roda de verdade depois do merge. Mesmos passos e argumentos dele, sobre o último run concluído do ci desta branch.
+  # migrado só roda de verdade depois do merge. Mesmos passos e argumentos dele, sobre o último run concluído do ci da branch em que o smoke roda.
   metrics:
     needs: smoke
     if: ${{ !cancelled() }}
@@ -99,7 +99,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          id=$(curl -fsS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=ci/runner-proprio&status=completed&per_page=1" | jq -r '.workflow_runs[0].id // empty')
+          id=$(curl -fsS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=$GITHUB_REF_NAME&status=completed&per_page=1" | jq -r '.workflow_runs[0].id // empty')
           [ -n "$id" ] || { echo "nenhum run concluído do ci nesta branch"; exit 1; }
           echo "run=$id" >> "$GITHUB_OUTPUT"
       - name: Coletar métricas do run
