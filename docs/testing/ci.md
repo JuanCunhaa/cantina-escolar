@@ -9,7 +9,8 @@ Linha de base, medições e orçamento: docs/status/ci-baseline.md.
 changes ─┬─ fast ──────────────┬─ quality ─┐
          ├─ backend (g1), (g2) ┘           │
          ├─ build ── e2e (g1), e2e (g2) ───┼─ check  (if: always())
-         ├─ security ──────────────────────┘
+         ├─ security ──────────────────────┤
+         ├─ appsec (só `trusted`) ─────────┘
 ```
 
 | Job | Faz | Por que separado |
@@ -19,8 +20,9 @@ changes ─┬─ fast ──────────────┬─ quality 
 | `backend (g1/g2)` | integração em 2 grupos, cada um com emulador próprio; Rules só no grupo indicado na partição; cobertura por grupo | caminho crítico (integração ~7 min num job só, run 37639559121) |
 | `build` | `npm run build` (Turbopack, como a Vercel) com ambiente hermético, Gitleaks no `.next`, pacote + manifesto | um build por run/tentativa, compartilhado |
 | `e2e (g1/g2)` | cada grupo com emuladores, servidor, dados e armazenamento próprios; usa o build compartilhado | divide a etapa mais longa |
-| `security` | Gitleaks, `npm audit` (produção), Veracode Pipeline Scan (SAST) e SCA | independente do código compilado |
-| `quality` | LCOV unit+integração mesclado → SonarQube Cloud → Quality Gate efetivo sem condições de segurança | depende das coberturas |
+| `security` | Gitleaks (histórico e diretório) e `npm audit` (produção); **sem segredos**, roda em todo evento | independente do código compilado |
+| `appsec` | Veracode Pipeline Scan (SAST) e SCA; **único job de segurança com segredos**; só em evento `trusted` | isola os segredos dos scanners |
+| `quality` | LCOV unit+integração mesclado → SonarQube Cloud → Quality Gate efetivo sem condições de segurança; recebe `SONAR_TOKEN`; só em evento `trusted` | depende das coberturas |
 | `check` | gate final (nome preservado) | sempre roda e decide |
 
 `needs` só onde há dependência real. Integração, Rules e scanners usam o fonte/manifestos, nunca o bundle do Next.
@@ -82,9 +84,20 @@ suíte e o grupo com `vitest list` (sem emulador) e o gate exige executados = li
 novo sem grupo reprova (`node scripts/ci/integration-groups.ts verify`, no `fast` e no `ci:precheck`). O `quality` mescla
 unit + integração g1 + g2 (tentativa mais recente de cada grupo). Testes não foram alterados.
 
+## Repositório público: eventos `trusted` × `external`
+
+O job `changes` classifica o evento (`trust`): `trusted` = `push` (inclui a `main`) e PR cujo `head.repo` é este repositório (não-Dependabot); `external` = PR de fork ou de bot. Usa só `pull_request` (nunca `pull_request_target`), então PR de fork roda o código do fork **sem segredos** e com `GITHUB_TOKEN` somente leitura; o GitHub já não entrega segredos a esses PRs e a classificação torna isso explícito. Cada segredo fica só em job isolado que não instala nem executa dependências do projeto: `appsec` (Veracode) e `quality` (Sonar).
+
+| Evento | Roda | Não roda |
+|---|---|---|
+| `trusted` (main, PR interno) | tudo: fast, backend, build, e2e, security, appsec, quality | — |
+| `external` (fork, bot) | changes, fast, backend, build, e2e, security (Gitleaks, `npm audit`) | appsec, quality (exigidos como `skipped` pelo gate) |
+
+O `check` de um PR externo prova os testes e o Gitleaks, **não** o Veracode nem o Sonar; esses rodam no `push` da `main` depois do merge (e em PR interno, se o mantenedor reabrir a mudança numa branch do repositório). `ci-metrics` (`workflow_run`) executa a definição da branch padrão, só lê metadados com `GITHUB_TOKEN` somente leitura e não baixa nem executa artefato ou código do PR. Configuração obrigatória no repositório público: *Actions → General → Fork pull request workflows → Require approval for all external contributors*; `GITHUB_TOKEN` padrão somente leitura. Nenhum workflow usa `pull_request_target`; não introduzir. Segredos de Vercel, Firebase, R2 e Mercado Pago não existem no GitHub (homologação/sandbox ficam na Vercel e no `.env.staging.local`).
+
 ## Gate `check`
 
-`scripts/ci/gate.ts`: para o modo, cada job exigido = `success`, cada dispensado = `skipped`; falha, cancelamento ou skip
+`scripts/ci/gate.ts`: para o modo e a confiança do evento (`trust` ausente ou desconhecida reprova), cada job exigido = `success`, cada dispensado = `skipped`; falha, cancelamento ou skip
 indevido reprovam; job sem regra reprova; cada suíte (unit, rules, integration-g1, integration-g2, e2e-g1, e2e-g2) precisa de resumo `ok` do
 commit testado (ausente, ilegível, skip, contagem divergente reprovam). Em reexecução vale o resumo mais recente de cada
 suíte: grupos já aprovados no mesmo commit continuam válidos; commit novo exige tudo de novo. Credencial ausente nos
@@ -101,7 +114,7 @@ proteção de branch (docs/status/ci-baseline.md); exigir o `check` depende de c
   `next.config.ts`; sem `.next`, `node_modules`, `.env`, testes) **enviado ao motor remoto da Veracode** para análise; o
   resultado volta ao job e não é publicado na plataforma (sem Upload and Scan, sem importação). Imagem oficial
   `veracode/pipeline-scan:cmd-26.9.0` fixada por digest. Bloqueia: Very High/High; `scan_status` ≠ SUCCESS; relatório ausente.
-- **Veracode SCA (agente `srcclr` 3.8.121, `--no-upload`)**: não publica resultados, mas **não é offline** (consulta a base
+- **Veracode SCA (agente `srcclr` 3.8.122, `--no-upload`)**: não publica resultados, mas **não é offline** (consulta a base
   da Veracode). Instalação com cadeia de integridade (impressão digital da chave, assinatura do índice, SHA-256 do pacote).
   Bloqueia: CVSS ≥ 7 em pacote da árvore de produção (`npm ls --omit=dev`); lista os de desenvolvimento sem bloquear;
   nenhuma biblioteca identificada ou estrutura desconhecida reprova.
