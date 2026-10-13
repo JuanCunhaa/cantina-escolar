@@ -3,8 +3,8 @@
 # chave GPG do repositório (impressão digital fixada) -> assinatura do Release -> SHA-256 do Packages -> SHA-256 do .deb (fixado).
 # Uso: bash scripts/ci/tools/install-srcclr.sh
 set -euo pipefail
-SRCCLR_VERSION=3.8.121
-SRCCLR_DEB_SHA256=602f27292a69c2c8b130795da0288626bb1b8ccfc1302dae9405f791d36eed6b
+SRCCLR_VERSION=3.8.122
+SRCCLR_DEB_SHA256=f247082f32390dd57c6f8d80d94d6c1102fa1cfb54432360581ecb128e98ab89
 KEY_FINGERPRINT=2B93609DA5A49D7F2082246FDF7DD7A50B746DD4
 REPO=https://download.sourceclear.com/ubuntu/stable
 tmp="$(mktemp -d)"
